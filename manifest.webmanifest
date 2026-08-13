@@ -1,0 +1,9 @@
+{
+  "name":"Mentoria Black",
+  "short_name":"Mentoria Black",
+  "start_url":"./",
+  "display":"standalone",
+  "background_color":"#070707",
+  "theme_color":"#C9A227",
+  "lang":"pt-BR"
+}
