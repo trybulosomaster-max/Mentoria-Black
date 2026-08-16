@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#070707">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Mentoria Black">
+<title>Mentoria Black — Gestão Financeira V80 ESCUDO FINAL</title>
+<link rel="manifest" href="manifest.webmanifest">
+<style>
+html,body{margin:0;background:#050505;color:#eee;font-family:system-ui,-apple-system,sans-serif}
+#v70Boot{min-height:100vh;display:grid;place-items:center;text-align:center;color:#aaa}
+#v70Boot b{display:block;color:#d9ad37;margin-bottom:8px}
+#v70Error{max-width:760px;padding:24px;line-height:1.5}
+</style>
+</head>
+<body>
+<div id="v70Boot"><div><b>MENTORIA BLACK — V80 ESCUDO FINAL</b>Carregando a base consolidada e o núcleo financeiro V80…</div></div>
+
+<script>
+(async()=>{
+'use strict';
+
+const BASE_URL='https://raw.githubusercontent.com/trybulosomaster-max/Mentoria-Black/main/index.html';
+
+function fail(err){
+  console.error('[V80]',err);
+  document.getElementById('v70Boot').innerHTML =
+    '<div id="v70Error"><b>Mentoria Black — V80</b><br>Não foi possível carregar a base consolidada.<br><br>'+
+    String(err?.message||err)+'</div>';
+}
+
+try{
+  const response=await fetch(BASE_URL,{cache:'no-store'});
+  if(!response.ok) throw new Error('Falha ao carregar a base consolidada.');
+  let html=await response.text();
+
+  /*
+   * V80 ESCUDO:
+   * A base é carregada uma única vez. Antes de executar:
+   * 1) removemos o bloco antigo da evolução anual que dependia de wrappers;
+   * 2) mantemos a base funcional consolidada;
+   * 3) instalamos uma única implementação canônica da evolução.
+   */
+  html=html.replace(/<title>[^<]*<\/title>/i,
+    '<title>Mentoria Black — Gestão Financeira V80 ESCUDO FINAL</title>');
+
+  /*
+   * V80 ROOT-CAUSE FIX: DATA/FILTERS are declared with `let` in the base
+   * document, so they are NOT properties of window. The V70/V79 wrapper was
+   * reading window.DATA/window.FILTERS and therefore always saw an empty data
+   * set, producing R$ 0,00 in Evolução das receitas. Expose read-only bridges
+   * from inside the base lexical scope before the V80 module executes.
+   */
+  html=html.replace(/let DATA=([^;]+);\s*let FILTERS=([^;]+);/,
+    'let DATA=$1; let FILTERS=$2; window.__MB_GET_DATA__=()=>DATA; window.__MB_GET_FILTERS__=()=>FILTERS;');
+
+  const v70Module=`
+<script>
+/* =========================================================
+   MENTORIA BLACK — V80 ESCUDO FINAL
+   NÚCLEO CANÔNICO DE EVOLUÇÃO DAS RECEITAS
+   ========================================================= */
+(function(){
+  'use strict';
+  if(window.__MB_V80_REVENUE__) return;
+  window.__MB_V80_REVENUE__=true;
+
+  const num=v=>Number.isFinite(Number(v))?Number(v):0;
+
+  function v70Date(t){
+    const raw=t?.transaction_date ?? t?.date ?? t?.created_at ?? t?.billing_date ?? '';
+    if(!raw) return null;
+
+    const s=String(raw).trim();
+
+    /* ISO: YYYY-MM-DD... */
+    let m=s.match(/^(\\d{4})-(\\d{2})-(\\d{2})/);
+    if(m) return {year:+m[1],month:+m[2],day:+m[3]};
+
+    /* BR: DD/MM/YYYY */
+    m=s.match(/^(\\d{2})\\/(\\d{2})\\/(\\d{4})/);
+    if(m) return {year:+m[3],month:+m[2],day:+m[1]};
+
+    const d=new Date(s);
+    if(Number.isNaN(d.getTime())) return null;
+    return {year:d.getFullYear(),month:d.getMonth()+1,day:d.getDate()};
+  }
+
+  function v70Type(t){
+    return String(t?.transaction_type ?? t?.type ?? '').trim().toLowerCase();
+  }
+
+  function v70Status(t){
+    return String(t?.status ?? '').trim().toLowerCase();
+  }
+
+  window.revenueYear=function(year){
+    const vals=Array(12).fill(0);
+    const source=typeof window.__MB_GET_DATA__==='function' ? window.__MB_GET_DATA__() : null;
+    const rows=Array.isArray(source?.transactions) ? source.transactions : [];
+
+    for(const t of rows){
+      if(v70Type(t)!=='receita') continue;
+      if(v70Status(t)==='cancelado') continue;
+
+      const d=v70Date(t);
+      if(!d || d.year!==Number(year) || d.month<1 || d.month>12) continue;
+
+      const amount=num(t?.amount);
+      if(amount>0) vals[d.month-1]+=amount;
+    }
+    return vals;
+  };
+
+  window.drawRevenue=function(id,year){
+    const el=document.getElementById(id);
+    if(!el || typeof Chart==='undefined') return;
+
+    if(window.CHARTS && window.CHARTS[id]){
+      try{window.CHARTS[id].destroy()}catch(_){}
+    }
+
+    const vals=window.revenueYear(year);
+    const labels=(window.MONTHS||[
+      'Janeiro','Fevereiro','Março','Abril','Maio','Junho',
+      'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'
+    ]).map(x=>String(x).slice(0,3));
+
+    window.CHARTS=window.CHARTS||{};
+    window.CHARTS[id]=new Chart(el,{
+      type:'line',
+      data:{
+        labels,
+        datasets:[{
+          label:'Receitas',
+          data:vals,
+          borderColor:'#7bc67b',
+          backgroundColor:'rgba(123,198,123,.12)',
+          fill:true,
+          tension:.3,
+          pointRadius:4,
+          pointHoverRadius:6
+        }]
+      },
+      options:{
+        responsive:true,
+        maintainAspectRatio:false,
+        interaction:{mode:'index',intersect:false},
+        plugins:{
+          legend:{display:false},
+          tooltip:{callbacks:{
+            label:c=>'Receitas: '+(typeof money==='function'?money(c.raw):c.raw)
+          }}
+        },
+        scales:{
+          x:{ticks:{color:'#aaa'},grid:{color:'#222'}},
+          y:{
+            beginAtZero:true,
+            ticks:{color:'#888',callback:v=>typeof money==='function'?money(v):v},
+            grid:{color:'#222'}
+          }
+        }
+      }
+    });
+  };
+
+  /* O gráfico entra somente no pipeline final do Dashboard. */
+  const originalDashboard=window.dashboard;
+  if(typeof originalDashboard==='function' && !originalDashboard.__mbV80){
+    const wrapped=function(){
+      let html=originalDashboard();
+
+      /* Remove qualquer card de evolução previamente inserido. */
+      html=html.replace(
+        /<section[^>]*class=["'][^"']*card[^"']*["'][^>]*>\\s*<div[^>]*>\\s*<h2>Evolução das receitas<\\/h2>[\\s\\S]*?<\\/section>/gi,
+        ''
+      );
+
+      const total=window.revenueYear((typeof window.__MB_GET_FILTERS__==='function' ? window.__MB_GET_FILTERS__()?.year : null)||new Date().getFullYear())
+        .reduce((a,b)=>a+b,0);
+
+      const fmt=typeof money==='function'?money:(
+        v=>Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})
+      );
+
+      const card=
+        '<section class="card s12 v70-revenue-card">'+
+        '<div class="row" style="justify-content:space-between">'+
+        '<div><h2>Evolução das receitas</h2>'+
+        '<div class="desc">Total recebido em cada mês de '+String((typeof window.__MB_GET_FILTERS__==='function' ? window.__MB_GET_FILTERS__()?.year : null)||new Date().getFullYear())+
+        '. Somente lançamentos do tipo Receita.</div></div>'+
+        '<strong class="positive">'+fmt(total)+'</strong></div>'+
+        '<div class="chartbox"><canvas id="v70RevenueYear"></canvas></div></section>';
+
+      const anchor='<section class="card s6"><h2>Cartões de crédito</h2>';
+      if(html.includes(anchor)) html=html.replace(anchor,card+anchor);
+      else html=html.replace('<div class="grid">','<div class="grid">'+card);
+
+      return html;
+    };
+    wrapped.__mbV80=true;
+    window.dashboard=wrapped;
+  }
+
+  const originalRender=window.render;
+  if(typeof originalRender==='function' && !originalRender.__mbV80){
+    const wrappedRender=function(){
+      const result=originalRender.apply(this,arguments);
+      requestAnimationFrame(()=>{
+        try{
+          if(window.TAB==='dashboard'){
+            const year=Number((typeof window.__MB_GET_FILTERS__==='function' ? window.__MB_GET_FILTERS__()?.year : null)||new Date().getFullYear());
+            window.drawRevenue('v70RevenueYear',year);
+          }
+        }catch(e){console.error('[V80 revenue render]',e)}
+      });
+      return result;
+    };
+    wrappedRender.__mbV80=true;
+    window.render=wrappedRender;
+  }
+
+  document.title='Mentoria Black — Gestão Financeira V80 ESCUDO FINAL';
+  document.addEventListener('DOMContentLoaded',()=>{
+    const f=document.querySelector('.footer');
+    if(f)f.textContent='Mentoria Black — Gestão Financeira V80 ESCUDO FINAL';
+  });
+})();
+<\/script>`;
+
+  html=html.replace(/<\/body>/i,v70Module+'\\n</body>');
+
+  /* Remove splash de bootstrap da base only if it exists after our loader. */
+  document.open();
+  document.write(html);
+  document.close();
+}catch(err){fail(err)}
+})();
+</script>
+</body>
+</html>
