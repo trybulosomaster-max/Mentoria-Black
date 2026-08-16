@@ -1,0 +1,527 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#070707">
+<title>Mentoria Black — Gestão Financeira V60</title>
+<style>html,body{margin:0;background:#050505;color:#eee;font-family:system-ui,-apple-system,sans-serif}#v60Boot{min-height:100vh;display:grid;place-items:center;text-align:center;color:#aaa}#v60Boot b{color:#d9ad37;display:block;margin-bottom:8px}</style>
+</head>
+<body>
+<div id="v60Boot"><div><b>MENTORIA BLACK — V60</b>Carregando a base V59 e as melhorias V60…</div></div>
+<script>
+(async()=>{
+ const base='https://raw.githubusercontent.com/trybulosomaster-max/Mentoria-Black/9841e59c244fe941f8fd8fd20c7b82c4277f97c7/index.html';
+ try{
+   const r=await fetch(base,{cache:'no-store'});
+   if(!r.ok)throw new Error('Não foi possível carregar a base V59.');
+   let html=await r.text();
+   html=html.replace(/<script\\s+src=["']\\.\\/v60\\.js[^>]*><\\/script>/gi,'');
+   html=html.replace(/<\\/body>/i,'<script>
+/* =========================================================
+   MENTORIA BLACK — V60
+   Camada funcional sobre a V59.
+   Preserva os módulos existentes e adiciona:
+   - Saúde Financeira: Mês, Ano, Mês×Mês, Ano×Ano, Histórico/Geral
+   - Evolução financeira, alertas, prioridades e conquistas
+   - Taxa de Construção Financeira
+   - Reserva de Emergência: mesma lógica de períodos + evolução
+   - Relatórios com a mesma metodologia e motor único de impressão
+   - Dashboard somente com acesso rápido à Saúde Financeira
+   - Reserva não duplicada em Patrimônio
+   - Nenhuma migração/schema do Supabase
+========================================================= */
+(function(){
+'use strict';
+if(window.__MB_V60__) return;
+window.__MB_V60__ = true;
+
+const N = x => Number.isFinite(Number(x)) ? Number(x) : 0;
+const money60 = x => typeof money === 'function' ? money(x) :
+  `R$ ${N(x).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+const pct60 = x => `${N(x).toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1})}%`;
+const esc60 = x => typeof esc === 'function' ? esc(x) :
+  String(x??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+const clamp60 = (x,a=0,b=100)=>Math.min(b,Math.max(a,N(x)));
+const key60 = (y,m)=>`${y}-${String(m).padStart(2,'0')}`;
+const monthName60 = m => (MONTHS && MONTHS[m-1]) || '';
+const txDate60 = t => String(t.transaction_date || t.date || '').slice(0,10);
+const txType60 = t => String(t.transaction_type || t.type || '').toLowerCase();
+const activeTx60 = () => (DATA.transactions||[]).filter(t=>t.status!=='cancelado' && txDate60(t));
+const ledgerKey60 = () => `mb_v56_reserve_ledger_${USER?.id||'local'}`;
+
+function ledger60(){
+  try{
+    const x=JSON.parse(localStorage.getItem(ledgerKey60())||'[]');
+    return Array.isArray(x)?x:[];
+  }catch{return []}
+}
+function reserveEntries60(){
+  return ledger60().map(x=>({
+    date:String(x.date||'').slice(0,10),
+    amount:N(x.amount),
+    type:String(x.type||'aporte').toLowerCase(),
+    description:String(x.description||'')
+  })).filter(x=>x.date);
+}
+function reserveCurrent60(){
+  return reserveEntries60().reduce((s,x)=>s+(x.type==='retirada'?-x.amount:x.amount),0);
+}
+function fixedExpenseRows60(){
+  return activeTx60().filter(t=>{
+    const cat=typeof topCategory==='function'?topCategory(t.category):t.category;
+    return String(cat).toLowerCase()==='gastos fixos' &&
+      ['despesa','expense','investimento','investment'].includes(txType60(t));
+  });
+}
+function fixedExpenseAmount60(rows){return rows.reduce((s,t)=>s+N(t.amount),0)}
+
+function periodBounds60(mode,y,m){
+  if(mode==='month'){
+    const a=key60(y,m);
+    return {start:`${a}-01`,end:new Date(y,m,0).toISOString().slice(0,10)};
+  }
+  if(mode==='year'){
+    return {start:`${y}-01-01`,end:`${y}-12-31`};
+  }
+  if(mode==='month-compare'){
+    const p=new Date(y,m-2,1);
+    return {start:`${p.getFullYear()}-${String(p.getMonth()+1).padStart(2,'0')}-01`,
+      end:new Date(y,m,0).toISOString().slice(0,10)};
+  }
+  if(mode==='year-compare'){
+    return {start:`${y-1}-01-01`,end:`${y}-12-31`};
+  }
+  return {start:'0000-01-01',end:'9999-12-31'};
+}
+function rowsBetween60(start,end){
+  return activeTx60().filter(t=>txDate60(t)>=start && txDate60(t)<=end);
+}
+function summarize60(rows){
+  let income=0,expense=0,investment=0,resgate=0;
+  rows.forEach(t=>{
+    const ty=txType60(t),v=Math.abs(N(t.amount));
+    if(['receita','income'].includes(ty)) income+=v;
+    else if(['resgate','redemption'].includes(ty)) resgate+=v;
+    else if(['investimento','investment'].includes(ty)) investment+=v;
+    else if(['despesa','expense'].includes(ty)) expense+=v;
+  });
+  const out=expense+investment;
+  return {income,expense,investment,resgate,out,balance:income+resgate-out};
+}
+function planFor60(y,m){
+  try{
+    const old=monthlyPlan();
+    if(Number(FILTERS.year)===y && Number(FILTERS.month)===m) return old||{};
+  }catch{}
+  const arr=(DATA.monthly||[]).filter(x=>Number(x.year)===y && Number(x.month)===m);
+  return arr[0]||{};
+}
+function periodData60(mode){
+  const y=N(FILTERS.year)||new Date().getFullYear(),m=N(FILTERS.month)||new Date().getMonth()+1;
+  if(mode==='month') return {mode,y,m,label:`${monthName60(m)} de ${y}`,rows:rowsBetween60(...Object.values(periodBounds60(mode,y,m)))};
+  if(mode==='year') return {mode,y,m,label:`Ano de ${y}`,rows:rowsBetween60(...Object.values(periodBounds60(mode,y,m)))};
+  if(mode==='month-compare'){
+    const prev=new Date(y,m-2,1), cur={y,m}, py=prev.getFullYear(),pm=prev.getMonth()+1;
+    return {mode,y,m,label:`${monthName60(m)}/${y} × ${monthName60(pm)}/${py}`,
+      current:rowsBetween60(...Object.values(periodBounds60('month',y,m))),
+      previous:rowsBetween60(...Object.values(periodBounds60('month',py,pm)))};
+  }
+  if(mode==='year-compare'){
+    return {mode,y,m,label:`${y} × ${y-1}`,
+      current:rowsBetween60(`${y}-01-01`,`${y}-12-31`),
+      previous:rowsBetween60(`${y-1}-01-01`,`${y-1}-12-31`)};
+  }
+  return {mode:'history',y,m,label:'Histórico / Geral',rows:rowsBetween60('0000-01-01','9999-12-31')};
+}
+
+function reserveFixedBase60(y,m){
+  // Mesma regra da V58/V59: média dos seis meses completos anteriores.
+  const vals=[];
+  for(let i=1;i<=6;i++){
+    const d=new Date(y,m-1-i,1), yy=d.getFullYear(), mm=d.getMonth()+1;
+    const rows=rowsBetween60(`${yy}-${String(mm).padStart(2,'0')}-01`,new Date(yy,mm,0).toISOString().slice(0,10));
+    vals.push(fixedExpenseAmount60(rows));
+  }
+  const known=vals.filter(v=>v>0);
+  return {avg:known.length?known.reduce((a,b)=>a+b,0)/known.length:0,known:known.length,values:vals};
+}
+function reserveMetrics60(mode){
+  const y=N(FILTERS.year)||new Date().getFullYear(),m=N(FILTERS.month)||new Date().getMonth()+1;
+  const s=(()=>{try{return JSON.parse(localStorage.getItem(`mb_v50_reserve_${USER?.id||'local'}`)||'{}')}catch{return {}}})();
+  const targetMode=s.targetMode==='custom'?'custom':'fixed';
+  const custom=N(s.customTarget);
+  const months=Math.max(.5,N(s.months||6));
+  const base=reserveFixedBase60(y,m);
+  const target=targetMode==='custom'?custom:base.avg*months;
+  const cur=reserveCurrent60();
+  const coverage=base.avg>0?cur/base.avg:0;
+  const progress=target>0?clamp60(cur/target*100):0;
+  const entries=reserveEntries60();
+  const inPeriod=mode==='history'?entries:
+    entries.filter(e=>e.date>=periodBounds60('month',y,m).start && e.date<=periodBounds60('month',y,m).end);
+  const aportes=inPeriod.filter(e=>e.type!=='retirada').reduce((a,e)=>a+e.amount,0);
+  const retiradas=inPeriod.filter(e=>e.type==='retirada').reduce((a,e)=>a+e.amount,0);
+  return {targetMode,custom,months,base,target,cur,coverage,progress,aportes,retiradas,net:aportes-retiradas,
+    entries,inPeriod,deadline:String(s.deadline||'')};
+}
+
+function construction60(rows){
+  const s=summarize60(rows);
+  const reserve=reserveEntries60().filter(e=>{
+    if(!rows.length)return false;
+    const min=rows.map(txDate60).sort()[0], max=rows.map(txDate60).sort().slice(-1)[0];
+    return e.date>=min && e.date<=max;
+  });
+  const reserveNet=reserve.reduce((a,e)=>a+(e.type==='retirada'?-e.amount:e.amount),0);
+  const directed=s.investment+Math.max(0,reserveNet);
+  const rate=s.income>0?directed/s.income*100:0;
+  let label=rate<5?'Baixa':rate<15?'Em formação':rate<25?'Boa':'Forte';
+  return {rate,directed,income:s.income,invest:s.investment,reserve:reserveNet,label};
+}
+
+function score60(rows){
+  const s=summarize60(rows);
+  const fixed=fixedExpenseAmount60(rows);
+  const income=s.income;
+  const budget=income>0?clamp60((1-Math.max(0,s.expense-income*.42)/Math.max(1,income*.42))*100):(s.balance>=0?70:35);
+  const invest=income>0?clamp60(s.investment/income*100):(s.investment>0?70:35);
+  const reserve=reserveMetrics60('month');
+  const reserveScore=reserve.target>0?clamp60(reserve.cur/reserve.target*100):0;
+  const commitment=income>0?clamp60((1-Math.max(0,fixed-income*.45)/Math.max(1,income*.45))*100):65;
+  const goals=(DATA.goals||[]).filter(g=>!(/reserva|emerg[eê]ncia|caixinha/i.test(String(g.name||''))));
+  const goal=goals.length?clamp60(goals.reduce((a,g)=>a+(N(g.target)>0?clamp60(N(g.current)/N(g.target)*100):100),0)/goals.length):70;
+  // Nota calculada a partir dos indicadores brutos; não é média simples de notas.
+  const raw=.28*budget+.22*invest+.20*reserveScore+.15*commitment+.15*goal;
+  const rate=construction60(rows);
+  const label=raw<40?'Crítica':raw<60?'Atenção':raw<75?'Regular':raw<90?'Boa':'Excelente';
+  return {score:Math.round(clamp60(raw)),label,budget,invest,reserveScore,commitment,goal,construction:rate,s};
+}
+
+function delta60(a,b){
+  if(!b)return {value:a,pct:null};
+  return {value:a-b,pct:(a-b)/Math.abs(b)*100};
+}
+function evolution60(mode){
+  const y=N(FILTERS.year),m=N(FILTERS.month);
+  const labels=[],income=[],out=[],construction=[];
+  if(mode==='year' || mode==='history'){
+    const start=mode==='history'?Math.max(2000,y-5):y;
+    const end=mode==='history'?y:y;
+    for(let yy=start;yy<=end;yy++){
+      const rows=rowsBetween60(`${yy}-01-01`,`${yy}-12-31`), s=summarize60(rows);
+      labels.push(String(yy));income.push(s.income);out.push(s.out);construction.push(construction60(rows).rate);
+    }
+  }else{
+    for(let i=11;i>=0;i--){
+      const d=new Date(y,m-1-i,1),yy=d.getFullYear(),mm=d.getMonth()+1;
+      const rows=rowsBetween60(`${yy}-${String(mm).padStart(2,'0')}-01`,new Date(yy,mm,0).toISOString().slice(0,10));
+      const s=summarize60(rows);
+      labels.push(`${String(mm).padStart(2,'0')}/${yy}`);income.push(s.income);out.push(s.out);construction.push(construction60(rows).rate);
+    }
+  }
+  return {labels,income,out,construction};
+}
+
+function alerts60(rows,h){
+  const a=[];
+  const s=h.s;
+  if(s.income===0) a.push(['Atenção','Não há receitas no período selecionado.']);
+  if(s.expense>s.income && s.income>0) a.push(['Atenção','As despesas superaram as receitas do período.']);
+  if(h.invest<10) a.push(['Construção','A taxa de investimento ainda está abaixo de 10% da receita.']);
+  if(h.construction.rate<10) a.push(['Construção','A taxa de construção financeira está baixa neste período.']);
+  if(h.reserveScore<50) a.push(['Proteção','A reserva ainda está abaixo de metade da meta definida.']);
+  if(h.commitment<60) a.push(['Estrutura','Os Gastos Fixos estão pressionando a margem financeira.']);
+  if(!a.length) a.push(['Positivo','Não foram identificados alertas críticos neste período.']);
+  return a;
+}
+function priorities60(h){
+  const list=[];
+  if(h.reserveScore<75)list.push(['1','Fortalecer a Reserva de Emergência','Aumentar o colchão financeiro até a meta definida.']);
+  if(h.construction.rate<20)list.push([String(list.length+1),'Aumentar a construção financeira','Elevar investimentos e aportes direcionados sem contar despesas de consumo.']);
+  if(h.commitment<75)list.push([String(list.length+1),'Reduzir pressão dos Gastos Fixos','Preservar margem para investimentos e metas.']);
+  if(h.goal<75)list.push([String(list.length+1),'Acelerar metas','Direcionar recursos para as metas que ainda estão abaixo do objetivo.']);
+  if(!list.length)list.push(['1','Manter consistência','Sua estrutura está saudável; o foco passa a ser preservar o ritmo.']);
+  return list.slice(0,4);
+}
+function achievements60(h){
+  const x=[];
+  if(h.invest>=15)x.push('Investidor consistente');
+  if(h.construction.rate>=20)x.push('Construtor financeiro');
+  if(h.reserveScore>=100)x.push('Reserva protegida');
+  if(h.goal>=90)x.push('Metas em dia');
+  if(h.s.balance>=0)x.push('Mês no azul');
+  return x.length?x:['Primeiro marco','Continue construindo sua base financeira.'];
+}
+
+function modeSelect60(id,current){
+  return `<select id="${id}">
+    <option value="month" ${current==='month'?'selected':''}>Mês</option>
+    <option value="year" ${current==='year'?'selected':''}>Ano</option>
+    <option value="month-compare" ${current==='month-compare'?'selected':''}>Mês × Mês</option>
+    <option value="year-compare" ${current==='year-compare'?'selected':''}>Ano × Ano</option>
+    <option value="history" ${current==='history'?'selected':''}>Histórico / Geral</option>
+  </select>`;
+}
+function periodControls60(mode,prefix){
+  return `<div class="filters v60-filters">
+    <div class="filter"><label>Ano</label><select id="${prefix}Year">${yearOptions(FILTERS.year)}</select></div>
+    <div class="filter"><label>Mês</label><select id="${prefix}Month">${monthOptions(FILTERS.month)}</select></div>
+    <div class="filter"><label>Visão</label>${modeSelect60(prefix+'Mode',mode)}</div>
+  </div>`;
+}
+function bindPeriod60(prefix,rerender){
+  const y=$(prefix+'Year'),m=$(prefix+'Month'),mode=$(prefix+'Mode');
+  if(y)y.onchange=()=>{FILTERS.year=N(y.value);rerender()};
+  if(m)m.onchange=()=>{FILTERS.month=N(m.value);rerender()};
+  if(mode)mode.onchange=()=>{rerender(mode.value)};
+}
+
+function healthPage60(mode='month'){
+  const d=periodData60(mode);
+  let rows=d.rows||d.current||[];
+  const h=score60(rows);
+  const current=d.current?score60(d.current):null, previous=d.previous?score60(d.previous):null;
+  const comp=current&&previous?delta60(current.score,previous.score):null;
+  const evo=evolution60(mode);
+  const alerts=alerts60(rows,h), priorities=priorities60(h), achievements=achievements60(h);
+  return `<div class="v60-page">
+    ${pageHead('Saúde Financeira','Visão integrada de desempenho, proteção e construção financeira.')}
+    ${periodControls60(mode,'v60Health')}
+    <div class="kpis">
+      ${kpi('Saúde financeira',`${h.score}/100`,h.label)}
+      ${kpi('Orçamento',`${Math.round(h.budget)}/100`,'controle financeiro')}
+      ${kpi('Investimentos',`${Math.round(h.invest)}/100`,'percentual da receita')}
+      ${kpi('Reserva',`${Math.round(h.reserveScore)}/100`,'progresso da meta')}
+      ${kpi('Construção',pct60(h.construction.rate),h.construction.label)}
+      ${kpi('Metas',`${Math.round(h.goal)}/100`,'evolução das metas')}
+    </div>
+    ${comp?`<section class="card"><h2>Comparação do período</h2><div class="desc">A nota é recalculada para cada período; não é uma média simples de notas.</div><div class="statline"><span>Variação da saúde financeira</span><strong class="${comp.value>=0?'positive':'negative'}">${comp.value>=0?'+':''}${comp.value.toFixed(0)} pontos ${comp.pct==null?'':`(${comp.pct>=0?'+':''}${comp.pct.toFixed(1)}%)`}</strong></div></section>`:''}
+    <div class="grid">
+      <section class="card s8">
+        <h2>Evolução financeira</h2><div class="desc">Receitas, saídas e taxa de construção financeira.</div>
+        <div class="chartbox"><canvas id="v60HealthChart"></canvas></div>
+      </section>
+      <section class="card s4">
+        <h2>Leitura financeira</h2>
+        <div class="notice" style="margin-top:10px;line-height:1.7">
+          ${esc60(h.label)}: ${h.score}/100. Receita ${money60(h.s.income)}, saídas ${money60(h.s.out)} e construção financeira de ${pct60(h.construction.rate)}.
+        </div>
+        <h3 style="margin:18px 0 8px">Prioridade</h3>
+        ${priorities.slice(0,2).map(x=>`<div class="statline"><span>${x[0]}. ${esc60(x[1])}</span><strong>→</strong></div>`).join('')}
+      </section>
+      <section class="card s6">
+        <h2>Alertas financeiros</h2>${alerts.map(x=>`<div class="statline"><span><b>${esc60(x[0])}</b><br><span class="small muted">${esc60(x[1])}</span></span></div>`).join('')}
+      </section>
+      <section class="card s6">
+        <h2>Prioridade financeira</h2>${priorities.map(x=>`<div class="statline"><span><b>${x[0]}.</b> ${esc60(x[1])}<br><span class="small muted">${esc60(x[2])}</span></span></div>`).join('')}
+      </section>
+      <section class="card s6">
+        <h2>Conquistas financeiras</h2><div class="row" style="margin-top:10px">${achievements.map(x=>`<span class="tag ok">${esc60(x)}</span>`).join('')}</div>
+      </section>
+      <section class="card s6">
+        <h2>Taxa de Construção Financeira</h2>
+        <div class="desc">Recursos direcionados à construção patrimonial ÷ receita. Não inclui despesas comuns nem metas de consumo.</div>
+        <div style="font-size:38px;font-weight:900;margin:10px 0">${pct60(h.construction.rate)}</div>
+        <div class="statline"><span>Valor direcionado</span><strong>${money60(h.construction.directed)}</strong></div>
+        <div class="statline"><span>Base de receita</span><strong>${money60(h.construction.income)}</strong></div>
+        <div class="statline"><span>Investimentos</span><strong>${money60(h.construction.invest)}</strong></div>
+        <div class="statline"><span>Reserva líquida</span><strong>${money60(h.construction.reserve)}</strong></div>
+      </section>
+    </div>
+  </div>`;
+}
+
+function reservePage60(mode='month'){
+  const r=reserveMetrics60(mode), y=N(FILTERS.year),m=N(FILTERS.month);
+  const history=r.entries.slice().sort((a,b)=>a.date.localeCompare(b.date));
+  const last=history.slice(-12);
+  const labels=last.map(x=>x.date.slice(0,7)), balances=[];
+  let running=0; history.forEach(x=>running+=x.type==='retirada'?-x.amount:x.amount);
+  const byMonth={}; history.forEach(x=>{const k=x.date.slice(0,7);byMonth[k]=(byMonth[k]||0)+(x.type==='retirada'?-x.amount:x.amount)});
+  let cur=0;Object.keys(byMonth).sort().slice(-12).forEach(k=>{cur+=byMonth[k];balances.push(cur)});
+  return `${pageHead('Reserva de Emergência','Acompanhamento completo da reserva, com evolução e comparação.')}
+    ${periodControls60(mode,'v60Reserve')}
+    <div class="kpis">
+      ${kpi('Reserva atual',money60(r.cur),'saldo da carteira')}
+      ${kpi('Aportes',money60(r.aportes),'período')}
+      ${kpi('Retiradas',money60(r.retiradas),'período')}
+      ${kpi('Evolução líquida',money60(r.net),'período')}
+      ${kpi('Cobertura',`${r.coverage.toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1})} meses`,'pela média de Gastos Fixos')}
+      ${kpi('Progresso',pct60(r.progress),'da meta')}
+    </div>
+    <div class="grid">
+      <section class="card s8"><h2>Evolução da Reserva</h2><div class="chartbox"><canvas id="v60ReserveChart"></canvas></div></section>
+      <section class="card s4">
+        <h2>Meta da Reserva</h2>
+        <div class="statline"><span>Modo</span><strong>${r.targetMode==='custom'?'Valor personalizado':'Por Gastos Fixos'}</strong></div>
+        <div class="statline"><span>Meta</span><strong>${money60(r.target)}</strong></div>
+        <div class="statline"><span>Base mensal</span><strong>${money60(r.base.avg)}</strong></div>
+        <div class="statline"><span>Meses</span><strong>${r.months}</strong></div>
+        ${r.base.known<6?`<div class="notice" style="margin-top:10px">Dados insuficientes: apenas ${r.base.known} de 6 meses anteriores possuem Gastos Fixos reconhecidos.</div>`:''}
+        <button class="btn gold" style="margin-top:12px" onclick="openV50Reserve()">Configurar meta</button>
+      </section>
+      <section class="card s12"><h2>Marcos da Reserva</h2>
+        <div class="row" style="margin-top:10px">
+          <span class="tag ${r.progress>=25?'ok':''}">25% ${r.progress>=25?'✓':'○'}</span>
+          <span class="tag ${r.progress>=50?'ok':''}">50% ${r.progress>=50?'✓':'○'}</span>
+          <span class="tag ${r.progress>=75?'ok':''}">75% ${r.progress>=75?'✓':'○'}</span>
+          <span class="tag ${r.progress>=100?'ok':''}">100% ${r.progress>=100?'✓':'○'}</span>
+        </div>
+      </section>
+      <section class="card s12"><h2>Lançamentos da reserva</h2><div class="desc">Somente aportes e retiradas desta carteira alteram o saldo da Reserva.</div>
+        ${r.entries.length?`<div class="tablewrap"><table><thead><tr><th>Data</th><th>Descrição</th><th>Tipo</th><th>Valor</th></tr></thead><tbody>${r.entries.slice().sort((a,b)=>b.date.localeCompare(a.date)).slice(0,20).map(x=>`<tr><td>${x.date}</td><td>${esc60(x.description||'—')}</td><td>${x.type==='retirada'?'Retirada':'Aporte'}</td><td class="${x.type==='retirada'?'negative':'positive'}">${money60(x.amount)}</td></tr>`).join('')}</tbody></table></div>`:`<div class="empty">Nenhum lançamento na reserva.</div>`}
+      </section>
+    </div>`;
+}
+
+function reportPage60(mode='month'){
+  const d=periodData60(mode), rows=d.rows||d.current||[], h=score60(rows), evo=evolution60(mode);
+  return `${pageHead('Relatórios','Relatórios integrados à mesma metodologia da Saúde Financeira.',`<button class="btn gold" onclick="window.printV60Report('${mode}')">PDF / Imprimir</button>`)}
+    ${periodControls60(mode,'v60Report')}
+    <div class="kpis">
+      ${kpi('Receitas',money60(h.s.income),'período')}
+      ${kpi('Saídas',money60(h.s.out),'despesas + investimentos')}
+      ${kpi('Saldo',money60(h.s.balance),'resultado')}
+      ${kpi('Investimentos',money60(h.s.investment),'construção patrimonial')}
+      ${kpi('Saúde',`${h.score}/100`,h.label)}
+      ${kpi('Construção',pct60(h.construction.rate),h.construction.label)}
+    </div>
+    <div class="grid">
+      <section class="card s8"><h2>Evolução</h2><div class="chartbox"><canvas id="v60ReportChart"></canvas></div></section>
+      <section class="card s4"><h2>Resumo</h2>
+        <div class="statline"><span>Receitas</span><strong>${money60(h.s.income)}</strong></div>
+        <div class="statline"><span>Despesas</span><strong>${money60(h.s.expense)}</strong></div>
+        <div class="statline"><span>Investimentos</span><strong>${money60(h.s.investment)}</strong></div>
+        <div class="statline"><span>Saldo</span><strong>${money60(h.s.balance)}</strong></div>
+      </section>
+      <section class="card s12"><h2>Metodologia</h2><div class="desc">A mesma base de cálculo é usada na Saúde Financeira e nos Relatórios. Comparações recalculam cada período separadamente; não há média simples das notas.</div>
+        <div class="statline"><span>Saúde financeira</span><strong>${h.score}/100</strong></div>
+        <div class="statline"><span>Taxa de Construção Financeira</span><strong>${pct60(h.construction.rate)}</strong></div>
+        <div class="statline"><span>Reserva</span><strong>${money60(reserveCurrent60())}</strong></div>
+      </section>
+    </div>`;
+}
+
+function quickHealthCard60(){
+ return `<section class="card v60-quick-health" style="margin-bottom:12px">
+   <div class="row" style="justify-content:space-between;align-items:center">
+    <div><h2>Saúde Financeira</h2><div class="desc">Acesse a análise completa por mês, ano, comparações e histórico.</div></div>
+    <button class="btn gold" onclick="TAB='health-v60';render()">Abrir análise</button>
+   </div>
+ </section>`;
+}
+
+// Navegação: substitui as rotas antigas por uma única versão V60.
+const oldNav60=window.nav;
+window.nav=function(){
+  if(typeof oldNav60==='function')oldNav60();
+  const navEl=$('nav'); if(!navEl)return;
+  ['health-v53','reserve-v52'].forEach(id=>navEl.querySelector(`[data-tab="${id}"]`)?.remove());
+  const ids=[...navEl.querySelectorAll('[data-tab]')].map(x=>x.dataset.tab);
+  const add=(id,label)=>{
+    if(navEl.querySelector(`[data-tab="${id}"]`))return;
+    const b=document.createElement('button');b.className=`btn ${TAB===id?'active':''}`;b.dataset.tab=id;b.textContent=label;
+    b.onclick=()=>{TAB=id;render()};navEl.appendChild(b);
+  };
+  add('reserve-v60','Reserva de Emergência');
+  add('health-v60','Saúde Financeira');
+};
+
+// Render V60 routes.
+const oldRender60=window.render;
+window.render=function(){
+  if(TAB==='health-v60'){
+    window.nav();$('view').innerHTML=healthPage60(window.__v60HealthMode||'month');
+    bindPeriod60('v60Health',m=>{window.__v60HealthMode=m||'month';render()});
+    requestAnimationFrame(()=>drawV60Health(window.__v60HealthMode||'month')); return;
+  }
+  if(TAB==='reserve-v60'){
+    window.nav();$('view').innerHTML=reservePage60(window.__v60ReserveMode||'month');
+    bindPeriod60('v60Reserve',m=>{window.__v60ReserveMode=m||'month';render()});
+    requestAnimationFrame(()=>drawV60Reserve()); return;
+  }
+  if(TAB==='reports-v60'){
+    window.nav();$('view').innerHTML=reportPage60(window.__v60ReportMode||'month');
+    bindPeriod60('v60Report',m=>{window.__v60ReportMode=m||'month';render()});
+    requestAnimationFrame(()=>drawV60Report(window.__v60ReportMode||'month')); return;
+  }
+  if(typeof oldRender60==='function')oldRender60();
+  // V60 dashboard: add only a compact access card.
+  if(TAB==='dashboard'){
+    const v=$('view');
+    if(v && !v.querySelector('.v60-quick-health')){
+      v.insertAdjacentHTML('afterbegin',quickHealthCard60());
+    }
+  }
+  // Patrimônio: remove the duplicate Reserve block.
+  if(TAB==='wealth'){
+    const v=$('view');
+    v?.querySelectorAll('.card').forEach(c=>{
+      if(/Reserva de emergência/i.test(c.textContent||''))c.remove();
+    });
+  }
+};
+
+// Reports become the same V60 methodology.
+const oldReports60=window.reports;
+window.reports=function(){
+  return reportPage60(window.__v60ReportMode||'month');
+};
+window.printV60Report=function(mode){
+  window.__v60ReportMode=mode||'month';
+  TAB='reports-v60';
+  render();
+  setTimeout(()=>window.print(),120);
+};
+
+function drawChart60(id,labels,series){
+  const el=$(id); if(!el || typeof Chart==='undefined')return;
+  try{CHARTS[id]?.destroy()}catch{}
+  CHARTS[id]=new Chart(el,{type:'line',data:{labels,datasets:series.map(s=>({label:s.label,data:s.data,borderWidth:2,tension:.25,fill:false}))},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#aaa'}}},
+      scales:{x:{ticks:{color:'#777'},grid:{color:'#1d1d1d'}},y:{ticks:{color:'#777'},grid:{color:'#1d1d1d'}}}}});
+}
+function drawV60Health(mode){
+  const e=evolution60(mode);
+  drawChart60('v60HealthChart',e.labels,[{label:'Receitas',data:e.income},{label:'Saídas',data:e.out},{label:'Construção %',data:e.construction}]);
+}
+function drawV60Reserve(){
+  const e=reserveEntries60().sort((a,b)=>a.date.localeCompare(b.date));
+  const by={};e.forEach(x=>{const k=x.date.slice(0,7);by[k]=(by[k]||0)+(x.type==='retirada'?-x.amount:x.amount)});
+  let cur=0;const labels=[],data=[];Object.keys(by).sort().slice(-12).forEach(k=>{cur+=by[k];labels.push(k);data.push(cur)});
+  drawChart60('v60ReserveChart',labels,[{label:'Saldo da reserva',data}]);
+}
+function drawV60Report(mode){
+  const e=evolution60(mode);
+  drawChart60('v60ReportChart',e.labels,[{label:'Receitas',data:e.income},{label:'Saídas',data:e.out},{label:'Construção %',data:e.construction}]);
+}
+
+// Injeta CSS V60.
+const st60=document.createElement('style');st60.id='mb-v60-style';st60.textContent=`
+.v60-filters{margin-top:4px}.v60-quick-health{border-color:#4b3d20;background:linear-gradient(145deg,#12110d,#0c0c0c)}
+@media print{.nav,.actions,.btn,.v60-filters{display:none!important}.card{break-inside:avoid}.wrap{max-width:none}.v60-page{padding:0}}
+`;document.head.appendChild(st60);
+
+// Inicialização e metadados.
+document.title='Mentoria Black — Gestão Financeira V60';
+const footer=document.querySelector('.footer');
+if(footer)footer.textContent=footer.textContent.replace(/V59|V58|V57|V56|V55|V54|V53|V52|V51|V50|V39/g,'V60');
+
+// O botão de Relatórios usa a mesma página V60.
+try{
+ const reportBtn=document.querySelector('#nav [data-tab="reports"]');
+ if(reportBtn){reportBtn.onclick=()=>{TAB='reports-v60';render()}}
+}catch{}
+})();
+
+</script></body>');
+   document.open();document.write(html);document.close();
+ }catch(e){
+   document.getElementById('v60Boot').innerHTML='<div><b>Mentoria Black V60</b>Não foi possível carregar a base V59. Verifique a conexão com a internet.</div>';
+   console.error(e);
+ }
+})();
+</script>
+</body>
+</html>
