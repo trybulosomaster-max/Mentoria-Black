@@ -1020,6 +1020,14 @@ if("serviceWorker" in navigator){
     const initial=t?.transaction_type||'despesa';
     const initialPurchase=t?.purchase_date || (t?.card_id ? t?.transaction_date : (id ? t?.transaction_date : new Date().toISOString().slice(0,10)));
     const initialBilling=t?.transaction_date || initialPurchase;
+    const goalOptions=(selected)=>{
+      const goals=Array.isArray(DATA.goals)?DATA.goals:[];
+      const current=String(selected||'');
+      const options=['<option value="">'+(goals.length?'Nenhuma':'Nenhuma meta cadastrada')+'</option>'];
+      goals.forEach(goal=>options.push(`<option value="${esc(goal.id)}" ${goal.id===current?'selected':''}>${esc(goal.name||'Meta sem nome')}</option>`));
+      if(current&&!goals.some(goal=>goal.id===current))options.push(`<option value="${esc(current)}" selected>Meta indisponível</option>`);
+      return options.join('');
+    };
     modal(id?'Editar lançamento':'Novo lançamento',`
       <form id="v19TxForm" class="v15-form">
         <div class="v15-amount"><span>Valor</span><input name="amount" id="v19Amount" inputmode="decimal" autocomplete="off" placeholder="R$ 0,00" value="${t?.amount?num(t.amount):''}" required autofocus></div>
@@ -1045,6 +1053,8 @@ if("serviceWorker" in navigator){
         <details class="v15-details"><summary>Mais detalhes <span>Opcional</span></summary>
           <div class="v15-detail-grid">
             <div><label>Forma de pagamento</label><input name="payment_method" value="${esc(t?.payment_method||'')}"></div>
+            <div><label>Vincular a uma meta</label><select name="goal_id" id="v19Goal">${goalOptions(t?.goal_id)}</select></div>
+            <div><label>Efeito na meta</label><select name="goal_effect" id="v19GoalEffect"><option value="contribution" ${(t?.goal_effect||'contribution')==='contribution'?'selected':''}>Aporte</option><option value="withdrawal" ${t?.goal_effect==='withdrawal'?'selected':''}>Retirada</option></select></div>
             <div class="full"><label>Observação</label><textarea name="note">${esc(t?.note||'')}</textarea></div>
             <div class="full v15-check"><label><input type="checkbox" id="v19Install"> Parcelar lançamento</label><span>Divide o lançamento em parcelas futuras.</span></div>
             <div class="full hidden" id="v19InstallFields"><div class="v19-card-grid"><div><label>Número de parcelas</label><input id="v19Count" type="number" min="2" max="120" value="2"></div><div><label>Primeira fatura</label><input id="v19Start" type="date" value="${initialBilling}"></div></div><div id="v19InstallPreview" class="notice" style="margin-top:12px"></div></div>
@@ -1058,7 +1068,7 @@ if("serviceWorker" in navigator){
     const form=$('v19TxForm'), amount=$('v19Amount'), typeButtons=document.querySelectorAll('#v19TxForm .v15-type'), typeInitial=initial;
     const typeState={value:typeInitial};
     const typeEl=()=>typeState.value;
-    const category=$('v19Category'), account=$('v19Account'), card=$('v19Card'), cardBox=$('v19CardBox'), purchase=$('v19PurchaseDate'), billing=$('v19BillingDate'), billingMain=$('v19TransactionDate'), dateLabel=$('v19DateLabel'), install=$('v19Install'), installFields=$('v19InstallFields'), start=$('v19Start'), count=$('v19Count'), installPreview=$('v19InstallPreview'), recurring=$('v19Recurring');
+    const category=$('v19Category'), account=$('v19Account'), card=$('v19Card'), cardBox=$('v19CardBox'), purchase=$('v19PurchaseDate'), billing=$('v19BillingDate'), billingMain=$('v19TransactionDate'), dateLabel=$('v19DateLabel'), install=$('v19Install'), installFields=$('v19InstallFields'), start=$('v19Start'), count=$('v19Count'), installPreview=$('v19InstallPreview'), recurring=$('v19Recurring'), goal=$('v19Goal'), goalEffect=$('v19GoalEffect');
     function syncCategories(){
       const list=V19_CATS_FOR(typeEl());
       category.innerHTML=v19Opts(list,v19CategoryFor(typeEl(),category.value)?category.value:'');
@@ -1096,6 +1106,11 @@ if("serviceWorker" in navigator){
       if(install.checked&&card.value) start.value=billing.value||billingMain.value;
       updateInstallPreview();
     }
+    function syncGoalEffect(){
+      const linked=!!goal.value;
+      goalEffect.disabled=!linked;
+      if(linked&&!goalEffect.value)goalEffect.value='contribution';
+    }
     function syncTypeState(){
       syncCategories();
       const installLabel=install.closest('.v15-check')?.querySelector('span');
@@ -1110,6 +1125,7 @@ if("serviceWorker" in navigator){
     typeButtons.forEach(button=>button.onclick=()=>setType(button.dataset.type));
     card.onchange=()=>{if(card.value)account.value='';syncTypeState();};
     account.onchange=()=>{if(account.value)card.value='';syncTypeState();};
+    goal.onchange=syncGoalEffect;
     purchase.onchange=()=>{if(card.value&&!id)billing.value=v19SuggestedBillingDate(purchase.value,card.value)||billing.value;billingMain.value=billing.value||billingMain.value;syncInstallments();};
     billing.onchange=()=>{billingMain.value=billing.value;syncInstallments();};
     billingMain.onchange=()=>{if(card.value)billing.value=billingMain.value;syncInstallments();};
@@ -1122,10 +1138,12 @@ if("serviceWorker" in navigator){
     else{count.disabled=false;delete install.dataset.existingParcel;}
     recurring.disabled=false;
     syncTypeState();
+    syncGoalEffect();
 
     form.onsubmit=async e=>{
       e.preventDefault();
       const fd=new FormData(form), type=typeEl(), amountValue=parseMoney(fd.get('amount')), cat=String(fd.get('category')||'').trim(), accountId=account.value||null, cardId=card.value||null;
+      const goalId=goal.value||null, goalEffectValue=goalId?(goalEffect.value==='withdrawal'?'withdrawal':'contribution'):null;
       const purchaseDate=cardId ? (purchase.value||billingMain.value) : null;
       const billingDate=cardId ? (billing.value||billingMain.value) : billingMain.value;
       const errors=[];
@@ -1145,7 +1163,8 @@ if("serviceWorker" in navigator){
         transaction_type:type, description:String(fd.get('description')).trim(), category:cat,
         subcategory:fd.get('subcategory')||null, amount:amountValue, status:fd.get('status')||'realizado',
         account_id:accountId, card_id:cardId,
-        payment_method:fd.get('payment_method')||null, note:fd.get('note')||null
+        payment_method:fd.get('payment_method')||null, note:fd.get('note')||null,
+        goal_id:goalId, goal_effect:goalEffectValue
       };
       if(id){
         const r=await sb.from('transactions').update(base).eq('id',id).eq('user_id',USER.id);
