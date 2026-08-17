@@ -526,45 +526,6 @@ function transactions(){
  return pageHead("Lançamentos","Receitas, despesas, investimentos, contas e cartões.",`<button class="btn gold" onclick="openTransaction()">＋ Novo lançamento</button>`)+
  `<div class="filters"><div class="filter"><label>Buscar</label><input id="txSearch" value="${esc(FILTERS.search)}" placeholder="Descrição ou categoria"></div><div class="filter"><label>Tipo</label><select id="txType"><option value="">Todos</option>${["receita","despesa","investimento","transferencia","resgate"].map(x=>`<option ${FILTERS.txType===x?"selected":""}>${x}</option>`).join("")}</select></div><div class="filter"><label>Categoria</label><select id="txCategory"><option value="">Todas</option>${DATA.categories.filter(c=>!c.parent).map(c=>`<option ${FILTERS.txCategory===c.name?"selected":""}>${esc(c.name)}</option>`).join("")}</select></div></div><div class="card">${transactionTable(arr)}</div>`;
 }
-function openTransaction(id){
- const t=id?DATA.transactions.find(x=>x.id===id):{}, isIncome=t.transaction_type==="receita";
- modal(id?"Editar lançamento":"Novo lançamento",`<form id="txForm"><div class="formgrid">
- <div><label>Data da compra/lançamento</label><input name="transaction_date" type="date" value="${t.transaction_date||new Date().toISOString().slice(0,10)}" required></div>
- <div><label>Tipo</label><select name="transaction_type" id="txModalType">${["despesa","receita","investimento","transferencia","resgate"].map(x=>`<option value="${x}" ${t.transaction_type===x?"selected":(!t.transaction_type&&x==="despesa")?"selected":""}>${x}</option>`).join("")}</select></div>
- <div class="full"><label>Descrição</label><input name="description" value="${esc(t.description||"")}" required></div>
- <div id="catWrap"><label>Categoria</label><select name="category" id="txModalCat">${categoryOptions(canonicalCategoryName(t.category,t.transaction_type),true)}</select></div>
- <div><label>Subcategoria</label><input name="subcategory" value="${esc(t.subcategory||"")}"></div>
- <div><label>Valor total da compra/lançamento</label><input name="amount" id="txAmount" value="${t.amount?num(t.amount):""}" inputmode="decimal" placeholder="Ex.: 1.234,56" required></div>
- <div><label>Status</label><select name="status"><option value="realizado">Realizado</option><option value="pendente" ${t.status==="pendente"?"selected":""}>Pendente</option><option value="cancelado" ${t.status==="cancelado"?"selected":""}>Cancelado</option></select></div>
- <div><label>Conta</label><select name="account_id" id="txAccount">${accountOptions(t.account_id||"")}</select></div>
- <div><label>Cartão</label><select name="card_id" id="txCard">${cardOptions(t.card_id||"")}</select></div>
- <div class="full"><label>Forma de pagamento</label><input name="payment_method" value="${esc(t.payment_method||"")}"></div>
- <div class="full"><label>Observação</label><textarea name="note">${esc(t.note||"")}</textarea></div>
- <div class="full" id="installArea">
-   <label><input type="checkbox" id="doInstall" style="width:auto" ${t.note&&/parcelado/i.test(t.note)?"checked":""}> Parcelar</label>
-   <div id="installFields" class="hidden">
-    <div class="formgrid"><div><label>Número de parcelas</label><input id="installCount" type="number" min="2" max="120" value="2"></div><div><label>Mês inicial do pagamento</label><input id="installStart" type="month" value="${(t.transaction_date||new Date().toISOString().slice(0,7)).slice(0,7)}"></div></div>
-    <div class="preview" id="installPreview">Como sua transação se repete?<br><b>2x/R$ 0,00</b></div>
-   </div>
- </div>
- <div class="full"><label><input type="checkbox" id="fixedExpense" style="width:auto"> Despesa fixa</label><div class="muted small">Ao marcar, o sistema cria uma recorrência mensal. Não misture com parcelamento.</div></div>
- </div><div id="txMsg" class="msg"></div><div class="modal-foot"><button type="button" class="btn" onclick="closeModal()">Cancelar</button><button class="btn primary">Salvar</button></div></form>`);
- const type=$("txModalType"),cat=$("catWrap"),install=$("installArea"),fixed=$("fixedExpense"),doInstall=$("doInstall"),installFields=$("installFields"),count=$("installCount"),start=$("installStart"),amt=$("txAmount");
- function refreshMode(){const income=type.value==="receita";cat.classList.toggle("hidden",income);install.classList.toggle("hidden",income||type.value==="transferencia"||type.value==="resgate");fixed.parentElement.parentElement.classList.toggle("hidden",income||type.value!=="despesa");if(income){$("txAccount").required=false;$("txCard").required=false}}
- function preview(){const total=parseMoney(amt.value),n=Math.max(2,Number(count.value)||2);const base=Math.floor((total/n)*100)/100;const last=Math.round((total-base*(n-1))*100)/100;$("installPreview").innerHTML=`Como sua transação se repete?<br>${[1,2,3,4,5].slice(0,Math.min(5,n)).map(i=>`${i}x/${money(i===n?last:base)}`).join(" &nbsp; ")}${n>5?` … ${n}x/${money(last)}`:""}`;}
- type.onchange=refreshMode;doInstall.onchange=()=>{installFields.classList.toggle("hidden",!doInstall.checked);fixed.checked=false;fixed.disabled=doInstall.checked;preview()};fixed.onchange=()=>{if(fixed.checked){doInstall.checked=false;installFields.classList.add("hidden");doInstall.disabled=true}else doInstall.disabled=false};[amt,count,start].forEach(e=>e?.addEventListener("input",preview));amt?.addEventListener("blur",()=>formatMoneyInput(amt));refreshMode();preview();
- $("txForm").onsubmit=async e=>{
-  e.preventDefault();const fd=new FormData(e.target),typev=fd.get("transaction_type"),amount=parseMoney(fd.get("amount")),category=fd.get("category"),account=fd.get("account_id"),card=fd.get("card_id");
-  const errs=[];if(!fd.get("description"))errs.push("Descrição");if(!amount||amount<=0)errs.push("Valor");if(typev!=="receita"&&typev!=="resgate"&&typev!=="transferencia"&&!category)errs.push("Categoria");if(typev==="despesa"&&!account&&!card)errs.push("Conta ou cartão");if(account&&card)errs.push("Escolha conta OU cartão, não os dois");if(typev==="transferencia"&&!account)errs.push("Conta para transferência");
-  if(errs.length){$("txMsg").textContent="Preencha/corrija: "+errs.join(", ")+". Veja os campos destacados.";return}
-  const base={transaction_date:fd.get("transaction_date"),transaction_type:typev,description:fd.get("description"),category:category||null,subcategory:fd.get("subcategory")||null,amount,status:fd.get("status"),account_id:account||null,card_id:card||null,payment_method:fd.get("payment_method")||null,note:fd.get("note")||null};
-  if(id){const r=await sb.from("transactions").update(base).eq("id",id).eq("user_id",USER.id);if(r.error){$("txMsg").textContent=r.error.message;return}closeModal();await reload();toast("Lançamento atualizado.");return}
-  if(doInstall.checked){const n=Math.max(2,Number(count.value)||2),s=start.value||base.transaction_date.slice(0,7),buy=base.transaction_date.slice(0,7),sy=Number(s.slice(0,4)),sm=Number(s.slice(5,7)),by=Number(buy.slice(0,4)),bm=Number(buy.slice(5,7));if(new Date(sy,sm-1)<new Date(by,bm-1)){ $("txMsg").textContent="O mês inicial do pagamento não pode ser anterior ao mês da compra.";return }const cents=Math.round(amount*100),baseC=Math.floor(cents/n),lastC=cents-baseC*(n-1),rows=[];for(let i=0;i<n;i++){const d=new Date(sy,sm-1+i,1);const day=Math.min(Number(base.transaction_date.slice(8,10))||1,new Date(d.getFullYear(),d.getMonth()+1,0).getDate());rows.push({...base,transaction_date:`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(day).padStart(2,"0")}`,amount:(i===n-1?lastC:baseC)/100,note:`${base.note?base.note+" • ":""}Parcelado ${i+1}/${n} • Compra ${buy}`})}const r=await sb.from("transactions").insert(rows);if(r.error){$("txMsg").textContent="Não foi possível criar as parcelas: "+r.error.message;return}closeModal();await reload();toast(`${n} parcelas criadas.`);return}
-  const r=await sb.from("transactions").insert({...base,user_id:USER.id});if(r.error){$("txMsg").textContent="Não foi possível salvar: "+r.error.message;return}
-  if(fixed.checked){const rr=await sb.from("recurring").insert({user_id:USER.id,name:base.description,frequency:"monthly",interval:1,next_date:base.transaction_date,amount:base.amount,type:"despesa",category:base.category,subcategory:base.subcategory,account_id:base.account_id,card_id:base.card_id,active:true});if(rr.error)toast("Lançamento salvo, mas a recorrência não foi criada: "+rr.error.message,true)}
-  closeModal();await reload();toast("Lançamento salvo.");
- };
-}
 function accounts(){return pageHead("Contas","Saldos e contas financeiras.",`<button class="btn gold" onclick="openAccount()">＋ Conta</button>`)+`<div class="card">${simpleTable(DATA.accounts,[["Conta",x=>esc(x.name)],["Instituição",x=>esc(x.institution||"—")],["Saldo",x=>money(x.statement_balance??x.opening_balance)],["Tipo",x=>esc(x.type||"—")]],"accounts")}</div>`}
 function cards(){const s=cardSummary();return pageHead("Cartões de crédito","Resumo dos gastos no período selecionado.",`<button class="btn gold" onclick="openCard()">＋ Cartão</button>`)+`<div class="card">${s.rows.length?`<div class="kpis" style="grid-template-columns:repeat(3,1fr)">${s.rows.map(([c,v])=>kpi(c.name,money(v),"período")).join("")}</div><div class="statline"><strong>Total</strong><strong>${money(s.total)}</strong></div>`:`<div class="empty">Nenhum cartão cadastrado.</div>`}</div>`}
 function simpleTable(rows,cols,table){if(!rows.length)return `<div class="empty">Nenhum registro cadastrado.</div>`;const edit={accounts:"Account",cards:"Card",categories:"Category",goals:"Goal",recurring:"Recurring"}[table];return `<div class="tablewrap"><table><thead><tr>${cols.map(c=>`<th>${c[0]}</th>`).join("")}<th></th></tr></thead><tbody>${rows.map(x=>`<tr>${cols.map(c=>`<td>${c[1](x)}</td>`).join("")}<td><div class="actions">${edit?`<button class="btn" onclick="open${edit}('${x.id}')">Editar</button>`:""}<button class="btn danger" onclick="deleteRow('${table}','${x.id}')">Excluir</button></div></td></tr>`).join("")}</tbody></table></div>`}
@@ -686,108 +647,6 @@ if("serviceWorker" in navigator){
     ["Renda extra","#5aa9e6"],["Outras receitas","#d9ad37"]
   ];
   const kindOf = c => String(c?.kind || "despesa").toLowerCase();
-  const incomeCats = () => visibleTopCategories(DATA.categories||[]).filter(c => (kindOf(c)==="receita" || kindOf(c)==="ambos"));
-  const expenseCats = () => visibleTopCategories(DATA.categories||[]).filter(c => (kindOf(c)==="despesa" || kindOf(c)==="ambos"));
-  const catsFor = type => type==="receita" ? incomeCats() : expenseCats();
-
-  async function ensureIncomeCategories(){
-    if(incomeCats().length) return;
-    for(const [name,color] of INCOME_DEFAULTS){
-      const r=await sb.from("categories").insert({user_id:USER.id,name,parent:null,kind:"receita",color}).select().maybeSingle();
-      if(!r.error && r.data) DATA.categories.push(r.data);
-    }
-  }
-  function opts(list,value="",blank=true){
-    return (blank?'<option value="">Selecione</option>':"") +
-      list.map(c=>`<option value="${esc(c.name)}" ${String(value).toLowerCase()===String(c.name).toLowerCase()?"selected":""}>${esc(c.name)}</option>`).join("");
-  }
-
-  const v15OpenTransaction = async function(id){
-    const t=id?DATA.transactions.find(x=>x.id===id):{};
-    if(t.transaction_type==="receita") await ensureIncomeCategories();
-    const initial=t.transaction_type||"despesa";
-    modal(id?"Editar lançamento":"Novo lançamento",`
-      <form id="v15TxForm" class="v15-form">
-        <div class="v15-amount"><span>Valor</span><input name="amount" id="v15Amount" inputmode="decimal" autocomplete="off" placeholder="R$ 0,00" value="${t.amount?num(t.amount):""}" required autofocus></div>
-        <div class="v15-types">${["despesa","receita","investimento"].map(x=>`<button type="button" class="v15-type ${initial===x?"active":""}" data-type="${x}">${x[0].toUpperCase()+x.slice(1)}</button>`).join("")}</div>
-        <div class="v15-essential">
-          <div><label>Data</label><input name="transaction_date" type="date" value="${t.transaction_date||new Date().toISOString().slice(0,10)}" required></div>
-          <div><label>Descrição</label><input name="description" value="${esc(t.description||"")}" placeholder="Ex.: Salário" required></div>
-          <div><label>Categoria</label><select name="category" id="v15Category" required>${opts(catsFor(initial),canonicalCategoryName(t.category,initial))}</select></div>
-          <div><label>Conta</label><select name="account_id" id="v15Account">${accountOptions(t.account_id||"")}</select></div>
-        </div>
-        <details class="v15-details"><summary>Mais detalhes <span>Opcional</span></summary>
-          <div class="v15-detail-grid">
-            <div><label>Subcategoria</label><input name="subcategory" value="${esc(t.subcategory||"")}"></div>
-            <div><label>Cartão</label><select name="card_id">${cardOptions(t.card_id||"")}</select></div>
-            <div><label>Forma de pagamento</label><input name="payment_method" value="${esc(t.payment_method||"")}"></div>
-            <div><label>Status</label><select name="status"><option value="realizado">Realizado</option><option value="pendente" ${t.status==="pendente"?"selected":""}>Pendente</option><option value="cancelado" ${t.status==="cancelado"?"selected":""}>Cancelado</option></select></div>
-            <div class="full"><label>Observação</label><textarea name="note">${esc(t.note||"")}</textarea></div>
-            <div class="full v15-check"><label><input type="checkbox" id="v15Install"> Parcelar lançamento</label><span>Cria todas as parcelas com centavos exatos, sem dupla contagem.</span></div>
-            <div class="full hidden" id="v15InstallFields"><div class="v15-detail-grid"><div><label>Número de parcelas</label><input id="v15Count" type="number" min="2" max="120" value="2"></div><div><label>Mês inicial</label><input id="v15Start" type="month" value="${(t.transaction_date||new Date().toISOString()).slice(0,7)}"></div></div></div>
-            <div class="full v15-check"><label><input type="checkbox" id="v15Fixed"> Lançamento recorrente</label><span>Cria automaticamente os próximos lançamentos mensais. Use em vez de parcelamento.</span></div>
-          </div>
-        </details>
-        <div id="v15TxMsg" class="msg"></div>
-        <div class="modal-foot"><button type="button" class="btn" onclick="closeModal()">Cancelar</button><button class="btn primary">Salvar lançamento</button></div>
-      </form>`);
-    const form=$("v15TxForm"), amount=$("v15Amount"), cat=$("v15Category"), install=$("v15Install"), fixed=$("v15Fixed"), fields=$("v15InstallFields");
-    let type=initial;
-    const setType=async next=>{
-      type=next;
-      if(type==="receita") await ensureIncomeCategories();
-      document.querySelectorAll(".v15-type").forEach(b=>b.classList.toggle("active",b.dataset.type===type));
-      cat.innerHTML=opts(catsFor(type), "");
-      fixed.parentElement.firstChild.textContent=" Lançamento recorrente";
-      if(type==="receita"){install.checked=false;fields.classList.add("hidden");}
-    };
-    document.querySelectorAll(".v15-type").forEach(b=>b.onclick=()=>setType(b.dataset.type));
-    amount.addEventListener("blur",()=>formatMoneyInput(amount));
-    install.onchange=()=>{fields.classList.toggle("hidden",!install.checked);if(install.checked)fixed.checked=false};
-    fixed.onchange=()=>{if(fixed.checked){install.checked=false;fields.classList.add("hidden")}};
-    form.onsubmit=async e=>{
-      e.preventDefault();
-      const fd=new FormData(form), amountValue=parseMoney(fd.get("amount")), category=String(fd.get("category")||"").trim(), account=fd.get("account_id"), card=fd.get("card_id");
-      const errors=[];
-      if(amountValue<=0) errors.push("valor");
-      if(!fd.get("description")) errors.push("descrição");
-      if(!category) errors.push("categoria");
-      if(type==="despesa" && !account && !card) errors.push("conta ou cartão");
-      if(account && card) errors.push("escolha conta OU cartão");
-      if(errors.length){$("v15TxMsg").textContent="Preencha/corrija: "+errors.join(", ")+".;";return}
-      const valid=catsFor(type).some(c=>String(c.name).toLowerCase()===category.toLowerCase());
-      if(!valid){$("v15TxMsg").textContent="A categoria não é compatível com o tipo escolhido.";return}
-      const base={transaction_date:fd.get("transaction_date"),transaction_type:type,description:fd.get("description"),category,subcategory:fd.get("subcategory")||null,amount:amountValue,status:fd.get("status")||"realizado",account_id:account||null,card_id:card||null,payment_method:fd.get("payment_method")||null,note:fd.get("note")||null};
-      if(id){
-        const r=await sb.from("transactions").update(base).eq("id",id).eq("user_id",USER.id);
-        if(r.error){$("v15TxMsg").textContent="Não foi possível salvar: "+r.error.message;return}
-        closeModal();await reload();toast("Lançamento atualizado.");return;
-      }
-      if(install.checked){
-        const n=Math.max(2,Math.min(120,Number($("v15Count").value)||2)), s=$("v15Start").value||base.transaction_date.slice(0,7);
-        const buy=base.transaction_date.slice(0,7), sy=+s.slice(0,4), sm=+s.slice(5,7), by=+buy.slice(0,4), bm=+buy.slice(5,7);
-        if(new Date(sy,sm-1)<new Date(by,bm-1)){ $("v15TxMsg").textContent="O mês inicial não pode ser anterior ao mês da compra.";return; }
-        const cents=Math.round(amountValue*100), each=Math.floor(cents/n), last=cents-each*(n-1), rows=[];
-        for(let i=0;i<n;i++){
-          const d=new Date(sy,sm-1+i,1), day=Math.min(+base.transaction_date.slice(8,10)||1,new Date(d.getFullYear(),d.getMonth()+1,0).getDate());
-          rows.push({...base,user_id:USER.id,transaction_date:`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(day).padStart(2,"0")}`,amount:(i===n-1?last:each)/100,note:`${base.note?base.note+" • ":""}Parcelado ${i+1}/${n} • Compra ${buy}`});
-        }
-        const r=await sb.from("transactions").insert(rows);
-        if(r.error){$("v15TxMsg").textContent="Não foi possível criar as parcelas: "+r.error.message;return}
-        closeModal();await reload();toast(`${n} parcelas criadas.`);return;
-      }
-      const r=await sb.from("transactions").insert({...base,user_id:USER.id});
-      if(r.error){$("v15TxMsg").textContent="Não foi possível salvar: "+r.error.message;return}
-      if(fixed.checked){
-        const next=addMonthsV16(base.transaction_date,1);
-        const rr=await sb.from("recurring").insert({user_id:USER.id,name:base.description,frequency:"monthly",interval:1,next_date:next,start_date:base.transaction_date,day_of_month:Number(base.transaction_date.slice(8,10))||1,amount:base.amount,type,category:base.category,subcategory:base.subcategory,account_id:base.account_id,card_id:base.card_id,active:true,auto_post:true,note:base.note||null});
-        if(rr.error) toast("Lançamento salvo, mas a recorrência não foi criada: "+rr.error.message,true);
-      }
-      closeModal();await reload();toast("Lançamento salvo.");
-    };
-    requestAnimationFrame(()=>amount.focus());
-  };
-
   window.openCategory = function(id){
     const x=id?DATA.categories.find(a=>a.id===id):{};
     modal(id?"Editar categoria":"Nova categoria",`
@@ -809,12 +668,6 @@ if("serviceWorker" in navigator){
       if(old&&old.name!==name){await sb.from("transactions").update({category:name}).eq("user_id",USER.id).eq("category",old.name);await sb.from("recurring").update({category:name}).eq("user_id",USER.id).eq("category",old.name)}
       closeModal();await reload();toast("Categoria salva.");
     };
-  };
-
-  window.categories = function(){
-    return pageHead("Categorias","Receitas e despesas possuem listas separadas.",`<button class="btn gold" onclick="openCategory()">＋ Categoria</button>`) +
-      `<div class="grid"><section class="card s6"><h2>Categorias de despesas</h2>${simpleTable(expenseCats(),[["Categoria",x=>`<span class="dot" style="background:${x.color||categoryColor(x.name)}"></span>${esc(x.name)}`],["Subcategoria",x=>esc(x.parent||"—")]],"categories")}</section>
-      <section class="card s6"><h2>Categorias de receitas</h2>${simpleTable(incomeCats(),[["Categoria",x=>`<span class="dot" style="background:${x.color||"#7bc67b"}"></span>${esc(x.name)}`],["Subcategoria",x=>esc(x.parent||"—")]],"categories")}</section></div>`;
   };
 
   function revenueYear(year){
@@ -920,25 +773,6 @@ if("serviceWorker" in navigator){
     });
   }
   window.drawRevenue=drawRevenue;
-
-  window.transactions=function(){
-    const arr=DATA.transactions.filter(t=>(!FILTERS.txType||t.transaction_type===FILTERS.txType)&&(!FILTERS.txCategory||topCategory(t.category,t.transaction_type)===FILTERS.txCategory)&&(!FILTERS.search||`${t.description} ${canonicalCategoryName(t.category,t.transaction_type)} ${t.subcategory||""}`.toLowerCase().includes(FILTERS.search.toLowerCase())));
-    const list=FILTERS.txType==="receita"?incomeCats():FILTERS.txType?expenseCats():[...expenseCats(),...incomeCats()];
-    return pageHead("Lançamentos","Receitas e despesas usam categorias próprias.",`<button class="btn gold" onclick="openTransaction()">＋ Novo lançamento</button>`) +
-      `<div class="filters"><div class="filter"><label>Buscar</label><input id="txSearch" value="${esc(FILTERS.search)}" placeholder="Descrição ou categoria"></div><div class="filter"><label>Tipo</label><select id="txType"><option value="">Todos</option>${["receita","despesa","investimento","transferencia","resgate"].map(x=>`<option value="${x}" ${FILTERS.txType===x?"selected":""}>${x}</option>`).join("")}</select></div><div class="filter"><label>Categoria</label><select id="txCategory"><option value="">Todas</option>${list.filter(c=>!c.parent).map(c=>`<option value="${esc(c.name)}" ${FILTERS.txCategory===c.name?"selected":""}>${esc(c.name)}</option>`).join("")}</select></div></div><div class="card">${transactionTable(arr)}</div>`;
-  };
-
-  const oldRecurring=openRecurring;
-  window.openRecurring=async function(id){
-    if(!id) await ensureIncomeCategories();
-    oldRecurring(id);
-    const type=$("f")?.querySelector('[name="type"]'), cat=$("f")?.querySelector('[name="category"]');
-    if(type&&cat){
-      const refresh=()=>{cat.innerHTML=opts(catsFor(type.value),cat.value,true)};
-      type.onchange=async()=>{if(type.value==="receita")await ensureIncomeCategories();refresh()};
-      refresh();
-    }
-  };
 
   const style=document.createElement("style");
   style.id="v15-style";
@@ -1699,7 +1533,6 @@ setTimeout(()=>{
    - Não altera o modelo do banco.
 */
 (function(){
-  const v23Money = v => money(Number(v)||0);
   const v23Parcel = t => {
     const m=String(t?.note||'').match(/Parcelado\s+(\d+)\/(\d+)/i);
     if(!m) return null;
@@ -1943,8 +1776,6 @@ setTimeout(()=>{
 
 /* módulo consolidado 3 */
 (function(){
-  const moneySafe = n => money(Number(n||0));
-
   // Investimentos são saída financeira: entram em Despesas, no Saldo e, separadamente, em Investimentos.
   // Investimentos também aparecem no mapa de saídas por categoria, sem perder a distinção de tipo.
 
