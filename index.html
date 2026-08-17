@@ -183,26 +183,35 @@ const MBFinance=(()=>{
    const aliases={receita:"receita",income:"receita",despesa:"despesa",expense:"despesa",investimento:"investimento",investment:"investimento",transferencia:"transferencia",transfer:"transferencia",resgate:"resgate",rescue:"resgate"};
    return aliases[raw]||raw;
  };
- const financialDate=row=>dateOnly(first(row,["transaction_date","date","due_date","created_at"]));
+ const financialDate=row=>["transaction_date","date","due_date","created_at"]
+   .map(field=>dateOnly(row?.[field]))
+   .find(Boolean)||"";
  const period=row=>{
    const date=financialDate(row);
    return date?{date,year:Number(date.slice(0,4)),month:Number(date.slice(5,7)),key:date.slice(0,7)}:{date:"",year:null,month:null,key:""};
  };
  const normalizeTransaction=row=>{
    const source=row||{}, date=financialDate(source), type=kind(first(source,["transaction_type","type"]));
-   const amount=first(source,["amount","value","valor"]);
-   const account=source.account??source.account_id??null, card=source.card??source.card_id??null;
-   return {...source,id:source.id??null,user_id:source.user_id??null,amount:parseMoney(amount),value:source.value??null,valor:source.valor??null,type,transaction_type:type,category:source.category??null,description:source.description??"",transaction_date:date,date:source.date??null,due_date:source.due_date??null,created_at:source.created_at??null,status:source.status??null,account,account_id:account,card,card_id:card,installment:source.installment??null,recurrence:source.recurrence??null};
+   const amount=first(source,["amount","value","valor"]), parsedAmount=parseMoney(amount);
+   const normalizedAmount=Number.isFinite(parsedAmount)?parsedAmount:0;
+   const account=source.account??null, accountId=source.account_id??source.account?.id??null;
+   const card=source.card??null, cardId=source.card_id??source.card?.id??null;
+   return {...source,id:source.id??null,user_id:source.user_id??null,amount:normalizedAmount,value:source.value??null,valor:source.valor??null,type,transaction_type:type,category:source.category??null,description:source.description??"",transaction_date:date,date:source.date??null,due_date:source.due_date??null,created_at:source.created_at??null,status:source.status??null,account,account_id:accountId,card,card_id:cardId,installment:source.installment??null,recurrence:source.recurrence??null};
  };
+ const isInvestment=row=>{
+   const type=kind(typeof row==="object"?(row.transaction_type??row.type):row);
+   return type==="investimento" || (type==="despesa" && typeof row==="object" && canonicalCategoryName(row.category,type)==="Investimentos");
+ };
+ const isExpense=row=>kind(typeof row==="object"?(row.transaction_type??row.type):row)==="despesa"&&!isInvestment(row);
  const totals=rows=>{
-   const normalized=(rows||[]).map(normalizeTransaction);
+   const normalized=(rows||[]).map(normalizeTransaction).filter(row=>!["cancelado","canceled","cancelled"].includes(folded(row.status)));
    const income=normalized.filter(row=>kind(row.transaction_type)==="receita").reduce((sum,row)=>sum+row.amount,0);
-   const expense=normalized.filter(row=>kind(row.transaction_type)==="despesa").reduce((sum,row)=>sum+row.amount,0);
-   const invest=normalized.filter(row=>kind(row.transaction_type)==="investimento").reduce((sum,row)=>sum+row.amount,0);
+   const expense=normalized.filter(isExpense).reduce((sum,row)=>sum+row.amount,0);
+   const invest=normalized.filter(isInvestment).reduce((sum,row)=>sum+row.amount,0);
    return {income,expense,invest,balance:income-expense-invest};
  };
  const category=(value,type)=>({raw:text(value),name:typeof canonicalCategoryName==="function"?canonicalCategoryName(value,kind(type)):text(value)||"Sem categoria",type:kind(type)});
- return Object.freeze({normalizeTransaction,financialDate,period,kind,category,totals,isCancelled:row=>["cancelado","canceled","cancelled"].includes(folded(typeof row==="object"?row?.status:row)),isIncome:row=>kind(typeof row==="object"?(row.transaction_type??row.type):row)==="receita",isExpense:row=>kind(typeof row==="object"?(row.transaction_type??row.type):row)==="despesa",isInvestment:row=>kind(typeof row==="object"?(row.transaction_type??row.type):row)==="investimento",isTransfer:row=>kind(typeof row==="object"?(row.transaction_type??row.type):row)==="transferencia",isRescue:row=>kind(typeof row==="object"?(row.transaction_type??row.type):row)==="resgate"});
+ return Object.freeze({normalizeTransaction,financialDate,period,kind,category,totals,isCancelled:row=>["cancelado","canceled","cancelled"].includes(folded(typeof row==="object"?row?.status:row)),isIncome:row=>kind(typeof row==="object"?(row.transaction_type??row.type):row)==="receita",isExpense,isInvestment,isTransfer:row=>kind(typeof row==="object"?(row.transaction_type??row.type):row)==="transferencia",isRescue:row=>kind(typeof row==="object"?(row.transaction_type??row.type):row)==="resgate"});
 })();
 const normalizeTransaction=MBFinance.normalizeTransaction;
 const isCancelled=MBFinance.isCancelled;
@@ -313,11 +322,12 @@ function periodTx(key=selectedKey()){return cleanTransactions(periodTxRaw(key)).
 function periodAudit(key=selectedKey()){return cleanTransactions(periodTxRaw(key)).duplicates}
 
 function investmentAmount(ts){
-  return (ts||[]).map(normalizeTransaction).filter(isInvestment).reduce((a,t)=>a+t.amount,0);
+  return (ts||[]).map(normalizeTransaction).filter(t=>!isCancelled(t)&&isInvestment(t)).reduce((a,t)=>a+t.amount,0);
 }
 function realizedByCategory(ts){
   const out={};
   for(const t of (ts||[]).map(normalizeTransaction)){
+    if(isCancelled(t)) continue;
     const amount=t.amount;
     if(!amount) continue;
     if(isExpense(t)){
@@ -458,7 +468,7 @@ async function deleteTransactionSmart(id){
  toast(choice==="one"?"Somente esta parcela foi excluída.":`${ids.length} parcela(s) excluída(s).`);
 }
 function dashboard(){
- const ts=periodTx(),t=totals(ts),p=monthlyPlan(),pv=planValues(p),planned=planTotal(p),res=reserveInfo(),cats=expensesByCat(ts),cards=cardSummary();
+ const ts=periodTx(),t=totals(ts),p=monthlyPlan(),pv=planValues(p),planned=planTotal(p),res=reserveInfo(),cats=expensesByCat(ts),cards=cardSummary(),realizedOut=t.expense+t.invest;
  const reserveK=res.current?money(res.current):"R$ 0,00";
  return pageHead("Dashboard",`${MONTHS[FILTERS.month-1]} de ${FILTERS.year}` ,`<button class="btn gold" onclick="openTransaction()">＋ Lançamento</button>`) +
  `<div class="filters">
@@ -472,7 +482,7 @@ function dashboard(){
   <section class="card s8"><h2>Despesas por categoria</h2><div class="desc">Valor + percentual diretamente acima de cada barra.</div>${cats.length?`<div class="chartbox"><canvas id="dashCat"></canvas></div>`:`<div class="empty">Ainda não há despesas neste período.</div>`}</section>
   <section class="card s4"><h2>Reserva de emergência</h2><div class="desc">Metas, contas ou ativos identificados como Reserva, Emergência ou Caixinha.</div><div style="font-size:28px;font-weight:850;margin:16px 0">${reserveK}</div>${res.target?`<div class="bar"><i style="width:${res.pct}%;background:var(--gold)"></i></div><div class="statline"><span>Progresso</span><strong>${pct(res.pct)}</strong></div>`:`<div class="notice">Cadastre uma meta/conta/ativo com nome contendo “Reserva”, “Emergência” ou “Caixinha”.</div>`}</section>
   <section class="card s6"><h2>Cartões de crédito</h2><div class="desc">Gastos do período por cartão.</div>${cards.rows.length?cards.rows.map(([c,v])=>`<div class="statline"><span>${esc(c.name)}</span><strong>${money(v)}</strong></div>`).join("")+`<div class="statline"><strong>Total</strong><strong>${money(cards.total)}</strong></div>`:`<div class="empty">Nenhum cartão cadastrado.</div>`}</section>
-  <section class="card s6"><h2>Planejado × realizado</h2><div class="desc">Comparação geral do período selecionado.</div>${planned?`<div class="statline"><span>Planejado</span><strong>${money(planned)}</strong></div><div class="statline"><span>Realizado</span><strong>${money(t.expense)}</strong></div><div class="statline"><span>Execução</span><strong>${pct(t.expense/planned*100)}</strong></div><div class="bar"><i style="width:${Math.min(100,t.expense/planned*100)}%;background:var(--gold)"></i></div>`:`<div class="empty">Cadastre o planejamento de ${MONTHS[FILTERS.month-1]} de ${FILTERS.year} para comparar.</div>`}</section>
+  <section class="card s6"><h2>Planejado × realizado</h2><div class="desc">Comparação geral do período selecionado.</div>${planned?`<div class="statline"><span>Planejado</span><strong>${money(planned)}</strong></div><div class="statline"><span>Realizado</span><strong>${money(realizedOut)}</strong></div><div class="statline"><span>Execução</span><strong>${pct(realizedOut/planned*100)}</strong></div><div class="bar"><i style="width:${Math.min(100,realizedOut/planned*100)}%;background:var(--gold)"></i></div>`:`<div class="empty">Cadastre o planejamento de ${MONTHS[FILTERS.month-1]} de ${FILTERS.year} para comparar.</div>`}</section>
   <section class="card s12"><h2>Planejado × realizado por categoria</h2>${planned?`<div class="tablewrap"><table><thead><tr><th>Categoria</th><th>Planejado</th><th>Realizado</th><th>Execução</th><th>Diferença</th></tr></thead><tbody>${CAT_ORDER.map(c=>{const real=cats.find(x=>x[0]===c)?.[1]||0,pl=pv[c]||0;return `<tr><td><span class="dot" style="background:${categoryColor(c)}"></span>${c}</td><td>${money(pl)}</td><td>${money(real)}</td><td>${pl?pct(real/pl*100):"—"}</td><td>${money(pl-real)}</td></tr>`}).join("")}</tbody></table></div>`:`<div class="empty">Sem planejamento no período.</div>`}</section>
   <section class="card s12"><h2>Últimos lançamentos do período</h2>${transactionTable([...periodTx()].sort((a,b)=>String(b.transaction_date).localeCompare(String(a.transaction_date))).slice(0,10))}</section>
  </div>`;
@@ -787,10 +797,10 @@ if("serviceWorker" in navigator){
 
   function revenueYear(year){
     const vals=Array(12).fill(0);
-    for(const t of cleanTransactions(DATA.transactions).rows){
-      if(t.status==="cancelado"||t.transaction_type!=="receita") continue;
-      const d=String(t.transaction_date||""); if(+d.slice(0,4)!==+year) continue;
-      const m=+d.slice(5,7); if(m>=1&&m<=12) vals[m-1]+=Number(t.amount||0);
+    for(const t of cleanTransactions((DATA.transactions||[]).map(normalizeTransaction)).rows){
+      const p=MBFinance.period(t);
+      if(isCancelled(t)||!isIncome(t)||p.year!==Number(year)) continue;
+      if(p.month>=1&&p.month<=12) vals[p.month-1]+=t.amount;
     }
     return vals;
   }
@@ -2145,7 +2155,8 @@ setTimeout(()=>{
     const planned=Number(p.revenue||0);
     const plannedOut=['fixed_expenses','investments','comfort','goals','leisure','knowledge']
       .reduce((a,k)=>a+safe(p[k]),0);
-    const budgetScore=plannedOut>0?clamp((1-Math.max(0,t.expense-plannedOut)/plannedOut)*100):
+    const actualOut=t.expense+t.invest;
+    const budgetScore=plannedOut>0?clamp((1-Math.max(0,actualOut-plannedOut)/plannedOut)*100):
       (t.balance>=0?75:35);
     const investScore=planned&&safe(t.invest)>0?clamp(t.invest/planned*100):
       (t.invest>0?70:40);
@@ -2786,12 +2797,12 @@ migrateReserveGoals();
 
   function fixedForMonth58(y,m){
     const key=monthKey58(y,m);
-    const rows=Array.isArray(DATA?.transactions)?DATA.transactions:[];
+    const rows=(Array.isArray(DATA?.transactions)?DATA.transactions:[]).map(normalizeTransaction);
     return rows
-      .filter(t=>String(t.transaction_date||'').slice(0,7)===key)
+      .filter(t=>MBFinance.period(t).key===key&&!isCancelled(t))
       .filter(t=>typeof topCategory==='function' && topCategory(t.category,t.transaction_type)==='Gastos Fixos')
-      .filter(t=>['despesa','investimento'].includes(String(t.transaction_type||'').toLowerCase()))
-      .reduce((sum,t)=>sum+n58(t.amount),0);
+      .filter(t=>isExpense(t)||isInvestment(t))
+      .reduce((sum,t)=>sum+t.amount,0);
   }
 
   function fixedAverage58(){
