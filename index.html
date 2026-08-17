@@ -101,7 +101,7 @@ const MONTHS=["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Ago
 const CAT_ORDER=["Gastos Fixos","Investimentos","Conforto","Metas","Lazer","Conhecimento"];
 const DEFAULT_COLORS=["#d9ad37","#8e72d9","#4f9ed7","#7dbb72","#e48b3c","#48aaa5"];
 let USER=null,TAB="dashboard",CHARTS={};
-let DATA={accounts:[],cards:[],categories:[],transactions:[],goals:[],recurring:[],assets:[],liabilities:[],monthly:[],strategy:[],rules:[],imports:[]};
+let DATA={accounts:[],cards:[],categories:[],transactions:[],goals:[],recurring:[],assets:[],liabilities:[],monthly:[],rules:[],imports:[]};
 let FILTERS={year:new Date().getFullYear(),month:new Date().getMonth()+1,txType:"",txCategory:"",txMonth:"",search:""};
 
 function toast(msg,err=false){$("toastBox").textContent=msg;$("toastBox").className=err?"errorbox":"notice";$("toast").classList.remove("hidden");clearTimeout(window.__toast);window.__toast=setTimeout(()=>$("toast").classList.add("hidden"),3500)}
@@ -300,19 +300,19 @@ async function load(){
   ["accounts","created_at"],["cards","created_at"],["categories","created_at"],
   ["transactions","transaction_date"],["goals","created_at"],
   ["recurring","created_at"],["assets","created_at"],["liabilities","created_at"],
-  ["monthly_plans","created_at"],["strategy_plans","created_at"],["rules","created_at"],["imports","imported_at"]
+  ["monthly_plans","created_at"],["rules","created_at"],["imports","imported_at"]
  ];
  const results=await Promise.all(specs.map(async([name,col])=>{
    const {data,error}=await sb.from(name).select("*").eq("user_id",USER.id).order(col,{ascending:false});
    if(error){
      console.error(name,error);
-     if(["strategy_plans","rules","imports"].includes(name)) return [name,[]];
+     if(["rules","imports"].includes(name)) return [name,[]];
      throw error;
    }
    return [name,data||[]];
  }));
  for(const [name,data] of results){
-   DATA[name==="monthly_plans"?"monthly":name==="strategy_plans"?"strategy":name]=data;
+   DATA[name==="monthly_plans"?"monthly":name]=data;
  }
 }
 function periodTxRaw(key=selectedKey()){
