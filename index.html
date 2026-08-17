@@ -897,6 +897,7 @@ if("serviceWorker" in navigator){
       plugins:[revenueValueLabels]
     });
   }
+  window.drawRevenue=drawRevenue;
 
   window.transactions=function(){
     const arr=DATA.transactions.filter(t=>(!FILTERS.txType||t.transaction_type===FILTERS.txType)&&(!FILTERS.txCategory||topCategory(t.category,t.transaction_type)===FILTERS.txCategory)&&(!FILTERS.search||`${t.description} ${canonicalCategoryName(t.category,t.transaction_type)} ${t.subcategory||""}`.toLowerCase().includes(FILTERS.search.toLowerCase())));
