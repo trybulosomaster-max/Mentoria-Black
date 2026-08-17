@@ -827,6 +827,7 @@ if("serviceWorker" in navigator){
           status:new Date(cursor+"T12:00:00")<=today?"realizado":"pendente",
           payment_method:r.card_id?"Cartão de crédito":"Conta",
           account_id:r.account_id||null, card_id:r.card_id||null,
+          goal_id:r.goal_id||null, goal_effect:r.goal_id?(r.goal_effect||'contribution'):null,
           note:(String(r.note||"").trim()?String(r.note).trim()+" • ":"")+`Recorrência automática • ${r.id}`
         };
         const sig=recurrenceSignature(row);
@@ -993,6 +994,15 @@ if("serviceWorker" in navigator){
     }
   }
 
+  function v19GoalOptions(selected){
+    const goals=Array.isArray(DATA.goals)?DATA.goals:[];
+    const current=String(selected||'');
+    const options=['<option value="">'+(goals.length?'Nenhuma':'Nenhuma meta cadastrada')+'</option>'];
+    goals.forEach(goal=>options.push(`<option value="${esc(goal.id)}" ${goal.id===current?'selected':''}>${esc(goal.name||'Meta sem nome')}</option>`));
+    if(current&&!goals.some(goal=>goal.id===current))options.push(`<option value="${esc(current)}" selected>Meta indisponível</option>`);
+    return options.join('');
+  }
+
   // Fix parcel deduplication: two purchases in the same month with the same description are not duplicates.
   window.txDuplicateKey = function(t){
     const note=String(t.note||'');
@@ -1020,14 +1030,6 @@ if("serviceWorker" in navigator){
     const initial=t?.transaction_type||'despesa';
     const initialPurchase=t?.purchase_date || (t?.card_id ? t?.transaction_date : (id ? t?.transaction_date : new Date().toISOString().slice(0,10)));
     const initialBilling=t?.transaction_date || initialPurchase;
-    const goalOptions=(selected)=>{
-      const goals=Array.isArray(DATA.goals)?DATA.goals:[];
-      const current=String(selected||'');
-      const options=['<option value="">'+(goals.length?'Nenhuma':'Nenhuma meta cadastrada')+'</option>'];
-      goals.forEach(goal=>options.push(`<option value="${esc(goal.id)}" ${goal.id===current?'selected':''}>${esc(goal.name||'Meta sem nome')}</option>`));
-      if(current&&!goals.some(goal=>goal.id===current))options.push(`<option value="${esc(current)}" selected>Meta indisponível</option>`);
-      return options.join('');
-    };
     modal(id?'Editar lançamento':'Novo lançamento',`
       <form id="v19TxForm" class="v15-form">
         <div class="v15-amount"><span>Valor</span><input name="amount" id="v19Amount" inputmode="decimal" autocomplete="off" placeholder="R$ 0,00" value="${t?.amount?num(t.amount):''}" required autofocus></div>
@@ -1053,7 +1055,7 @@ if("serviceWorker" in navigator){
         <details class="v15-details"><summary>Mais detalhes <span>Opcional</span></summary>
           <div class="v15-detail-grid">
             <div><label>Forma de pagamento</label><input name="payment_method" value="${esc(t?.payment_method||'')}"></div>
-            <div><label>Vincular a uma meta</label><select name="goal_id" id="v19Goal">${goalOptions(t?.goal_id)}</select></div>
+            <div><label>Vincular a uma meta</label><select name="goal_id" id="v19Goal">${v19GoalOptions(t?.goal_id)}</select></div>
             <div><label>Efeito na meta</label><select name="goal_effect" id="v19GoalEffect"><option value="contribution" ${(t?.goal_effect||'contribution')==='contribution'?'selected':''}>Aporte</option><option value="withdrawal" ${t?.goal_effect==='withdrawal'?'selected':''}>Retirada</option></select></div>
             <div class="full"><label>Observação</label><textarea name="note">${esc(t?.note||'')}</textarea></div>
             <div class="full v15-check"><label><input type="checkbox" id="v19Install"> Parcelar lançamento</label><span>Divide o lançamento em parcelas futuras.</span></div>
@@ -1196,7 +1198,8 @@ if("serviceWorker" in navigator){
           user_id:USER.id,name:base.description,frequency:'monthly',interval:1,next_date:recurringStart,
           start_date:base.transaction_date,day_of_month:Number(billingDate.slice(8,10))||1,
           amount:base.amount,type:base.transaction_type,category:base.category,subcategory:base.subcategory,
-          account_id:base.account_id,card_id:base.card_id,active:true,auto_post:true,note:base.note||null
+          account_id:base.account_id,card_id:base.card_id,goal_id:base.goal_id,goal_effect:base.goal_effect,
+          active:true,auto_post:true,note:base.note||null
         });
         if(rr.error){$('v19TxMsg').textContent='Lançamento salvo, mas a recorrência não foi criada: '+rr.error.message;return}
       }
@@ -1262,6 +1265,8 @@ if("serviceWorker" in navigator){
           <div><label>Cartão</label><select name="card_id" id="v19RecurringCard">${cardOptions(x?.card_id||'')}</select></div>
         </div>
         <details class="v15-details"><summary>Mais opções <span>Opcional</span></summary><div class="v15-detail-grid">
+          <div><label>Vincular a uma meta</label><select name="goal_id" id="v19RecurringGoal">${v19GoalOptions(x?.goal_id)}</select></div>
+          <div><label>Efeito na meta</label><select name="goal_effect" id="v19RecurringGoalEffect"><option value="contribution" ${(x?.goal_effect||'contribution')==='contribution'?'selected':''}>Aporte</option><option value="withdrawal" ${x?.goal_effect==='withdrawal'?'selected':''}>Retirada</option></select></div>
           <div class="full v15-check"><label><input name="active" type="checkbox" ${x?.active!==false?'checked':''}> Recorrência ativa</label><span>Regras pausadas não geram novos lançamentos.</span></div>
           <div class="full v15-check"><label><input name="auto_post" type="checkbox" ${x?.auto_post!==false?'checked':''}> Lançamento automático</label><span>Preserva a compatibilidade com a materialização atual.</span></div>
           <div class="full"><label>Observação</label><textarea name="note">${esc(x?.note||'')}</textarea></div>
@@ -1269,7 +1274,7 @@ if("serviceWorker" in navigator){
         <div id="v19RecurringMsg" class="msg"></div>
         <div class="modal-foot"><button type="button" class="btn" onclick="closeModal()">Cancelar</button><button class="btn primary">Salvar</button></div>
       </form>`);
-    const form=$('v19RecurringForm'), type=$('v19RecurringType'), category=$('v19RecurringCategory'), account=$('v19RecurringAccount'), card=$('v19RecurringCard'), start=$('v19RecurringStart'), next=$('v19RecurringNext'), day=$('v19RecurringDay'), amount=$('v19RecurringAmount');
+    const form=$('v19RecurringForm'), type=$('v19RecurringType'), category=$('v19RecurringCategory'), account=$('v19RecurringAccount'), card=$('v19RecurringCard'), start=$('v19RecurringStart'), next=$('v19RecurringNext'), day=$('v19RecurringDay'), amount=$('v19RecurringAmount'), goal=$('v19RecurringGoal'), goalEffect=$('v19RecurringGoalEffect');
     const syncType=()=>{
       const keep=category.value;
       category.innerHTML=v19Opts(V19_CATS_FOR(type.value),v19CategoryFor(type.value,keep)?keep:'');
@@ -1281,12 +1286,20 @@ if("serviceWorker" in navigator){
     type.onchange=async()=>{if(type.value==='receita')await v19EnsureIncomeCategories();syncType();};
     account.onchange=()=>{if(account.value)card.value='';syncType();};
     card.onchange=()=>{if(card.value)account.value='';syncType();};
+    const syncGoalEffect=()=>{
+      const linked=!!goal.value;
+      goalEffect.disabled=!linked;
+      if(linked&&!goalEffect.value)goalEffect.value='contribution';
+    };
+    goal.onchange=syncGoalEffect;
     start.onchange=()=>{if(!next.value)next.value=start.value;day.value=Number(start.value.slice(8,10))||1;};
     amount.addEventListener('blur',()=>formatMoneyInput(amount));
     syncType();
+    syncGoalEffect();
     form.onsubmit=async e=>{
       e.preventDefault();
       const fd=new FormData(form), amountValue=parseMoney(fd.get('amount')), selectedType=type.value, selectedCategory=String(fd.get('category')||'').trim(), accountId=account.value||null, cardId=card.value||null;
+      const goalId=goal.value||null, goalEffectValue=goalId?(goalEffect.value==='withdrawal'?'withdrawal':'contribution'):null;
       const errors=[];
       if(!String(fd.get('name')||'').trim()) errors.push('nome');
       if(!Number.isFinite(amountValue)||amountValue<=0) errors.push('valor');
@@ -1302,7 +1315,8 @@ if("serviceWorker" in navigator){
         name:String(fd.get('name')).trim(), frequency:String(fd.get('frequency')||'monthly'), interval:Math.max(1,Math.min(120,Number(fd.get('interval'))||1)),
         next_date:fd.get('next_date'), start_date:fd.get('start_date'), day_of_month:Math.min(31,Math.max(1,Number(fd.get('day_of_month'))||Number(String(fd.get('start_date')).slice(8,10))||1)),
         amount:amountValue, type:selectedType, category:selectedCategory, subcategory:fd.get('subcategory')||null,
-        account_id:accountId, card_id:cardId, active:fd.get('active')==='on', auto_post:fd.get('auto_post')==='on', note:fd.get('note')||null
+        account_id:accountId, card_id:cardId, goal_id:goalId, goal_effect:goalEffectValue,
+        active:fd.get('active')==='on', auto_post:fd.get('auto_post')==='on', note:fd.get('note')||null
       };
       const r=id?await sb.from('recurring').update(o).eq('id',id).eq('user_id',USER.id):await sb.from('recurring').insert({...o,user_id:USER.id});
       if(r.error){$('v19RecurringMsg').textContent=r.error.message;return}
