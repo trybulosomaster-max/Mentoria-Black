@@ -160,6 +160,57 @@ function formatMoneyInput(el){
  const n=parseMoney(el.value); if(!Number.isFinite(n))return;
  el.value=n.toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2});
 }
+/* Camada financeira canônica: leitura e normalização, sem alterar registros remotos. */
+const MBFinance=(()=>{
+ const text=value=>String(value??"").trim();
+ const folded=value=>text(value).normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLocaleLowerCase("pt-BR");
+ const first=(row,keys)=>keys.map(key=>row?.[key]).find(value=>value!==undefined&&value!==null&&text(value)!=="");
+ const validDate=(year,month,day)=>{
+   const date=new Date(year,month-1,day);
+   return date.getFullYear()===year&&date.getMonth()===month-1&&date.getDate()===day;
+ };
+ const dateOnly=value=>{
+   if(value instanceof Date&&!Number.isNaN(value.getTime())) return value.toISOString().slice(0,10);
+   const raw=text(value);
+   let match=raw.match(/^(\d{4})-(\d{2})-(\d{2})(?:$|[T\s])/);
+   if(match){const [,y,m,d]=match.map(Number);return validDate(y,m,d)?`${String(y).padStart(4,"0")}-${String(m).padStart(2,"0")}-${String(d).padStart(2,"0")}`:"";}
+   match=raw.match(/^(\d{2})\/(\d{2})\/(\d{4})(?:$|\s)/);
+   if(match){const [,d,m,y]=match.map(Number);return validDate(y,m,d)?`${y}-${String(m).padStart(2,"0")}-${String(d).padStart(2,"0")}`:"";}
+   return "";
+ };
+ const kind=value=>{
+   const raw=folded(value);
+   const aliases={receita:"receita",income:"receita",despesa:"despesa",expense:"despesa",investimento:"investimento",investment:"investimento",transferencia:"transferencia",transfer:"transferencia",resgate:"resgate",rescue:"resgate"};
+   return aliases[raw]||raw;
+ };
+ const financialDate=row=>dateOnly(first(row,["transaction_date","date","due_date","created_at"]));
+ const period=row=>{
+   const date=financialDate(row);
+   return date?{date,year:Number(date.slice(0,4)),month:Number(date.slice(5,7)),key:date.slice(0,7)}:{date:"",year:null,month:null,key:""};
+ };
+ const normalizeTransaction=row=>{
+   const source=row||{}, date=financialDate(source), type=kind(first(source,["transaction_type","type"]));
+   const amount=first(source,["amount","value","valor"]);
+   const account=source.account??source.account_id??null, card=source.card??source.card_id??null;
+   return {...source,id:source.id??null,user_id:source.user_id??null,amount:parseMoney(amount),value:source.value??null,valor:source.valor??null,type,transaction_type:type,category:source.category??null,description:source.description??"",transaction_date:date,date:source.date??null,due_date:source.due_date??null,created_at:source.created_at??null,status:source.status??null,account,account_id:account,card,card_id:card,installment:source.installment??null,recurrence:source.recurrence??null};
+ };
+ const totals=rows=>{
+   const normalized=(rows||[]).map(normalizeTransaction);
+   const income=normalized.filter(row=>kind(row.transaction_type)==="receita").reduce((sum,row)=>sum+row.amount,0);
+   const expense=normalized.filter(row=>kind(row.transaction_type)==="despesa").reduce((sum,row)=>sum+row.amount,0);
+   const invest=normalized.filter(row=>kind(row.transaction_type)==="investimento").reduce((sum,row)=>sum+row.amount,0);
+   return {income,expense,invest,balance:income-expense-invest};
+ };
+ const category=(value,type)=>({raw:text(value),name:typeof canonicalCategoryName==="function"?canonicalCategoryName(value,kind(type)):text(value)||"Sem categoria",type:kind(type)});
+ return Object.freeze({normalizeTransaction,financialDate,period,kind,category,totals,isCancelled:row=>["cancelado","canceled","cancelled"].includes(folded(typeof row==="object"?row?.status:row)),isIncome:row=>kind(typeof row==="object"?(row.transaction_type??row.type):row)==="receita",isExpense:row=>kind(typeof row==="object"?(row.transaction_type??row.type):row)==="despesa",isInvestment:row=>kind(typeof row==="object"?(row.transaction_type??row.type):row)==="investimento",isTransfer:row=>kind(typeof row==="object"?(row.transaction_type??row.type):row)==="transferencia",isRescue:row=>kind(typeof row==="object"?(row.transaction_type??row.type):row)==="resgate"});
+})();
+const normalizeTransaction=MBFinance.normalizeTransaction;
+const isCancelled=MBFinance.isCancelled;
+const isIncome=MBFinance.isIncome;
+const isExpense=MBFinance.isExpense;
+const isInvestment=MBFinance.isInvestment;
+const isTransfer=MBFinance.isTransfer;
+const isRescue=MBFinance.isRescue;
 function categoryColor(name){
   const canonical=canonicalCategoryName(name);
   const cats=Array.isArray(DATA.categories)?DATA.categories:[];
@@ -234,7 +285,7 @@ async function load(){
  }
 }
 function periodTxRaw(key=selectedKey()){
- return DATA.transactions.filter(t=>String(t.transaction_date||"").slice(0,7)===key && t.status!=="cancelado");
+ return DATA.transactions.map(normalizeTransaction).filter(t=>MBFinance.period(t).key===key&&!isCancelled(t));
 }
 function txDuplicateKey(t){
  const note=String(t.note||"");
@@ -262,34 +313,24 @@ function periodTx(key=selectedKey()){return cleanTransactions(periodTxRaw(key)).
 function periodAudit(key=selectedKey()){return cleanTransactions(periodTxRaw(key)).duplicates}
 
 function investmentAmount(ts){
-  return (ts||[]).filter(t=>
-    String(t?.transaction_type||"").trim().toLowerCase()==="investimento" ||
-    canonicalCategoryName(t?.category,t?.transaction_type)==="Investimentos"
-  ).reduce((a,t)=>a+Number(t?.amount||0),0);
+  return (ts||[]).map(normalizeTransaction).filter(isInvestment).reduce((a,t)=>a+t.amount,0);
 }
 function realizedByCategory(ts){
   const out={};
-  for(const t of (ts||[])){
-    const amount=Number(t?.amount||0);
+  for(const t of (ts||[]).map(normalizeTransaction)){
+    const amount=t.amount;
     if(!amount) continue;
-    const type=String(t?.transaction_type||"").trim().toLowerCase();
-    if(type==="despesa"){
-      const c=canonicalCategoryName(t?.category,type);
+    if(isExpense(t)){
+      const c=MBFinance.category(t.category,t.transaction_type).name;
       if(c) out[c]=(out[c]||0)+amount;
-    }else if(type==="investimento"){
+    }else if(isInvestment(t)){
       out["Investimentos"]=(out["Investimentos"]||0)+amount;
     }
   }
   return out;
 }
 function totals(ts){
-  const rows=ts||[];
-  const income=rows.filter(t=>String(t?.transaction_type||"").trim().toLowerCase()==="receita")
-    .reduce((a,t)=>a+Number(t?.amount||0),0);
-  const expense=rows.filter(t=>["despesa","investimento"].includes(String(t?.transaction_type||"").trim().toLowerCase()))
-    .reduce((a,t)=>a+Number(t?.amount||0),0);
-  const invest=investmentAmount(rows);
-  return {income,expense,invest,balance:income-expense};
+  return MBFinance.totals(ts);
 }
 function monthlyPlan(){return DATA.monthly.find(p=>Number(p.year)===Number(FILTERS.year)&&Number(p.month)===Number(FILTERS.month))||null}
 function planValues(p){p=p||{};return {"Gastos Fixos":Number(p.fixed_expenses||0),"Investimentos":Number(p.investments||0),"Conforto":Number(p.comfort||0),"Metas":Number(p.goals||0),"Lazer":Number(p.leisure||0),"Conhecimento":Number(p.knowledge||0)}}
@@ -1123,18 +1164,6 @@ if("serviceWorker" in navigator){
     }
     return {rows:out,duplicates};
   };
-  window.periodTxRaw = function(key=selectedKey()){ return DATA.transactions.filter(t=>String(t.transaction_date||'').slice(0,7)===key && t.status!=='cancelado'); };
-  window.periodTx = function(key=selectedKey()){ return window.cleanTransactions(window.periodTxRaw(key)).rows; };
-  window.periodAudit = function(key=selectedKey()){ return window.cleanTransactions(window.periodTxRaw(key)).duplicates; };
-
-  // Correct financial semantics: expenses are expenses; investments are a separate outflow.
-  window.totals = function(ts){
-    const income=ts.filter(t=>t.transaction_type==='receita').reduce((a,t)=>a+Number(t.amount||0),0);
-    const expense=ts.filter(t=>t.transaction_type==='despesa').reduce((a,t)=>a+Number(t.amount||0),0);
-    const invest=ts.filter(t=>t.transaction_type==='investimento').reduce((a,t)=>a+Number(t.amount||0),0);
-    return {income,expense,invest,balance:income-expense-invest};
-  };
-
   window.cardSummary = function(){
     const map={}; window.periodTx().filter(t=>t.card_id&&['despesa','investimento'].includes(t.transaction_type)).forEach(t=>map[t.card_id]=(map[t.card_id]||0)+Number(t.amount||0));
     const rows=DATA.cards.map(c=>[c,Number(map[c.id]||0)]); return {rows,total:rows.reduce((a,x)=>a+x[1],0)};
@@ -1404,9 +1433,9 @@ if("serviceWorker" in navigator){
     FILTERS.txMonth=String(Number(legacy.slice(5,7)));
   }
 
-  const dateKey=t=>{const d=String(t?.transaction_date||'').slice(0,10);return /^\d{4}-\d{2}-\d{2}$/.test(d)?d:''};
-  const txYear=t=>{const d=dateKey(t);return d?Number(d.slice(0,4)):null};
-  const txMonth=t=>{const d=dateKey(t);return d?Number(d.slice(5,7)):null};
+  const dateKey=t=>MBFinance.financialDate(t);
+  const txYear=t=>MBFinance.period(t).year;
+  const txMonth=t=>MBFinance.period(t).month;
 
   function existingYears(){
     return [...new Set((DATA.transactions||[]).map(txYear).filter(y=>Number.isInteger(y)))]
@@ -1439,8 +1468,8 @@ if("serviceWorker" in navigator){
       .filter(t=>{
         const d=dateKey(t);
         if(!d) return false;
-        if(t.status==='cancelado') return false;
-        if(type && String(t.transaction_type||'')!==type) return false;
+        if(isCancelled(t)) return false;
+        if(type && MBFinance.kind(t.transaction_type||t.type)!==MBFinance.kind(type)) return false;
         if(cat){
           const direct=String(t.category||'');
           const top=typeof topCategory==='function'?String(topCategory(direct)||direct):direct;
@@ -1455,7 +1484,7 @@ if("serviceWorker" in navigator){
         }
         return true;
       })
-      .sort((a,b)=>String(b.transaction_date||'').localeCompare(String(a.transaction_date||'')));
+      .sort((a,b)=>dateKey(b).localeCompare(dateKey(a)));
   }
 
   function periodTitle(){
