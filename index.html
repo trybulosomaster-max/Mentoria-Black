@@ -259,6 +259,28 @@ function isLegacyInvestmentCategory(name){
 function visibleTopCategories(list){
   return (list||[]).filter(c=>!c.parent&&!isLegacyInvestmentCategory(c.name));
 }
+function categoryUiNameKey(value){
+  const name=typeof value==="object"?value?.name:value;
+  return String(name??"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/\s+/g," ").trim().toLocaleLowerCase("pt-BR");
+}
+function categoryUiKind(value){
+  const kind=String(value??"").trim().toLocaleLowerCase("pt-BR");
+  return kind==="investimento"?"despesa":kind;
+}
+function categoryUiIdentity(category,fallbackKind=""){
+  const source=category&&typeof category==="object"?category:{name:category,kind:fallbackKind};
+  const kind=categoryUiKind(source.kind??fallbackKind);
+  const level=String(source.parent??"").trim()?"sub":"top";
+  return `${kind}|${level}|${categoryUiNameKey(source)}`;
+}
+function dedupeCategoryOptions(list,fallbackKind=""){
+  const seen=new Set();
+  return (list||[]).filter(category=>{
+    const key=categoryUiIdentity(category,fallbackKind);
+    if(!categoryUiNameKey(category)||seen.has(key))return false;
+    seen.add(key);return true;
+  });
+}
 function categoryOptions(value="",allowBlank=true){
  const selected=canonicalCategoryName(value);
  const cats=visibleTopCategories(DATA.categories);
@@ -1090,8 +1112,8 @@ if("serviceWorker" in navigator){
   const V19_EXPENSE_DEFAULTS = ['Gastos Fixos','Investimentos','Conforto','Metas','Lazer','Conhecimento'];
   const V19_CATS = () => Array.isArray(DATA.categories) ? DATA.categories : [];
   const V19_TOP = () => visibleTopCategories(V19_CATS());
-  const V19_INCOME = () => V19_TOP().filter(c => ['receita','ambos'].includes(V19_KIND(c.kind)));
-  const V19_EXPENSE = () => V19_TOP().filter(c => ['despesa','ambos'].includes(V19_KIND(c.kind)));
+  const V19_INCOME = () => dedupeCategoryOptions(V19_TOP().filter(c => ['receita','ambos'].includes(V19_KIND(c.kind))));
+  const V19_EXPENSE = () => dedupeCategoryOptions(V19_TOP().filter(c => ['despesa','ambos'].includes(V19_KIND(c.kind))));
   const V19_CATS_FOR = type => type === 'receita' ? V19_INCOME() : V19_EXPENSE();
   const V19_NORM = value => String(value ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ').trim().toLowerCase();
   const V19_DEFAULT_EXPENSE_SET = new Set(V19_EXPENSE_DEFAULTS.map(V19_NORM));
@@ -1102,7 +1124,7 @@ if("serviceWorker" in navigator){
   V19_CATS().forEach(c => { if (!c.kind) c.kind = V19_EXPENSE_DEFAULTS.map(x=>x.toLowerCase()).includes(String(c.name||'').toLowerCase()) ? 'despesa' : 'despesa'; });
 
   function v19Opts(list, value='') {
-    return '<option value="">Selecione</option>' + list.map(c =>
+    return '<option value="">Selecione</option>' + dedupeCategoryOptions(list).map(c =>
       `<option value="${esc(c.name)}" ${V19_CATEGORY_MATCH(value,c.name)?'selected':''}>${esc(c.name)}</option>`
     ).join('');
   }
@@ -1453,17 +1475,21 @@ if("serviceWorker" in navigator){
       .sort((a,b)=>b-a);
   }
 
-  function categoryNames(){
+  function categoryNames(type=''){
     const names=new Map();
-    (DATA.categories||[]).forEach(c=>{
-      const name=String(c?.name||'').trim();
-      if(name&&!isLegacyInvestmentCategory(name)) names.set(name,name);
-    });
+    const wantedKind=categoryUiKind(type);
+    const add=(category,fallbackKind='')=>{
+      const name=String(category?.name??category??'').trim();
+      const kind=categoryUiKind((category?.kind??fallbackKind)||'despesa');
+      if(!name||isLegacyInvestmentCategory(name)||(wantedKind&&kind!==wantedKind&&kind!=='ambos'))return;
+      const key=categoryUiIdentity({...((category&&typeof category==='object')?category:{}),name,kind},fallbackKind);
+      if(!names.has(key)) names.set(key,name);
+    };
+    (DATA.categories||[]).forEach(c=>add(c));
     // Historical transaction labels are normalized to the current category
     // before entering the filter list.
     (DATA.transactions||[]).forEach(t=>{
-      const name=canonicalCategoryName(t?.category,t?.transaction_type);
-      if(name&&!isLegacyInvestmentCategory(name)) names.set(name,name);
+      add({name:canonicalCategoryName(t?.category,t?.transaction_type),kind:t?.transaction_type});
     });
     return [...names.values()].sort((a,b)=>a.localeCompare(b,'pt-BR'));
   }
@@ -1484,7 +1510,8 @@ if("serviceWorker" in navigator){
         if(cat){
           const direct=String(t.category||'');
           const top=typeof topCategory==='function'?String(topCategory(direct)||direct):direct;
-          if(cat!==direct && cat!==top) return false;
+          const selected=categoryUiNameKey(cat);
+          if(selected!==categoryUiNameKey(direct) && selected!==categoryUiNameKey(top)) return false;
         }
         if(m && txMonth(t)!==m) return false;
         if(y && txYear(t)!==y) return false;
@@ -1521,7 +1548,7 @@ if("serviceWorker" in navigator){
   window.transactions=function(){
     const rows=filteredTransactions();
     const years=existingYears();
-    const cats=categoryNames();
+    const cats=categoryNames(FILTERS.txType);
     const types=['receita','despesa','investimento','transferencia','resgate'];
     const m=FILTERS.txMonth?String(Number(FILTERS.txMonth)):'';
     const y=FILTERS.txYear?String(Number(FILTERS.txYear)):'';
