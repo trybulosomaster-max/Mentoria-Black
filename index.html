@@ -702,7 +702,7 @@ if("serviceWorker" in navigator){
       list.map(c=>`<option value="${esc(c.name)}" ${String(value).toLowerCase()===String(c.name).toLowerCase()?"selected":""}>${esc(c.name)}</option>`).join("");
   }
 
-  window.openTransaction = async function(id){
+  const v15OpenTransaction = async function(id){
     const t=id?DATA.transactions.find(x=>x.id===id):{};
     if(t.transaction_type==="receita") await ensureIncomeCategories();
     const initial=t.transaction_type||"despesa";
@@ -1084,14 +1084,6 @@ if("serviceWorker" in navigator){
     }
   })();
 
-  const originalOpen=window.openTransaction;
-  window.openTransaction=async function(id){
-    await originalOpen(id);
-    requestAnimationFrame(()=>{
-      const input=$("v15Amount");
-      if(input){input.focus({preventScroll:true});input.select();}
-    });
-  };
 })();
 </script>
 <script>
@@ -1229,10 +1221,10 @@ if("serviceWorker" in navigator){
           <div><label>Cartão</label><select name="card_id" id="v19Card">${cardOptions(t?.card_id||'')}</select></div>
           <div><label>Subcategoria</label><input name="subcategory" value="${esc(t?.subcategory||'')}"></div>
         </div>
+        <div class="v38-status-row"><label>Status</label><select name="status"><option value="realizado">Realizado</option><option value="pendente" ${t?.status==='pendente'?'selected':''}>Pendente</option><option value="cancelado" ${t?.status==='cancelado'?'selected':''}>Cancelado</option></select></div>
         <details class="v15-details"><summary>Mais detalhes <span>Opcional</span></summary>
           <div class="v15-detail-grid">
             <div><label>Forma de pagamento</label><input name="payment_method" value="${esc(t?.payment_method||'')}"></div>
-            <div><label>Status</label><select name="status"><option value="realizado">Realizado</option><option value="pendente" ${t?.status==='pendente'?'selected':''}>Pendente</option><option value="cancelado" ${t?.status==='cancelado'?'selected':''}>Cancelado</option></select></div>
             <div class="full"><label>Observação</label><textarea name="note">${esc(t?.note||'')}</textarea></div>
             <div class="full v15-check"><label><input type="checkbox" id="v19Install"> Parcelar lançamento</label><span>Divide o lançamento em parcelas futuras.</span></div>
             <div class="full hidden" id="v19InstallFields"><div class="v19-card-grid"><div><label>Número de parcelas</label><input id="v19Count" type="number" min="2" max="120" value="2"></div><div><label>Primeira fatura</label><input id="v19Start" type="date" value="${initialBilling}"></div></div><div id="v19InstallPreview" class="notice" style="margin-top:12px"></div></div>
@@ -1247,74 +1239,70 @@ if("serviceWorker" in navigator){
     const typeState={value:typeInitial};
     const typeEl=()=>typeState.value;
     const category=$('v19Category'), account=$('v19Account'), card=$('v19Card'), cardBox=$('v19CardBox'), purchase=$('v19PurchaseDate'), billing=$('v19BillingDate'), billingMain=$('v19TransactionDate'), dateLabel=$('v19DateLabel'), install=$('v19Install'), installFields=$('v19InstallFields'), start=$('v19Start'), count=$('v19Count'), installPreview=$('v19InstallPreview'), recurring=$('v19Recurring');
-    function syncDatesFromCard(){
-      const has=!!card.value && typeEl()!=='receita';
-      cardBox.style.display=has?'block':'none';
-      if(has){
-        dateLabel.textContent='Data da despesa na fatura';
-        purchase.value=purchase.value || billingMain.value;
-        if(!id || !t?.card_id) billing.value=v19SuggestedBillingDate(purchase.value,card.value) || billingMain.value;
-        billingMain.value=billing.value || billingMain.value;
-      }else{
-        dateLabel.textContent='Data do lançamento';
-      }
-    }
     function syncCategories(){
       const list=V19_CATS_FOR(typeEl());
-      category.innerHTML=v19Opts(list, v19CategoryFor(typeEl(),category.value)?category.value:'');
+      category.innerHTML=v19Opts(list,v19CategoryFor(typeEl(),category.value)?category.value:'');
       category.required=true;
-      if(typeEl()==='receita'){
-        card.value=''; cardBox.style.display='none';
-        account.disabled=false;
-      }
-      // Receitas também podem ser parceladas e/ou recorrentes.
-      // Conta continua obrigatória para receita; cartão continua proibido.
-      install.closest('.v15-check').style.display='';
-      recurring.closest('.v15-check').style.display='';
-      const installLabel=install.closest('.v15-check')?.querySelector('span');
-      if(installLabel) installLabel.textContent=typeEl()==='receita'
-        ? 'Divide a receita total em parcelas futuras, sem alterar o valor total informado.'
-        : 'Para cartão, cada parcela fica no mês da respectiva fatura.';
-      const startLabel=install.closest('.v15-check')?.nextElementSibling?.querySelector('label');
-      if(startLabel) startLabel.textContent=typeEl()==='receita'?'Primeiro lançamento':'Primeira fatura';
-      const recurringLabel=recurring.closest('.v15-check')?.querySelector('span');
-      if(recurringLabel) recurringLabel.textContent=typeEl()==='receita'
-        ? 'Cria uma regra mensal para receber automaticamente nos próximos meses.'
-        : 'Cria uma regra mensal. Pode ser usada junto com o parcelamento.';
-      if(typeEl()==='receita'){
-        card.value='';
-        cardBox.style.display='none';
-        account.disabled=false;
-      }
     }
-    function setType(next){
-      typeState.value=next; typeButtons.forEach(b=>b.classList.toggle('active',b.dataset.type===next)); syncCategories(); syncDatesFromCard();
+    function syncAccountCard(){
+      const revenue=typeEl()==='receita';
+      if(revenue) card.value='';
+      card.disabled=revenue;
+      account.disabled=!!card.value;
     }
-    typeButtons.forEach(b=>b.onclick=()=>setType(b.dataset.type));
-    card.onchange=()=>{
-      if(card.value){account.value=''; if(typeEl()==='receita')setType('despesa'); syncDatesFromCard();}
-      else syncDatesFromCard();
-    };
-    account.onchange=()=>{if(account.value)card.value='';syncDatesFromCard()};
-    purchase.onchange=()=>{if(card.value && !id) billing.value=v19SuggestedBillingDate(purchase.value,card.value)||billing.value;billingMain.value=billing.value||billingMain.value};
-    billing.onchange=()=>billingMain.value=billing.value;
-    billingMain.onchange=()=>{if(card.value)billing.value=billingMain.value};
+    function syncDatesFromCard(){
+      const hasCard=!!card.value && typeEl()!=='receita';
+      cardBox.style.display=hasCard?'block':'none';
+      dateLabel.textContent=hasCard?'Data da despesa na fatura':'Data do lançamento';
+      if(!hasCard)return;
+      purchase.value=purchase.value||billingMain.value;
+      if(!id||!t?.card_id) billing.value=v19SuggestedBillingDate(purchase.value,card.value)||billingMain.value;
+      billingMain.value=billing.value||billingMain.value;
+      if(install.checked) start.value=billing.value||billingMain.value;
+    }
     function updateInstallPreview(){
-      if(!install.checked){installPreview.innerHTML='';return}
-      const total=Math.round(parseMoney(amount.value)*100), n=Math.max(2,Math.min(120,Number(count.value)||2));
-      if(!total){installPreview.innerHTML='<b>Prévia:</b> informe o valor total para calcular as parcelas.';return}
-      const each=Math.floor(total/n), last=total-each*(n-1);
-      const values=Array.from({length:n},(_,i)=>(i===n-1?last:each)/100);
-      const first=values[0], lastValue=values[n-1];
-      installPreview.innerHTML='<b>Prévia das parcelas:</b> '+n+'× '+money(first)+(Math.abs(lastValue-first)>0.001?' · última: '+money(lastValue):'')+'<br><span class="small muted">Total: '+money(total/100)+' · '+values.map((v,i)=>`Parcela ${i+1}: ${money(v)}`).join(' · ')+'</span>';
+      if(!install.checked){installPreview.innerHTML='';return;}
+      const cents=Math.round(parseMoney(amount.value)*100), n=Math.max(2,Math.min(120,Number(count.value)||2));
+      if(cents<=0){installPreview.innerHTML='<b>Prévia:</b> informe o valor total da compra.';return;}
+      const base=Math.floor(cents/n), last=cents-base*(n-1);
+      const values=Array.from({length:n},(_,i)=>(i===n-1?last:base)/100);
+      const shown=values.length<=6
+        ? values.map((value,i)=>`<span>Parcela ${i+1}: <b>${money(value)}</b></span>`).join(' · ')
+        : values.slice(0,3).map((value,i)=>`<span>${i+1}ª: <b>${money(value)}</b></span>`).join(' · ')+' · … · '+`<span>${n}ª: <b>${money(values[n-1])}</b></span>`;
+      installPreview.innerHTML=`<b>Prévia:</b> ${n}x de ${money(values[0])}<br><span class="small muted">Total ${money(cents/100)} · ${shown}</span>`;
     }
-    install.onchange=()=>{installFields.classList.toggle('hidden',!install.checked); if(install.checked){start.value=card.value?billing.value:billingMain.value; } updateInstallPreview();}
+    function syncInstallments(){
+      installFields.classList.toggle('hidden',!install.checked);
+      if(install.checked&&card.value) start.value=billing.value||billingMain.value;
+      updateInstallPreview();
+    }
+    function syncTypeState(){
+      syncCategories();
+      const installLabel=install.closest('.v15-check')?.querySelector('span');
+      if(installLabel)installLabel.textContent=typeEl()==='receita'?'Divide a receita total em parcelas futuras, sem alterar o valor total informado.':'Para cartão, cada parcela fica no mês da respectiva fatura.';
+      const startLabel=install.closest('.v15-check')?.nextElementSibling?.querySelector('label');
+      if(startLabel)startLabel.textContent=typeEl()==='receita'?'Primeiro lançamento':'Primeira fatura';
+      const recurringLabel=recurring.closest('.v15-check')?.querySelector('span');
+      if(recurringLabel)recurringLabel.textContent=typeEl()==='receita'?'Cria uma regra mensal para receber automaticamente nos próximos meses.':'Cria uma regra mensal. Pode ser usada junto com o parcelamento.';
+      syncAccountCard();syncDatesFromCard();syncInstallments();
+    }
+    function setType(next){typeState.value=next;typeButtons.forEach(button=>button.classList.toggle('active',button.dataset.type===next));syncTypeState();}
+    typeButtons.forEach(button=>button.onclick=()=>setType(button.dataset.type));
+    card.onchange=()=>{if(card.value)account.value='';syncTypeState();};
+    account.onchange=()=>{if(account.value)card.value='';syncTypeState();};
+    purchase.onchange=()=>{if(card.value&&!id)billing.value=v19SuggestedBillingDate(purchase.value,card.value)||billing.value;billingMain.value=billing.value||billingMain.value;syncInstallments();};
+    billing.onchange=()=>{billingMain.value=billing.value;syncInstallments();};
+    billingMain.onchange=()=>{if(card.value)billing.value=billingMain.value;syncInstallments();};
+    install.onchange=()=>{if(install.checked)start.value=card.value?(billing.value||billingMain.value):billingMain.value;syncInstallments();};
     amount.addEventListener('blur',()=>{formatMoneyInput(amount);updateInstallPreview();});
     amount.addEventListener('input',updateInstallPreview);
     count.addEventListener('input',updateInstallPreview);
-    syncCategories();syncDatesFromCard();
-    if(t?.note && /parcelado\s+\d+\/\d+/i.test(t.note)) install.checked=false;
-    updateInstallPreview();
+    const parcelMatch=`${t?.note||''} ${t?.description||''}`.match(/(?:Parcelado\s+|\()(\d+)\/(\d+)\)?/i);
+    if(parcelMatch){install.checked=true;count.value=Number(parcelMatch[2]);install.dataset.existingParcel='1';count.disabled=true;}
+    else{count.disabled=false;delete install.dataset.existingParcel;}
+    recurring.disabled=false;
+    recurring.closest('.v15-check')?.classList.add('v23-recurring-enabled');
+    syncTypeState();
 
     form.onsubmit=async e=>{
       e.preventDefault();
@@ -1377,7 +1365,7 @@ if("serviceWorker" in navigator){
       closeModal();await reload();
       toast(createdInstallments && recurring.checked ? 'Parcelas e recorrência criadas.' : createdInstallments ? `${Math.max(2,Math.min(120,Number(count.value)||2))} parcelas criadas.` : recurring.checked ? 'Lançamento e recorrência criados.' : 'Lançamento salvo.');
     };
-    requestAnimationFrame(()=>amount.focus());
+    requestAnimationFrame(()=>{amount.focus({preventScroll:true});amount.select();});
   };
 
   // Category screen and filters use the same normalized kind rules as the transaction form.
@@ -1737,67 +1725,6 @@ setTimeout(()=>{
     }).join('')}</tbody></table></div>`;
   };
 
-  // Prévia independente do estado de salvamento.
-  function v23InstallPreview(totalValue,count){
-    const cents=Math.round(Number(totalValue||0)*100);
-    const n=Math.max(2,Math.min(120,Number(count)||2));
-    if(cents<=0)return '<b>Prévia:</b> informe o valor total da compra.';
-    const base=Math.floor(cents/n), last=cents-base*(n-1);
-    const vals=Array.from({length:n},(_,i)=>(i===n-1?last:base)/100);
-    const shown=vals.length<=6
-      ? vals.map((v,i)=>`<span>Parcela ${i+1}: <b>${v23Money(v)}</b></span>`).join(' · ')
-      : vals.slice(0,3).map((v,i)=>`<span>${i+1}ª: <b>${v23Money(v)}</b></span>`).join(' · ')+' · … · '+`<span>${n}ª: <b>${v23Money(vals[n-1])}</b></span>`;
-    return `<b>Prévia:</b> ${n}x de ${v23Money(vals[0])}<br><span class="small muted">Total ${v23Money(cents/100)} · ${shown}</span>`;
-  }
-
-  // Encapsula a implementação anterior, mas garante que a UI final seja a V23.
-  const oldOpen=window.openTransaction;
-  window.openTransaction=async function(id){
-    await oldOpen(id);
-    requestAnimationFrame(()=>{
-      const form=$('v19TxForm');
-      if(!form)return;
-      const install=$('v19Install'), fields=$('v19InstallFields'), count=$('v19Count'), amount=$('v19Amount'), preview=$('v19InstallPreview'), recurring=$('v19Recurring');
-      if(!install||!fields||!count||!amount||!preview)return;
-
-      // Sempre mantém as duas opções independentes.
-      const sync=()=>{
-        if(install.checked){
-          fields.classList.remove('hidden');
-          preview.innerHTML=v23InstallPreview(parseMoney(amount.value),count.value);
-        }else{
-          fields.classList.add('hidden');
-          preview.innerHTML='';
-        }
-      };
-      install.onchange=sync;
-      count.oninput=sync;
-      amount.oninput=sync;
-      amount.onblur=()=>{formatMoneyInput(amount);sync()};
-
-      // Ao editar uma parcela existente, recuperar automaticamente o 1/N.
-      const idValue=id?DATA.transactions.find(x=>x.id===id):null;
-      const m=String(idValue?.note||'').match(/Parcelado\s+(\d+)\/(\d+)/i);
-      if(m){
-        install.checked=true;
-        count.value=Number(m[2]);
-        // Uma parcela existente é um registro já criado; não cria uma segunda série ao salvar.
-        install.dataset.existingParcel='1';
-        count.disabled=true;
-      }else{
-        count.disabled=false;
-        delete install.dataset.existingParcel;
-      }
-      sync();
-
-      // Mantém a possibilidade de marcar Parcelado + Recorrente simultaneamente.
-      if(recurring){
-        recurring.disabled=false;
-        recurring.closest('.v15-check')?.classList.add('v23-recurring-enabled');
-      }
-    });
-  };
-
   const style=document.createElement('style');
   style.id='v23-style';
   style.textContent=`
@@ -1970,34 +1897,6 @@ setTimeout(()=>{
    Não criar novos patches de versão para essas regras.
 */
 (function(){
-/* módulo consolidado 1 */
-(function(){
-  const applyRevenueOptions=()=>{
-    const form=document.getElementById('v19TxForm');
-    if(!form)return;
-    const active=form.querySelector('.v15-type.active');
-    if(!active || active.dataset.type!=='receita')return;
-    const install=document.getElementById('v19Install');
-    const recurring=document.getElementById('v19Recurring');
-    if(install?.closest('.v15-check'))install.closest('.v15-check').style.display='';
-    if(recurring?.closest('.v15-check'))recurring.closest('.v15-check').style.display='';
-    const card=document.getElementById('v19Card');
-    const cardBox=document.getElementById('v19CardBox');
-    if(card)card.value='';
-    if(cardBox)cardBox.style.display='none';
-    const account=document.getElementById('v19Account');
-    if(account)account.disabled=false;
-  };
-  const oldOpen=window.openTransaction;
-  window.openTransaction=async function(id){
-    await oldOpen(id);
-    requestAnimationFrame(applyRevenueOptions);
-  };
-  document.addEventListener('click',e=>{
-    if(e.target.closest('#v19TxForm .v15-type'))requestAnimationFrame(applyRevenueOptions);
-  });
-})();
-
 /* módulo consolidado 2 */
 (function(){
   const normV38=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim();
@@ -2027,41 +1926,6 @@ setTimeout(()=>{
           : '';
     return {current,target,pct:target?Math.min(100,current/target*100):0,source,accounts,assets:uniqueAssets,goals};
   };
-
-  function moveStatusBeforeOptions(){
-    const form=document.getElementById('v19TxForm');
-    if(!form)return;
-    const details=form.querySelector('.v15-details');
-    if(!details)return;
-    if(form.querySelector('.v38-status-row'))return;
-    const status=details.querySelector('select[name="status"]');
-    if(!status)return;
-    const holder=status.parentElement;
-    const row=document.createElement('div');
-    row.className='v38-status-row';
-    row.innerHTML='<label>Status</label>';
-    row.appendChild(status);
-    const anchor=details;
-    anchor.parentNode.insertBefore(row,anchor);
-    holder.remove();
-    const summary=details.querySelector('summary');
-    if(summary)summary.innerHTML='Mais opções <span>Opcional</span>';
-  }
-
-  const oldOpen=window.openTransaction;
-  window.openTransaction=async function(id){
-    await oldOpen(id);
-    requestAnimationFrame(()=>{
-      moveStatusBeforeOptions();
-      const form=document.getElementById('v19TxForm');
-      const amount=document.getElementById('v19Amount');
-      if(form && amount){amount.focus({preventScroll:true});amount.select();}
-    });
-  };
-
-  document.addEventListener('click',e=>{
-    if(e.target.closest('#v19TxForm .v15-type')) requestAnimationFrame(moveStatusBeforeOptions);
-  });
 
   const style=document.createElement('style');
   style.id='v38-style';
@@ -2099,25 +1963,6 @@ setTimeout(()=>{
       const pending=t.status==='pendente';
       return `<tr><td>${t.transaction_date?new Date(t.transaction_date+'T12:00:00').toLocaleDateString('pt-BR'):''}${purchase}${invoice}${parcelInfo}${recurringInfo}</td><td>${esc(t.description)}</td><td>${esc(canonicalCategoryName(t.category,t.transaction_type)||'—')}${t.subcategory?' / '+esc(t.subcategory):''}</td><td>${esc(t.transaction_type)}</td><td>${esc(rel||'—')}</td><td class="${t.transaction_type==='receita'||t.transaction_type==='resgate'?'positive':'negative'}">${money(t.amount)}</td><td>${pending?'<span class="tag warn">Pendente</span>':'<span class="tag ok">Realizado</span>'}</td><td><div class="actions">${pending?`<button class="btn gold" onclick="markPaid('${t.id}')">Pagar</button>`:''}<button class="btn" onclick="openTransaction('${t.id}')">Editar</button><button class="btn danger" onclick="deleteTransactionSmart('${t.id}')">Excluir</button></div></td></tr>`;
     }).join('')}</tbody></table></div>`;
-  };
-
-  // Reforço da regra de competência: em cartão, a primeira parcela SEMPRE usa a primeira fatura.
-  const previousOpen=window.openTransaction;
-  window.openTransaction=async function(id){
-    await previousOpen(id);
-    requestAnimationFrame(()=>{
-      const form=document.getElementById('v19TxForm'); if(!form)return;
-      const card=document.getElementById('v19Card'), billing=document.getElementById('v19BillingDate'), main=document.getElementById('v19TransactionDate'), start=document.getElementById('v19Start'), install=document.getElementById('v19Install');
-      if(!card||!billing||!main||!start)return;
-      const syncFirstInvoice=()=>{
-        if(card.value && install?.checked) start.value=billing.value||main.value;
-      };
-      billing.addEventListener('change',syncFirstInvoice);
-      main.addEventListener('change',()=>{if(card.value){billing.value=main.value;syncFirstInvoice();}});
-      card.addEventListener('change',()=>{if(card.value)syncFirstInvoice();});
-      install?.addEventListener('change',syncFirstInvoice);
-      syncFirstInvoice();
-    });
   };
 
   const style=document.createElement('style');
