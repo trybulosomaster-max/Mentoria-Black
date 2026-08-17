@@ -220,6 +220,118 @@ const isExpense=MBFinance.isExpense;
 const isInvestment=MBFinance.isInvestment;
 const isTransfer=MBFinance.isTransfer;
 const isRescue=MBFinance.isRescue;
+/* Camada canônica de Metas 2.0: somente leitura; current permanece a base manual legada. */
+const MBGoals=(()=>{
+ const finite=value=>Number.isFinite(Number(value))?Number(value):0;
+ const clamp=value=>Math.max(0,Math.min(100,finite(value)));
+ const fold=value=>String(value??'').trim().normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('pt-BR');
+ const localDate=value=>{
+   if(value instanceof Date&&!Number.isNaN(value.getTime())) return `${value.getFullYear()}-${String(value.getMonth()+1).padStart(2,'0')}-${String(value.getDate()).padStart(2,'0')}`;
+   return MBFinance.financialDate({transaction_date:value});
+ };
+ const todayKey=now=>localDate(now||new Date());
+ const dateParts=value=>{const date=localDate(value);return date?{date,year:Number(date.slice(0,4)),month:Number(date.slice(5,7)),day:Number(date.slice(8,10))}:null;};
+ const addMonths=(value,months)=>{
+   const p=dateParts(value);if(!p)return null;
+   const target=p.year*12+p.month-1+Number(months||0), year=Math.floor(target/12), month=target%12+1;
+   const last=new Date(year,month,0).getDate(), day=Math.min(p.day,last);
+   return `${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+ };
+ const effectOf=row=>{
+   const raw=String(row?.goal_effect??'').trim().toLowerCase();
+   if(!raw)return 'contribution';
+   return raw==='contribution'||raw==='withdrawal'?raw:null;
+ };
+ const statusOf=row=>{
+   const raw=fold(row?.status);
+   if(['realizado','realized','paid','pago'].includes(raw))return 'realized';
+   if(['pendente','pending'].includes(raw))return 'pending';
+   return raw||'unknown';
+ };
+ const sourceRecurringId=row=>(String(row?.note||'').match(/Recorrência automática • ([0-9a-f-]{8,})/i)||[])[1]||null;
+ const sourceData=options=>({
+   goals:Array.isArray(options?.goals)?options.goals:(Array.isArray(DATA.goals)?DATA.goals:[]),
+   transactions:Array.isArray(options?.transactions)?options.transactions:(Array.isArray(DATA.transactions)?DATA.transactions:[]),
+   recurring:Array.isArray(options?.recurring)?options.recurring:(Array.isArray(DATA.recurring)?DATA.recurring:[]),
+   now:options?.now||new Date()
+ });
+ function classifyTransactions(goalId,options={}){
+   const data=sourceData(options), today=todayKey(data.now), result={realized:[],programmed:[],ignored:[],futureRealized:[]};
+   for(const raw of data.transactions){
+     if(String(raw?.goal_id||'')!==String(goalId||''))continue;
+     const rawAmount=raw?.amount??raw?.value??raw?.valor;
+     const invalidRawAmount=(typeof rawAmount==='number'&&!Number.isFinite(rawAmount))||/^(?:nan|[+-]?infinity)$/i.test(String(rawAmount??'').trim());
+     const row=MBFinance.normalizeTransaction(raw), date=MBFinance.financialDate(row), amount=Number(row.amount), effect=effectOf(row);
+     if(MBFinance.isCancelled(row)){result.ignored.push({row,reason:'cancelled'});continue;}
+     if(!date){result.ignored.push({row,reason:'invalid_date'});continue;}
+     if(invalidRawAmount||!Number.isFinite(amount)){result.ignored.push({row,reason:'invalid_amount'});continue;}
+     if(!effect){result.ignored.push({row,reason:'invalid_effect'});continue;}
+     const future=date>today, status=statusOf(row), item={row,date,effect,amount,signed:effect==='withdrawal'?-amount:amount};
+     if(future||status==='pending'){
+       result.programmed.push(item);
+       if(future&&status==='realized')result.futureRealized.push(item);
+     }else if(status==='realized')result.realized.push(item);
+     else result.ignored.push({row,reason:'unrecognized_status'});
+   }
+   return result;
+ }
+ function recurringInfo(goalId,options={}){
+   const data=sourceData(options), txByRule=new Map();
+   data.transactions.forEach(row=>{const id=sourceRecurringId(row);if(!id)return;const date=MBFinance.financialDate(row);if(date&&(!txByRule.has(id)||date>txByRule.get(id)))txByRule.set(id,date);});
+   const factor=row=>{
+     const interval=Math.max(1,finite(row?.interval)||1), frequency=fold(row?.frequency||'monthly');
+     if(frequency==='yearly')return 1/(12*interval);
+     if(frequency==='weekly')return 52/(12*interval);
+     if(frequency==='biweekly')return 26/(12*interval);
+     if(frequency==='daily')return 365.2425/(12*interval);
+     return 1/interval;
+   };
+   const rules=data.recurring.filter(row=>String(row?.goal_id||'')===String(goalId||'')).map(row=>{
+     const effect=effectOf(row), nextDate=localDate(row?.next_date), active=row?.active!==false;
+     const monthlyAmount=effect&&active?finite(row.amount)*factor(row)*(effect==='withdrawal'?-1:1):0;
+     return {id:row.id||null,goalId:row.goal_id||null,effect,nextDate,interval:Math.max(1,finite(row.interval)||1),frequency:row.frequency||'monthly',active,lastMaterializedDate:txByRule.get(String(row.id))||null,monthlyAmount};
+   });
+   return {rules,monthlyPace:rules.reduce((sum,row)=>sum+row.monthlyAmount,0),hasReliablePace:rules.some(row=>row.active&&row.nextDate&&row.effect)};
+ }
+ function paceFor(goalId,classified,options={}){
+   const data=sourceData(options), today=dateParts(data.now);if(!today)return {monthlyPace:null,paceSampleMonths:0};
+   const keys=Array.from({length:3},(_,index)=>addMonths(`${today.year}-${String(today.month).padStart(2,'0')}-01`,-(index+1)).slice(0,7));
+   const byMonth=new Map(keys.map(key=>[key,0])), observed=new Set();
+   classified.realized.forEach(item=>{const key=item.date.slice(0,7);if(!byMonth.has(key))return;byMonth.set(key,byMonth.get(key)+item.signed);observed.add(key);});
+   const paceSampleMonths=observed.size;
+   return {monthlyPace:paceSampleMonths>=2?[...byMonth.values()].reduce((sum,value)=>sum+value,0)/3:null,paceSampleMonths};
+ }
+ function deadlineInfo(value,now){
+   const deadline=localDate(value), today=todayKey(now);if(!deadline)return {deadline:null,hasDeadline:false,isOverdue:false,isDeadlineToday:false,monthsRemaining:null};
+   const monthDiff=(Number(deadline.slice(0,4))-Number(today.slice(0,4)))*12+Number(deadline.slice(5,7))-Number(today.slice(5,7));
+   return {deadline,hasDeadline:true,isOverdue:deadline<today,isDeadlineToday:deadline===today,monthsRemaining:Math.max(0,monthDiff)};
+ }
+ function metrics(goal,options={}){
+   const data=sourceData(options), target=Math.max(0,finite(goal?.target)), baseManual=finite(goal?.current), classified=classifyTransactions(goal?.id,options);
+   const realized=baseManual+classified.realized.reduce((sum,item)=>sum+item.signed,0);
+   const programmed=classified.programmed.reduce((sum,item)=>sum+item.signed,0);
+   const projectedCovered=Math.max(0,realized+programmed), remainingReal=Math.max(0,target-realized), remainingUnplanned=Math.max(0,target-realized-programmed);
+   const deadline=deadlineInfo(goal?.deadline,data.now), pace=paceFor(goal?.id,classified,options), recurring=recurringInfo(goal?.id,options);
+   const recurringPace=recurring.hasReliablePace&&recurring.monthlyPace>0?recurring.monthlyPace:null;
+   const forecastPace=recurringPace??(pace.monthlyPace>0?pace.monthlyPace:null);
+   const estimatedCompletionDate=realized>=target?todayKey(data.now):forecastPace?addMonths(todayKey(data.now),Math.ceil(remainingReal/forecastPace)):null;
+   let status='no_forecast';
+   if(realized>=target)status='completed';
+   else if(deadline.hasDeadline&&estimatedCompletionDate){
+     const aheadCutoff=addMonths(deadline.deadline,-1);
+     status=estimatedCompletionDate<=aheadCutoff?'ahead':estimatedCompletionDate<=deadline.deadline?'on_track':'behind';
+   }
+   return {goal,target,baseManual,realized,programmed,projectedCovered,remainingReal,remainingUnplanned,progressRealPct:target>0?clamp(realized/target*100):0,progressProjectedPct:target>0?clamp((realized+programmed)/target*100):0,deadline:deadline.deadline,monthsRemaining:deadline.monthsRemaining,monthlyNeeded:deadline.monthsRemaining>0?remainingUnplanned/deadline.monthsRemaining:remainingUnplanned,isOverdue:deadline.isOverdue,isDeadlineToday:deadline.isDeadlineToday,isCompleted:realized>=target,monthlyPace:pace.monthlyPace,paceSampleMonths:pace.paceSampleMonths,recurring,recurringMonthlyPace:recurringPace,estimatedCompletionDate,forecastSource:recurringPace?'recurring':pace.monthlyPace>0?'history':null,status,transactions:classified};
+ }
+ function all(options={}){const data=sourceData(options);return data.goals.map(goal=>metrics(goal,{...options,goals:data.goals,transactions:data.transactions,recurring:data.recurring,now:data.now}));}
+ function budget(options={}){
+   const data=sourceData(options), goals=all(options), plan=options.monthlyPlan!==undefined?options.monthlyPlan:(typeof monthlyPlan==='function'?monthlyPlan():null), budgetForGoals=finite(plan?.goals), requiredForActiveGoals=goals.filter(goal=>!goal.isCompleted).reduce((sum,goal)=>sum+goal.monthlyNeeded,0), goalBudgetGap=budgetForGoals-requiredForActiveGoals;
+   const goalBudgetStatus=requiredForActiveGoals<=0?'sufficient':budgetForGoals<=0?'no_budget':goalBudgetGap>=0?'sufficient':'insufficient';
+   return {budgetForGoals,requiredForActiveGoals,goalBudgetGap,goalBudgetStatus,goals};
+ }
+ return Object.freeze({metrics,all,budget,classifyTransactions,recurringInfo,paceFor});
+})();
+window.MBGoals=MBGoals;
 function categoryColor(name){
   const canonical=canonicalCategoryName(name);
   const cats=Array.isArray(DATA.categories)?DATA.categories:[];
