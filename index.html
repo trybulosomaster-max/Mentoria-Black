@@ -1415,17 +1415,81 @@ if("serviceWorker" in navigator){
 
   // Make the existing revenue chart and all dashboard calculations use the patched period functions.
 
-  // Recurrence form also follows the same category/type separation.
-  const v19OldRecurring = window.openRecurring;
+  // Formulário autocontido: não depende mais do openRecurring nem dos helpers privados do V15.
   window.openRecurring = async function(id){
+    const x=id?DATA.recurring.find(a=>a.id===id):{};
     if(!id) await v19EnsureIncomeCategories();
-    v19OldRecurring(id);
-    const form=document.querySelector('#f');
-    if(!form) return;
-    const type=form.querySelector('[name=type]'), cat=form.querySelector('[name=category]');
-    if(!type||!cat) return;
-    const refresh=()=>{const keep=cat.value;cat.innerHTML=v19Opts(V19_CATS_FOR(type.value),keep);};
-    type.onchange=refresh; refresh();
+    const today=new Date().toISOString().slice(0,10);
+    const initialType=['despesa','receita','investimento'].includes(x?.type)?x.type:'despesa';
+    const startDate=x?.start_date||x?.next_date||today;
+    const nextDate=x?.next_date||startDate;
+    const frequency=String(x?.frequency||'monthly');
+    const frequencies=[['monthly','Mensal'],['weekly','Semanal'],['biweekly','Quinzenal'],['yearly','Anual'],['daily','Diária']];
+    if(!frequencies.some(([value])=>value===frequency)) frequencies.push([frequency,frequency]);
+    modal(id?'Editar recorrência':'Nova recorrência',`
+      <form id="v19RecurringForm" class="v15-form">
+        <div class="v15-essential">
+          <div><label>Nome</label><input name="name" required value="${esc(x?.name||'')}"></div>
+          <div><label>Valor</label><input name="amount" id="v19RecurringAmount" class="money-field" inputmode="decimal" value="${x?.amount?num(x.amount):''}" required></div>
+          <div><label>Tipo</label><select name="type" id="v19RecurringType">${['despesa','receita','investimento'].map(type=>`<option value="${type}" ${initialType===type?'selected':''}>${type[0].toUpperCase()+type.slice(1)}</option>`).join('')}</select></div>
+          <div><label>Categoria</label><select name="category" id="v19RecurringCategory" required>${v19Opts(V19_CATS_FOR(initialType),x?.category||'')}</select></div>
+          <div><label>Frequência</label><select name="frequency">${frequencies.map(([value,label])=>`<option value="${esc(value)}" ${frequency===value?'selected':''}>${esc(label)}</option>`).join('')}</select></div>
+          <div><label>Intervalo</label><input name="interval" type="number" min="1" max="120" value="${Math.max(1,Number(x?.interval)||1)}" required></div>
+          <div><label>Data inicial</label><input name="start_date" id="v19RecurringStart" type="date" value="${startDate}" required></div>
+          <div><label>Próxima data</label><input name="next_date" id="v19RecurringNext" type="date" value="${nextDate}" required></div>
+          <div><label>Dia do mês</label><input name="day_of_month" id="v19RecurringDay" type="number" min="1" max="31" value="${Math.min(31,Math.max(1,Number(x?.day_of_month)||Number(startDate.slice(8,10))||1))}" required></div>
+          <div><label>Subcategoria</label><input name="subcategory" value="${esc(x?.subcategory||'')}"></div>
+          <div><label>Conta</label><select name="account_id" id="v19RecurringAccount">${accountOptions(x?.account_id||'')}</select></div>
+          <div><label>Cartão</label><select name="card_id" id="v19RecurringCard">${cardOptions(x?.card_id||'')}</select></div>
+        </div>
+        <details class="v15-details"><summary>Mais opções <span>Opcional</span></summary><div class="v15-detail-grid">
+          <div class="full v15-check"><label><input name="active" type="checkbox" ${x?.active!==false?'checked':''}> Recorrência ativa</label><span>Regras pausadas não geram novos lançamentos.</span></div>
+          <div class="full v15-check"><label><input name="auto_post" type="checkbox" ${x?.auto_post!==false?'checked':''}> Lançamento automático</label><span>Preserva a compatibilidade com a materialização atual.</span></div>
+          <div class="full"><label>Observação</label><textarea name="note">${esc(x?.note||'')}</textarea></div>
+        </div></details>
+        <div id="v19RecurringMsg" class="msg"></div>
+        <div class="modal-foot"><button type="button" class="btn" onclick="closeModal()">Cancelar</button><button class="btn primary">Salvar</button></div>
+      </form>`);
+    const form=$('v19RecurringForm'), type=$('v19RecurringType'), category=$('v19RecurringCategory'), account=$('v19RecurringAccount'), card=$('v19RecurringCard'), start=$('v19RecurringStart'), next=$('v19RecurringNext'), day=$('v19RecurringDay'), amount=$('v19RecurringAmount');
+    const syncType=()=>{
+      const keep=category.value;
+      category.innerHTML=v19Opts(V19_CATS_FOR(type.value),v19CategoryFor(type.value,keep)?keep:'');
+      const revenue=type.value==='receita';
+      if(revenue) card.value='';
+      card.disabled=revenue;
+      account.disabled=!!card.value;
+    };
+    type.onchange=async()=>{if(type.value==='receita')await v19EnsureIncomeCategories();syncType();};
+    account.onchange=()=>{if(account.value)card.value='';syncType();};
+    card.onchange=()=>{if(card.value)account.value='';syncType();};
+    start.onchange=()=>{if(!next.value)next.value=start.value;day.value=Number(start.value.slice(8,10))||1;};
+    amount.addEventListener('blur',()=>formatMoneyInput(amount));
+    syncType();
+    form.onsubmit=async e=>{
+      e.preventDefault();
+      const fd=new FormData(form), amountValue=parseMoney(fd.get('amount')), selectedType=type.value, selectedCategory=String(fd.get('category')||'').trim(), accountId=account.value||null, cardId=card.value||null;
+      const errors=[];
+      if(!String(fd.get('name')||'').trim()) errors.push('nome');
+      if(!Number.isFinite(amountValue)||amountValue<=0) errors.push('valor');
+      if(!v19CategoryFor(selectedType,selectedCategory)) errors.push('categoria compatível com o tipo');
+      if(['despesa','investimento'].includes(selectedType)&&!accountId&&!cardId) errors.push('conta ou cartão');
+      if(selectedType==='receita'&&!accountId) errors.push('conta');
+      if(accountId&&cardId) errors.push('escolha conta OU cartão');
+      if(cardId&&selectedType==='receita') errors.push('receita não pode usar cartão de crédito');
+      if(!fd.get('start_date')) errors.push('data inicial');
+      if(!fd.get('next_date')) errors.push('próxima data');
+      if(errors.length){$('v19RecurringMsg').textContent='Preencha/corrija: '+errors.join(', ')+'.';return}
+      const o={
+        name:String(fd.get('name')).trim(), frequency:String(fd.get('frequency')||'monthly'), interval:Math.max(1,Math.min(120,Number(fd.get('interval'))||1)),
+        next_date:fd.get('next_date'), start_date:fd.get('start_date'), day_of_month:Math.min(31,Math.max(1,Number(fd.get('day_of_month'))||Number(String(fd.get('start_date')).slice(8,10))||1)),
+        amount:amountValue, type:selectedType, category:selectedCategory, subcategory:fd.get('subcategory')||null,
+        account_id:accountId, card_id:cardId, active:fd.get('active')==='on', auto_post:fd.get('auto_post')==='on', note:fd.get('note')||null
+      };
+      const r=id?await sb.from('recurring').update(o).eq('id',id).eq('user_id',USER.id):await sb.from('recurring').insert({...o,user_id:USER.id});
+      if(r.error){$('v19RecurringMsg').textContent=r.error.message;return}
+      closeModal();await reload();toast('Recorrência salva.');
+    };
+    requestAnimationFrame(()=>amount.focus());
   };
 
 
