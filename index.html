@@ -1121,7 +1121,6 @@ if("serviceWorker" in navigator){
     if(parcelMatch){install.checked=true;count.value=Number(parcelMatch[2]);install.dataset.existingParcel='1';count.disabled=true;}
     else{count.disabled=false;delete install.dataset.existingParcel;}
     recurring.disabled=false;
-    recurring.closest('.v15-check')?.classList.add('v23-recurring-enabled');
     syncTypeState();
 
     form.onsubmit=async e=>{
@@ -1516,8 +1515,6 @@ setTimeout(()=>{
   style.id='v23-style';
   style.textContent=`
     .v23-parcel-tag{display:inline-flex;align-items:center;gap:3px;margin-top:6px;padding:4px 8px;border:1px solid #6b5716;border-radius:999px;background:#171308;color:#e4c55b;font-size:11px;font-weight:700;line-height:1.25;white-space:normal}
-    .v23-recurring-tag{display:inline-flex;align-items:center;gap:3px;margin-top:6px;padding:4px 8px;border:1px solid #315b45;border-radius:999px;background:#0f1a14;color:#9fd0ad;font-size:11px;font-weight:700;line-height:1.25;white-space:normal}
-    .v23-invoice{color:#7bc6c0!important}
     #v19InstallPreview{line-height:1.55;border-color:#6b5716!important;background:#171308!important;color:#f1e4b4!important}
     #v19InstallPreview b{color:#e4c55b}
     #v19Count:disabled{opacity:.65}
@@ -1719,8 +1716,6 @@ setTimeout(()=>{
   style.textContent=`
     .v38-status-row{margin:10px 0;padding:12px 14px;border:1px solid #2d2d2d;border-radius:12px;background:#0e0e0e}
     .v38-status-row select{margin-top:4px}
-    .v38-invest-card{min-height:100%}
-    .v38-invest-card .bar{margin-top:12px}
   `;
   document.head.appendChild(style);
   document.title='Mentoria Black — Gestão Financeira V81 ESCUDO FINAL';
@@ -1755,7 +1750,6 @@ setTimeout(()=>{
   style.textContent=`
     .v38-recurring-tag{color:#c9a227;margin-top:3px}
     .v38-recurring-tag b{color:#e4c55b}
-    .v38-invest-card{min-height:100%}
   `;
   document.head.appendChild(style);
   document.title='Mentoria Black — Gestão Financeira V81 ESCUDO FINAL';
