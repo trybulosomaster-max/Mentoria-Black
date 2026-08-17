@@ -993,20 +993,6 @@ if("serviceWorker" in navigator){
     }
   }
 
-  // The table now distinguishes purchase date from the date that impacts the selected month.
-  window.transactionTable = function(rows){
-    if(!rows.length) return '<div class="empty">Nenhum lançamento encontrado para os filtros atuais.</div>';
-    return `<div class="tablewrap"><table><thead><tr><th>Data</th><th>Descrição</th><th>Categoria</th><th>Tipo</th><th>Conta/Cartão</th><th>Valor</th><th>Status</th><th></th></tr></thead><tbody>${rows.map(t=>{
-      const rel=t.account_id?DATA.accounts.find(a=>a.id===t.account_id)?.name:t.card_id?DATA.cards.find(c=>c.id===t.card_id)?.name:'';
-      const purchase=t.purchase_date ? `<div class="small muted">Compra: ${new Date(t.purchase_date+'T12:00:00').toLocaleDateString('pt-BR')}</div>` : '';
-      const invoice=t.card_id ? `<div class="small" style="color:#7bc6c0">Fatura: ${t.transaction_date?new Date(t.transaction_date+'T12:00:00').toLocaleDateString('pt-BR'):'—'}</div>` : '';
-      const parcelMatch=String(t.note||'').match(/Parcelado\s+(\d+)\/(\d+)/i);
-      const rem=Math.max(0,Number(parcelMatch[2])-Number(parcelMatch[1])); const parcelInfo=parcelMatch ? `<div class="small v23-parcel-tag"><b>Parcela ${parcelMatch[1]}/${parcelMatch[2]}</b> · ${rem?`${rem} parcela${rem>1?'s':''} restante${rem>1?'s':''}`:'última parcela'}</div>` : '';
-      const pending=t.status==='pendente';
-      return `<tr><td>${t.transaction_date?new Date(t.transaction_date+'T12:00:00').toLocaleDateString('pt-BR'):''}${purchase}${invoice}${parcelInfo}</td><td>${esc(t.description)}</td><td>${esc(canonicalCategoryName(t.category,t.transaction_type)||'—')}${t.subcategory?' / '+esc(t.subcategory):''}</td><td>${esc(t.transaction_type)}</td><td>${esc(rel||'—')}</td><td class="${t.transaction_type==='receita'||t.transaction_type==='resgate'?'positive':'negative'}">${money(t.amount)}</td><td>${pending?'<span class="tag warn">Pendente</span>':'<span class="tag ok">Realizado</span>'}</td><td><div class="actions">${pending?`<button class="btn gold" onclick="markPaid('${t.id}')">Pagar</button>`:''}<button class="btn" onclick="openTransaction('${t.id}')">Editar</button><button class="btn danger" onclick="deleteTransactionSmart('${t.id}')">Excluir</button></div></td></tr>`;
-    }).join('')}</tbody></table></div>`;
-  };
-
   // Fix parcel deduplication: two purchases in the same month with the same description are not duplicates.
   window.txDuplicateKey = function(t){
     const note=String(t.note||'');
@@ -1207,13 +1193,6 @@ if("serviceWorker" in navigator){
     return pageHead('Categorias','Receitas e despesas possuem listas separadas.',`<button class="btn gold" onclick="openCategory()">＋ Categoria</button>`) +
       `<div class="grid"><section class="card s6"><h2>Categorias de despesas</h2>${simpleTable(V19_EXPENSE(),[['Categoria',x=>`<span class="dot" style="background:${x.color||categoryColor(x.name)}"></span>${esc(x.name)}`],['Subcategoria',x=>esc(x.parent||'—')]],'categories')}</section>
       <section class="card s6"><h2>Categorias de receitas</h2>${simpleTable(V19_INCOME(),[['Categoria',x=>`<span class="dot" style="background:${x.color||'#7bc67b'}"></span>${esc(x.name)}`],['Subcategoria',x=>esc(x.parent||'—')]],'categories')}</section></div>`;
-  };
-
-  window.transactions=function(){
-    const arr=DATA.transactions.filter(t=>(!FILTERS.txType||t.transaction_type===FILTERS.txType)&&(!FILTERS.txCategory||topCategory(t.category,t.transaction_type)===FILTERS.txCategory)&&(!FILTERS.search||`${t.description} ${canonicalCategoryName(t.category,t.transaction_type)} ${t.subcategory||''}`.toLowerCase().includes(FILTERS.search.toLowerCase())));
-    const list=FILTERS.txType==='receita'?V19_INCOME():FILTERS.txType?V19_EXPENSE():[...V19_EXPENSE(),...V19_INCOME()];
-    return pageHead('Lançamentos','A data da compra do cartão é separada da data que entra na fatura.',`<button class="btn gold" onclick="openTransaction()">＋ Novo lançamento</button>`) +
-      `<div class="filters"><div class="filter"><label>Buscar</label><input id="txSearch" value="${esc(FILTERS.search)}" placeholder="Descrição ou categoria"></div><div class="filter"><label>Tipo</label><select id="txType"><option value="">Todos</option>${['receita','despesa','investimento','transferencia','resgate'].map(x=>`<option value="${x}" ${FILTERS.txType===x?'selected':''}>${x}</option>`).join('')}</select></div><div class="filter"><label>Categoria</label><select id="txCategory"><option value="">Todas</option>${list.filter(c=>!c.parent).map(c=>`<option value="${esc(c.name)}" ${FILTERS.txCategory===c.name?'selected':''}>${esc(c.name)}</option>`).join('')}</select></div></div><div class="card">${transactionTable(arr)}</div>`;
   };
 
   // Account form bug: V18 saved account_type but rendered type.
@@ -1533,31 +1512,6 @@ setTimeout(()=>{
    - Não altera o modelo do banco.
 */
 (function(){
-  const v23Parcel = t => {
-    const m=String(t?.note||'').match(/Parcelado\s+(\d+)\/(\d+)/i);
-    if(!m) return null;
-    const current=Number(m[1]), total=Number(m[2]);
-    if(!Number.isFinite(current)||!Number.isFinite(total)||total<2) return null;
-    return {current,total,remaining:Math.max(total-current,0)};
-  };
-
-  // Lista: deixa claro em qual parcela o usuário está e quantas faltam.
-  window.transactionTable=function(rows){
-    if(!rows.length)return '<div class="empty">Nenhum lançamento encontrado para os filtros atuais.</div>';
-    return `<div class="tablewrap"><table><thead><tr><th>Data</th><th>Descrição</th><th>Categoria</th><th>Tipo</th><th>Conta/Cartão</th><th>Valor</th><th>Status</th><th></th></tr></thead><tbody>${rows.map(t=>{
-      const rel=t.account_id?DATA.accounts.find(a=>a.id===t.account_id)?.name:t.card_id?DATA.cards.find(c=>c.id===t.card_id)?.name:"";
-      const pending=t.status==='pendente';
-      const parcel=v23Parcel(t);
-      const parcelHtml=parcel?`<div class="v23-parcel-tag"><b>Parcela ${parcel.current}/${parcel.total}</b> · ${parcel.remaining?`${parcel.remaining} parcela${parcel.remaining>1?'s':''} restante${parcel.remaining>1?'s':''}`:'última parcela'}</div>`:'';
-      const recurringMatch=String(t?.note||'').match(/Recorrência automática\s+•\s+([0-9a-f-]{8,})/i);
-      const recurringRule=recurringMatch ? (DATA.recurring||[]).find(r=>r.id===recurringMatch[1]) : null;
-      const recurringHtml=recurringMatch?`<div class="v23-recurring-tag"><b>↻ Recorrente</b> · mensal${recurringRule?.active===false?' · encerrada':''}</div>`:'';
-      const purchase=t.purchase_date?`<div class="small muted">Compra: ${new Date(t.purchase_date+'T12:00:00').toLocaleDateString('pt-BR')}</div>`:'';
-      const invoice=t.card_id?`<div class="small v23-invoice">Fatura: ${t.transaction_date?new Date(t.transaction_date+'T12:00:00').toLocaleDateString('pt-BR'):'—'}</div>`:'';
-      return `<tr><td>${t.transaction_date?new Date(t.transaction_date+'T12:00:00').toLocaleDateString('pt-BR'):''}${purchase}${invoice}</td><td>${esc(t.description)}${parcelHtml}${recurringHtml}</td><td>${esc(canonicalCategoryName(t.category,t.transaction_type)||'—')}${t.subcategory?' / '+esc(t.subcategory):''}</td><td>${esc(t.transaction_type)}</td><td>${esc(rel||'—')}</td><td class="${t.transaction_type==='receita'||t.transaction_type==='resgate'?'positive':'negative'}">${money(t.amount)}</td><td>${pending?'<span class="tag warn">Pendente</span>':'<span class="tag ok">Realizado</span>'}</td><td><div class="actions">${pending?`<button class="btn gold" onclick="markPaid('${t.id}')">Pagar</button>`:''}<button class="btn" onclick="openTransaction('${t.id}')">Editar</button><button class="btn danger" onclick="deleteTransactionSmart('${t.id}')">Excluir</button></div></td></tr>`;
-    }).join('')}</tbody></table></div>`;
-  };
-
   const style=document.createElement('style');
   style.id='v23-style';
   style.textContent=`
