@@ -226,6 +226,134 @@ function unclassifiedTransactions(rows, period, now) {
   return selectByState(rows, period, now, 'nao_classificado');
 }
 
+const TYPE_ALIASES = Object.freeze({
+  receita: 'receita',
+  income: 'receita',
+  despesa: 'despesa',
+  expense: 'despesa',
+  investimento: 'investimento',
+  investment: 'investimento',
+  transferencia: 'transferencia',
+  transfer: 'transferencia',
+  resgate: 'resgate',
+  rescue: 'resgate'
+});
+
+function canonicalType(tx) {
+  return TYPE_ALIASES[fold(tx?.transaction_type ?? tx?.type)] || 'nao_classificado';
+}
+
+function monetaryAmount(value) {
+  if (typeof value === 'number') return Number.isFinite(value) && value > 0 ? value : null;
+  if (typeof value !== 'string' || !value.trim()) return null;
+  const normalized = value.trim();
+  if (!/^(?:\d+\.?\d*|\.\d+)$/.test(normalized)) return null;
+  const amount = Number(normalized);
+  return Number.isFinite(amount) && amount > 0 ? amount : null;
+}
+
+function emptyEffect(tx, type, temporal, amount, warnings, valid = true) {
+  return {
+    type,
+    temporalState: temporal.state,
+    financialDate: temporal.financialDate,
+    amount,
+    valid,
+    sourceAccountId: tx?.source_account_id ?? null,
+    destinationAccountId: tx?.destination_account_id ?? null,
+    accountId: tx?.account_id ?? null,
+    assetId: tx?.asset_id ?? null,
+    liabilityId: tx?.liability_id ?? null,
+    availableBalanceDelta: 0,
+    sourceAccountDelta: 0,
+    destinationAccountDelta: 0,
+    assetDelta: 0,
+    liabilityDelta: 0,
+    netWorthDelta: 0,
+    incomeAmount: 0,
+    consumptionExpenseAmount: 0,
+    investmentAmount: 0,
+    transferAmount: 0,
+    rescueAmount: 0,
+    warnings
+  };
+}
+
+function financialEffect(tx, options = {}) {
+  const temporal = temporalState(tx, options.now);
+  const type = canonicalType(tx);
+  const amount = monetaryAmount(tx?.amount);
+  const warnings = [...temporal.warnings];
+
+  if (type === 'nao_classificado') warnings.push('unknown_type');
+  if (amount === null) warnings.push('invalid_amount');
+  if (temporal.state === 'nao_classificado') warnings.push('unclassified_transaction');
+
+  let valid = type !== 'nao_classificado' && amount !== null;
+  const sourceAccountId = tx?.source_account_id ?? tx?.account_id ?? null;
+  const destinationAccountId = tx?.destination_account_id ?? tx?.account_id ?? null;
+
+  if (type === 'receita' && !destinationAccountId) warnings.push('missing_destination_account');
+  if (type === 'despesa' && !sourceAccountId) warnings.push('missing_source_account');
+  if (type === 'investimento') {
+    if (!sourceAccountId) warnings.push('missing_source_account');
+    if (!tx?.asset_id) warnings.push('missing_asset_destination');
+  }
+  if (type === 'transferencia') {
+    const transferSource = tx?.source_account_id ?? null;
+    const transferDestination = tx?.destination_account_id ?? null;
+    if (!transferSource) {
+      warnings.push('missing_source_account');
+      valid = false;
+    }
+    if (!transferDestination) {
+      warnings.push('missing_destination_account');
+      valid = false;
+    }
+    if (transferSource && transferDestination && String(transferSource) === String(transferDestination)) {
+      warnings.push('same_transfer_account');
+      valid = false;
+    }
+  }
+  if (type === 'resgate') {
+    if (!destinationAccountId) warnings.push('missing_destination_account');
+    if (!tx?.asset_id) warnings.push('missing_asset_source');
+  }
+
+  const effect = emptyEffect(tx, type, temporal, amount, warnings, valid);
+  if (type === 'despesa' || type === 'investimento') effect.sourceAccountId = sourceAccountId;
+  if (type === 'receita' || type === 'resgate') effect.destinationAccountId = destinationAccountId;
+  if (temporal.state !== 'efetivado' || !valid) return effect;
+
+  if (type === 'receita') {
+    effect.availableBalanceDelta = amount;
+    effect.destinationAccountDelta = destinationAccountId ? amount : 0;
+    effect.netWorthDelta = amount;
+    effect.incomeAmount = amount;
+  } else if (type === 'despesa') {
+    effect.availableBalanceDelta = -amount;
+    effect.sourceAccountDelta = sourceAccountId ? -amount : 0;
+    effect.netWorthDelta = -amount;
+    effect.consumptionExpenseAmount = amount;
+  } else if (type === 'investimento') {
+    effect.availableBalanceDelta = -amount;
+    effect.sourceAccountDelta = sourceAccountId ? -amount : 0;
+    effect.assetDelta = amount;
+    effect.investmentAmount = amount;
+  } else if (type === 'transferencia') {
+    effect.sourceAccountDelta = -amount;
+    effect.destinationAccountDelta = amount;
+    effect.transferAmount = amount;
+  } else if (type === 'resgate') {
+    effect.availableBalanceDelta = amount;
+    effect.destinationAccountDelta = destinationAccountId ? amount : 0;
+    effect.assetDelta = -amount;
+    effect.rescueAmount = amount;
+  }
+
+  return effect;
+}
+
 module.exports = Object.freeze({
   canonicalStatus,
   financialDate,
@@ -237,5 +365,6 @@ module.exports = Object.freeze({
   realizedTransactions,
   scheduledTransactions,
   cancelledTransactions,
-  unclassifiedTransactions
+  unclassifiedTransactions,
+  financialEffect
 });
