@@ -142,6 +142,12 @@ function occurrenceKey(seriesId,date) {
   return `${seriesId}|${date}`;
 }
 
+function materializedOccurrenceKey(row) {
+  const seriesId = materializedSeriesId(row);
+  const date = materializedDate(row);
+  return seriesId && date ? occurrenceKey(seriesId,date) : null;
+}
+
 function reconcileOccurrenceSets(materialized,projected) {
   if (!Array.isArray(materialized) || !Array.isArray(projected)) throw new TypeError('materialized and projected must be arrays');
   const keys = new Set(), canonicalMaterialized = [], duplicateMaterialized = [];
@@ -259,5 +265,6 @@ module.exports = Object.freeze({
   projectRecurringOccurrences,
   reconcileOccurrences,
   reconcileOccurrenceSets,
+  materializedOccurrenceKey,
   projectRecurringForGoal
 });
