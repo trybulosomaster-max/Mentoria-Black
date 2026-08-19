@@ -1,3 +1,8 @@
+(function(root, factory) {
+  const api = factory();
+  if (typeof module === 'object' && module.exports) module.exports = api;
+  if (root) root.MBCanonicalFinance = api;
+})(typeof globalThis !== 'undefined' ? globalThis : this, function() {
 'use strict';
 
 const STATUS_ALIASES = Object.freeze({
@@ -354,7 +359,7 @@ function financialEffect(tx, options = {}) {
   return effect;
 }
 
-module.exports = Object.freeze({
+return Object.freeze({
   canonicalStatus,
   financialDate,
   temporalState,
@@ -367,4 +372,5 @@ module.exports = Object.freeze({
   cancelledTransactions,
   unclassifiedTransactions,
   financialEffect
+});
 });

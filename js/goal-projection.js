@@ -1,7 +1,15 @@
+(function(root, factory) {
+  const api = typeof module === 'object' && module.exports
+    ? factory(require('./financial-core'), require('./recurrence-projection'))
+    : factory(root?.MBCanonicalFinance, root?.MBRecurrenceProjection);
+  if (typeof module === 'object' && module.exports) module.exports = api;
+  if (root) root.MBGoalProjection = api;
+})(typeof globalThis !== 'undefined' ? globalThis : this, function(financialCore, recurrenceProjection) {
 'use strict';
 
-const {temporalState,financialDate} = require('./financial-core');
-const {projectRecurringOccurrences,materializedOccurrenceKey} = require('./recurrence-projection');
+if (!financialCore || !recurrenceProjection) throw new Error('Canonical goal projection dependencies are unavailable');
+const {temporalState,financialDate} = financialCore;
+const {projectRecurringOccurrences,materializedOccurrenceKey} = recurrenceProjection;
 
 function finiteNumber(value,fallback=0) {
   return Number.isFinite(Number(value)) ? Number(value) : fallback;
@@ -86,15 +94,19 @@ function projectGoal(goal,transactions,recurringRules,options={}) {
 
   const rules=recurringRules.filter(rule=>String(rule?.goal_id??'')===goalId);
   let projectedOccurrences=[];
-  for(const rule of rules) {
-    projectedOccurrences.push(...projectRecurringOccurrences(rule,{
-      horizonStart,
-      horizonEnd,
-      deadline:deadline||undefined,
-      materializedOccurrences:linked,
-      maxOccurrences:options.maxOccurrences,
-      maxIterations:options.maxIterations
-    }));
+  if(horizonStart>horizonEnd) {
+    warnings.push('projection_horizon_elapsed');
+  } else {
+    for(const rule of rules) {
+      projectedOccurrences.push(...projectRecurringOccurrences(rule,{
+        horizonStart,
+        horizonEnd,
+        deadline:deadline||undefined,
+        materializedOccurrences:linked,
+        maxOccurrences:options.maxOccurrences,
+        maxIterations:options.maxIterations
+      }));
+    }
   }
   projectedOccurrences.sort((a,b)=>a.occurrenceDate.localeCompare(b.occurrenceDate)||a.key.localeCompare(b.key));
 
@@ -142,4 +154,5 @@ function projectGoal(goal,transactions,recurringRules,options={}) {
   };
 }
 
-module.exports=Object.freeze({projectGoal});
+return Object.freeze({projectGoal});
+});

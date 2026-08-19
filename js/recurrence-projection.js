@@ -1,3 +1,8 @@
+(function(root, factory) {
+  const api = factory();
+  if (typeof module === 'object' && module.exports) module.exports = api;
+  if (root) root.MBRecurrenceProjection = api;
+})(typeof globalThis !== 'undefined' ? globalThis : this, function() {
 'use strict';
 
 const FREQUENCIES = new Set(['daily','weekly','biweekly','monthly','yearly']);
@@ -261,10 +266,11 @@ function projectRecurringForGoal(rule, goal, materialized = [], options = {}) {
   };
 }
 
-module.exports = Object.freeze({
+return Object.freeze({
   projectRecurringOccurrences,
   reconcileOccurrences,
   reconcileOccurrenceSets,
   materializedOccurrenceKey,
   projectRecurringForGoal
+});
 });
