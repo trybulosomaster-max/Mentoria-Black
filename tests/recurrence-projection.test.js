@@ -4,6 +4,7 @@ const path = require('path');
 const {
   projectRecurringOccurrences,
   reconcileOccurrences,
+  reconcileOccurrenceSets,
   projectRecurringForGoal
 } = require('../js/recurrence-projection');
 
@@ -86,6 +87,79 @@ test('reconciliação prefere IDs estruturais e aceita note legado',()=>{
   ];
   deepEqual(dates(reconcileOccurrences(materialized,projected)),['2026-03-01','2026-04-01']);
   deepEqual(dates(project({id:'12345678-abcd'},{horizonEnd:'2026-04-01',materializedOccurrences:materialized})),['2026-03-01','2026-04-01']);
+});
+
+test('reconciliação mantém séries diferentes na mesma data',()=>{
+  const projected=[
+    {key:'series-a|2026-01-01',recurringSeriesId:'series-a',occurrenceDate:'2026-01-01'},
+    {key:'series-b|2026-01-01',recurringSeriesId:'series-b',occurrenceDate:'2026-01-01'}
+  ];
+  const materialized=[{recurring_series_id:'series-a',recurring_occurrence_date:'2026-01-01',amount:90}];
+  const result=reconcileOccurrenceSets(materialized,projected);
+  equal(result.materialized.length,1);
+  deepEqual(result.projected.map(item=>item.key),['series-b|2026-01-01']);
+});
+
+test('mesma série em datas diferentes permanece separada',()=>{
+  const projected=[
+    {key:'series-a|2026-01-01',recurringSeriesId:'series-a',occurrenceDate:'2026-01-01'},
+    {key:'series-a|2026-02-01',recurringSeriesId:'series-a',occurrenceDate:'2026-02-01'}
+  ];
+  const materialized=[{recurring_series_id:'series-a',recurring_occurrence_date:'2026-01-01'}];
+  deepEqual(reconcileOccurrenceSets(materialized,projected).projected.map(item=>item.key),['series-a|2026-02-01']);
+});
+
+test('materializado funciona como override mesmo com valor diferente',()=>{
+  const projected=[{key:'series-a|2026-01-01',recurringSeriesId:'series-a',occurrenceDate:'2026-01-01',amount:100,goalEffect:'contribution'}];
+  const materialized=[{recurring_series_id:'series-a',recurring_occurrence_date:'2026-01-01',amount:125,goal_effect:'contribution'}];
+  const result=reconcileOccurrenceSets(materialized,projected);
+  equal(result.materialized[0].amount,125);
+  equal(result.projected.length,0);
+});
+
+test('ID estrutural prevalece sobre note legado conflitante',()=>{
+  const projected=[
+    {key:'structured|2026-01-01',recurringSeriesId:'structured',occurrenceDate:'2026-01-01'},
+    {key:'legacy|2026-01-01',recurringSeriesId:'legacy',occurrenceDate:'2026-01-01'}
+  ];
+  const materialized=[{recurring_series_id:'structured',note:'Recorrência automática • legacy',transaction_date:'2026-01-01'}];
+  deepEqual(reconcileOccurrenceSets(materialized,projected).projected.map(item=>item.key),['legacy|2026-01-01']);
+});
+
+test('duplicata materializada é isolada e não somada duas vezes',()=>{
+  const rule={id:'dup-series',amount:100,frequency:'monthly',next_date:'2026-01-01',goal_effect:'contribution'};
+  const goal={id:'goal',current:0,target:1000,deadline:'2026-03-01'};
+  const materialized=[
+    {id:'first',recurring_series_id:'dup-series',recurring_occurrence_date:'2026-01-01',amount:110,goal_effect:'contribution'},
+    {id:'duplicate',recurring_series_id:'dup-series',recurring_occurrence_date:'2026-01-01',amount:999,goal_effect:'withdrawal'}
+  ];
+  const result=projectRecurringForGoal(rule,goal,materialized,{horizonStart:'2026-01-01',horizonEnd:'2026-03-01'});
+  equal(result.materialized.length,1);
+  equal(result.materialized[0].id,'first');
+  equal(result.duplicateMaterialized.length,1);
+  equal(result.materializedAmount,110);
+  deepEqual(result.projected.map(item=>item.occurrenceDate),['2026-02-01','2026-03-01']);
+});
+
+test('withdrawal materializado substitui virtual com direção preservada',()=>{
+  const result=projectRecurringForGoal(
+    {id:'withdraw-series',amount:50,frequency:'monthly',next_date:'2026-01-01',goal_effect:'withdrawal'},
+    {id:'goal',current:500,target:1000,deadline:'2026-02-01'},
+    [{recurring_series_id:'withdraw-series',recurring_occurrence_date:'2026-01-01',amount:75,goal_effect:'withdrawal'}],
+    {horizonStart:'2026-01-01',horizonEnd:'2026-02-01'}
+  );
+  equal(result.materializedAmount,-75);
+  equal(result.projectedAmount,-50);
+  equal(result.projectedCoverage,375);
+});
+
+test('reconciliação endurecida não muta arrays ou registros',()=>{
+  const materialized=[{recurring_series_id:'series',recurring_occurrence_date:'2026-01-01',amount:100}];
+  const projected=[{key:'series|2026-01-01',recurringSeriesId:'series',occurrenceDate:'2026-01-01',amount:90}];
+  const beforeMaterialized=JSON.stringify(materialized),beforeProjected=JSON.stringify(projected);
+  reconcileOccurrenceSets(materialized,projected);
+  equal(JSON.stringify(materialized),beforeMaterialized);
+  equal(JSON.stringify(projected),beforeProjected);
 });
 
 test('contribution e withdrawal permanecem separados do sinal',()=>{

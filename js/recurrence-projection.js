@@ -142,15 +142,30 @@ function occurrenceKey(seriesId,date) {
   return `${seriesId}|${date}`;
 }
 
-function reconcileOccurrences(materialized,projected) {
+function reconcileOccurrenceSets(materialized,projected) {
   if (!Array.isArray(materialized) || !Array.isArray(projected)) throw new TypeError('materialized and projected must be arrays');
-  const keys = new Set();
+  const keys = new Set(), canonicalMaterialized = [], duplicateMaterialized = [];
   for (const row of materialized) {
     const seriesId = materializedSeriesId(row);
     const date = materializedDate(row);
-    if (seriesId && date) keys.add(occurrenceKey(seriesId,date));
+    if (!seriesId || !date) continue;
+    const key = occurrenceKey(seriesId,date);
+    if (keys.has(key)) {
+      duplicateMaterialized.push(row);
+      continue;
+    }
+    keys.add(key);
+    canonicalMaterialized.push(row);
   }
-  return projected.filter(item=>!keys.has(item.key));
+  return {
+    materialized:canonicalMaterialized,
+    projected:projected.filter(item=>!keys.has(item.key)),
+    duplicateMaterialized
+  };
+}
+
+function reconcileOccurrences(materialized,projected) {
+  return reconcileOccurrenceSets(materialized,projected).projected;
 }
 
 function projectRecurringOccurrences(rule, options = {}) {
@@ -213,7 +228,9 @@ function projectRecurringForGoal(rule, goal, materialized = [], options = {}) {
     deadline,
     materializedOccurrences:materialized
   });
-  const matchingMaterialized = materialized.filter(row=>materializedSeriesId(row) === seriesId);
+  const matchingRows = materialized.filter(row=>materializedSeriesId(row) === seriesId);
+  const reconciled = reconcileOccurrenceSets(matchingRows,[]);
+  const matchingMaterialized = reconciled.materialized;
   const baseManual = Number.isFinite(Number(goal.current)) ? Number(goal.current) : 0;
   const materializedAmount = matchingMaterialized.reduce((sum,row)=>sum+signedGoalAmount(row),0);
   let selectedProjected = projected;
@@ -229,6 +246,7 @@ function projectRecurringForGoal(rule, goal, materialized = [], options = {}) {
   const projectedAmount = selectedProjected.reduce((sum,item)=>sum+(item.goalEffect === 'withdrawal' ? -item.amount : item.amount),0);
   return {
     materialized:matchingMaterialized.slice(),
+    duplicateMaterialized:reconciled.duplicateMaterialized.slice(),
     projected:selectedProjected,
     baseManual,
     materializedAmount,
@@ -240,5 +258,6 @@ function projectRecurringForGoal(rule, goal, materialized = [], options = {}) {
 module.exports = Object.freeze({
   projectRecurringOccurrences,
   reconcileOccurrences,
+  reconcileOccurrenceSets,
   projectRecurringForGoal
 });
