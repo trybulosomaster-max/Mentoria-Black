@@ -4,6 +4,9 @@ const path = require('path');
 const vm = require('vm');
 
 const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+assert(html.includes('class="tablewrap report-table-wrap"'), 'reports table must use its responsive scroll container');
+assert(html.includes('class="report-table"'), 'reports table must have isolated responsive styling');
+assert(/\.report-table\{min-width:780px\}/.test(html), 'reports table must preserve a readable minimum width on mobile');
 const start = html.indexOf('function reportStatus');
 const end = html.indexOf('function reportCheck', start);
 assert(start > 0 && end > start, 'report query layer must be present');
