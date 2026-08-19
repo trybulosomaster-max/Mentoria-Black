@@ -2966,9 +2966,10 @@ migrateReserveGoals();
   };
 
   function dashboardGoalsSummary(){
-    if(!window.MBGoals)return '';
+    if(!window.MBGoals||!window.MBGoalsV82)return '';
     const statusMap={completed:['Meta alcançada','goal-status-completed'],ahead:['Adiantada','goal-status-ahead'],on_track:['No ritmo','goal-status-track'],behind:['Atrasada','goal-status-behind'],no_forecast:['Sem previsão','goal-status-forecast']};
-    const all=window.MBGoals.all();
+    const current=new Date(), now=`${current.getFullYear()}-${String(current.getMonth()+1).padStart(2,'0')}-${String(current.getDate()).padStart(2,'0')}`;
+    const all=window.MBGoalsV82.projectGoalsForView(DATA.goals||[],DATA.transactions||[],DATA.recurring||[],{now});
     const active=all.filter(goal=>!goal.isCompleted);
     const completed=all.filter(goal=>goal.isCompleted);
     const rank=goal=>goal.status==='behind'?0:goal.deadline?1:goal.status==='on_track'?2:3;
@@ -2977,7 +2978,7 @@ migrateReserveGoals();
     const row=goal=>{
       const [status,statusClass]=statusMap[goal.status]||statusMap.no_forecast;
       const when=goal.estimatedCompletionDate?`previsão: ${dateLabel(goal.estimatedCompletionDate)}`:goal.deadline?`prazo: ${dateLabel(goal.deadline)}`:'sem prazo';
-      return `<div class="dashboard-goal-row"><div class="name">${esc(goal.goal.name||'Meta sem nome')}</div><div class="copy">${money(goal.realized)} / ${money(goal.target)} • ${pct(goal.progressRealPct)}</div><div class="meta"><span class="tag ${statusClass}">${status}</span><span>${when}</span></div></div>`;
+      return `<div class="dashboard-goal-row"><div class="name">${esc(goal.goal.name||'Meta sem nome')}</div><div class="copy">Realizado: ${money(goal.realizedTotal)} / ${money(goal.target)} • ${pct(goal.progressRealPct)}</div><div class="copy">Cobertura prevista: ${money(goal.projectedCovered)} • ${pct(goal.progressProjectedPct)}</div><div class="small muted">Programado: ${money(goal.programmed)} • Projetado: ${money(goal.projected)} • Falta: ${money(goal.remainingReal)}</div><div class="meta"><span class="tag ${statusClass}">${status}</span><span>${when}</span></div></div>`;
     };
     const budget=window.MBGoals.budget();
     const budgetText=budget.goalBudgetStatus==='sufficient'?'Seu orçamento comporta as metas atuais.':budget.goalBudgetStatus==='insufficient'?`Faltam ${money(Math.abs(budget.goalBudgetGap))}/mês para financiar as metas nos prazos definidos.`:'Defina o orçamento de Metas no Planejamento.';
