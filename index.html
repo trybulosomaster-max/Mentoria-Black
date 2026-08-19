@@ -706,7 +706,9 @@ function matchesReportAccount(transaction,filters=REPORT_FILTERS){
    (!filters.goalId||String(transaction.goal_id||"")===String(filters.goalId));
 }
 function buildReportDataset(filters=REPORT_FILTERS){
- return (DATA.transactions||[]).map(MBFinance.normalizeTransaction).filter(t=>
+ const normalized=(DATA.transactions||[]).map(MBFinance.normalizeTransaction);
+ const source=typeof cleanTransactions==="function"?cleanTransactions(normalized).rows:normalized;
+ return source.filter(t=>
    matchesReportPeriod(t,filters)&&matchesReportType(t,filters)&&matchesReportCategory(t,filters)&&matchesReportStatus(t,filters)&&matchesReportAccount(t,filters)
  ).sort((a,b)=>MBFinance.financialDate(b).localeCompare(MBFinance.financialDate(a)));
 }
@@ -719,8 +721,8 @@ function reportTotalsByMonth(rows){return aggregateReportBy(rows,t=>MBFinance.fi
 function reportTotalsByYear(rows){return aggregateReportBy(rows,t=>MBFinance.financialDate(t).slice(0,4))}
 function reportTotalsByStatus(rows){return aggregateReportBy(rows,reportStatus)}
 function reportAggregations(rows){
- const byType=reportTotalsByType(rows);
- return {count:rows.length,total:rows.reduce((sum,t)=>sum+Number(t.amount||0),0),balance:Number(byType.receita||0)+Number(byType.resgate||0)-Number(byType.despesa||0)-Number(byType.investimento||0),byType,byCategory:reportTotalsByCategory(rows),byMonth:reportTotalsByMonth(rows),byYear:reportTotalsByYear(rows),byStatus:reportTotalsByStatus(rows)};
+ const byType=reportTotalsByType(rows),canonical=MBFinance.totals(rows);
+ return {count:rows.length,movementTotal:rows.reduce((sum,t)=>sum+Number(t.amount||0),0),periodBalance:canonical.balance,byType,byCategory:reportTotalsByCategory(rows),byMonth:reportTotalsByMonth(rows),byYear:reportTotalsByYear(rows),byStatus:reportTotalsByStatus(rows)};
 }
 function reportExistingYears(){return [...new Set((DATA.transactions||[]).map(t=>MBFinance.period(t).year).filter(Number.isInteger))].sort((a,b)=>b-a)}
 function printReport(){
@@ -749,7 +751,7 @@ function reports(){
   <div class="filter"><label>Cartão</label><select id="reportCard">${option("","Todos",!REPORT_FILTERS.cardId)}${DATA.cards.map(c=>option(c.id,c.name,REPORT_FILTERS.cardId===c.id)).join("")}</select></div>
   <div class="filter"><label>Meta vinculada</label><select id="reportGoal">${option("","Todas",!REPORT_FILTERS.goalId)}${DATA.goals.map(g=>option(g.id,g.name,REPORT_FILTERS.goalId===g.id)).join("")}</select></div>
  </div><div class="report-choice-row"><div><label>Tipos</label>${[["receita","Receita"],["despesa","Despesa"],["investimento","Investimento"],["transferencia","Transferência"],["resgate","Resgate"]].map(([v,l])=>reportCheck("types",v,l)).join("")}</div><div><label>Status</label>${[["realizado","Realizado"],["pendente","Pendente/programado"],["cancelado","Cancelado"]].map(([v,l])=>reportCheck("statuses",v,l)).join("")}<label class="report-check"><input id="reportFuture" type="checkbox" ${REPORT_FILTERS.includeFuture?"checked":""}> Incluir futuros</label></div></div><div class="actions report-actions"><button class="btn gold" id="applyReportFilters">Aplicar filtros</button><button class="btn" id="clearReportFilters">Limpar filtros</button></div></section>
- <div class="kpis report-kpis">${kpi("Lançamentos",agg.count,"registros filtrados")}${kpi("Valor total",money(agg.total),"soma sem alterar semântica")}${kpi("Resultado",money(agg.balance),"receitas + resgates − despesas − investimentos")}${Object.entries(agg.byType).slice(0,3).map(([k,v])=>kpi(k,money(v),"por tipo")).join("")}</div>
+ <div class="kpis report-kpis">${kpi("Lançamentos",agg.count,"registros filtrados")}${kpi("Movimentação total",money(agg.movementTotal),"soma dos valores filtrados")}${kpi("Saldo do período",money(agg.periodBalance),"receitas − despesas − investimentos")}${Object.entries(agg.byType).slice(0,3).map(([k,v])=>kpi(k,money(v),"por tipo")).join("")}</div>
  <div class="grid"><section class="card s8 report-chart-card"><h2>Totais por categoria</h2><div class="chartbox"><canvas id="reportCat"></canvas></div></section><section class="card s4"><h2>Resumo por tipo</h2>${Object.entries(agg.byType).map(([k,v])=>`<div class="statline"><span>${esc(k)}</span><strong>${money(v)}</strong></div>`).join("")||'<div class="empty">Sem dados.</div>'}</section><section class="card s12"><h2>Lançamentos filtrados</h2>${table}</section></div></div>`;
 }
 function bindReportFilters(){

@@ -11,6 +11,19 @@ assert(start > 0 && end > start, 'report query layer must be present');
 const fold = value => String(value ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 const financialDate = row => ['transaction_date', 'date', 'due_date', 'created_at'].map(k => String(row?.[k] || '').slice(0, 10)).find(v => /^\d{4}-\d{2}-\d{2}$/.test(v)) || '';
 const kind = value => ({income:'receita', expense:'despesa', investment:'investimento', transfer:'transferencia', rescue:'resgate'})[fold(value)] || fold(value);
+const txDuplicateKey = t => {
+  const parcel=String(t.note||'').match(/parcelado\s+(\d+)\/(\d+).*?compra\s+([0-9]{4}-[0-9]{2}(?:-[0-9]{2})?)/i);
+  if(parcel)return ['parcel',parcel[3],parcel[1],parcel[2],String(t.description||'').trim().toLowerCase(),String(t.transaction_type||''),String(t.category||'').trim().toLowerCase(),t.account_id||'',t.card_id||''].join('|');
+  return [t.transaction_date,t.purchase_date||'',t.transaction_type,String(t.description||'').trim().toLowerCase(),String(t.category||'').trim().toLowerCase(),Number(t.amount||0).toFixed(2),t.account_id||'',t.card_id||''].join('|');
+};
+const cleanTransactions = rows => {
+  const seen=new Set(),out=[],duplicates=[];
+  for(const row of rows){
+    if(/parcelado\s+\d+\/\d+/i.test(String(row.note||''))){const key=txDuplicateKey(row);if(seen.has(key)){duplicates.push(row);continue}seen.add(key)}
+    out.push(row);
+  }
+  return {rows:out,duplicates};
+};
 const context = {
   REPORT_FILTERS: {},
   DATA: {transactions: []},
@@ -20,8 +33,16 @@ const context = {
     period: row => { const d=financialDate(row); return {year:d?Number(d.slice(0,4)):null}; },
     kind,
     category: value => ({name:String(value || 'Sem categoria')}),
-    isCancelled: row => ['cancelado','canceled','cancelled'].includes(fold(row.status))
+    isCancelled: row => ['cancelado','canceled','cancelled'].includes(fold(row.status)),
+    totals: rows => {
+      const active=rows.filter(row=>!['cancelado','canceled','cancelled'].includes(fold(row.status)));
+      const income=active.filter(row=>kind(row.transaction_type)==='receita').reduce((sum,row)=>sum+Number(row.amount||0),0);
+      const expense=active.filter(row=>kind(row.transaction_type)==='despesa').reduce((sum,row)=>sum+Number(row.amount||0),0);
+      const invest=active.filter(row=>kind(row.transaction_type)==='investimento').reduce((sum,row)=>sum+Number(row.amount||0),0);
+      return {income,expense,invest,balance:income-expense-invest};
+    }
   },
+  cleanTransactions,
   categoryUiNameKey: fold,
   console
 };
@@ -71,9 +92,35 @@ assert.strictEqual(agg.byStatus.realizado, 5400);
 assert.strictEqual(agg.byMonth['2026-01'], 5400);
 assert.strictEqual(agg.byYear['2026'], 6100);
 
+const duplicateRows=[
+  {id:'p1',transaction_date:'2026-01-20',purchase_date:'2026-01-02',transaction_type:'despesa',category:'Conforto',status:'realizado',amount:100,description:'Compra parcelada',account_id:'a1',note:'Parcelado 1/2 • Compra 2026-01-02'},
+  {id:'p1-duplicate',transaction_date:'2026-01-20',purchase_date:'2026-01-02',transaction_type:'despesa',category:'Conforto',status:'realizado',amount:100,description:'Compra parcelada',account_id:'a1',note:'Parcelado 1/2 • Compra 2026-01-02'}
+];
+context.DATA.transactions=duplicateRows;
+const before=JSON.stringify(context.DATA.transactions);
+const deduplicated=api.buildReportDataset(base);
+assert.deepStrictEqual(Array.from(deduplicated,row=>row.id),['p1']);
+assert.strictEqual(api.reportAggregations(deduplicated).count,1);
+assert.strictEqual(api.reportAggregations(deduplicated).movementTotal,100);
+assert.strictEqual(JSON.stringify(context.DATA.transactions),before,'report deduplication must not mutate DATA.transactions');
+
+const balanceOf = row => api.reportAggregations([row]).periodBalance;
+assert.strictEqual(balanceOf({transaction_type:'receita',amount:100,status:'realizado'}),100);
+assert.strictEqual(balanceOf({transaction_type:'despesa',amount:100,status:'realizado'}),-100);
+assert.strictEqual(balanceOf({transaction_type:'investimento',amount:100,status:'realizado'}),-100);
+assert.strictEqual(balanceOf({transaction_type:'transferencia',amount:100,status:'realizado'}),0);
+assert.strictEqual(balanceOf({transaction_type:'resgate',amount:100,status:'realizado'}),0);
+const rescueAgg=api.reportAggregations([{transaction_type:'resgate',amount:100,status:'realizado'}]);
+assert.strictEqual(rescueAgg.byType.resgate,100);
+assert.strictEqual(rescueAgg.movementTotal,100);
+
 assert(html.includes('if(TAB==="reports")bindReportFilters()'), 'reports must use its own binder');
 assert(!html.includes('["planYear","planMonth"],["repYear","repMonth"]'), 'legacy shared report filters must be removed');
 assert(/@media print\{[\s\S]*\.report-no-print/.test(html), 'report print controls must be hidden');
 assert(!html.slice(start, end).includes('sb.from('), 'report query layer must be read-only');
+assert(html.slice(start,end).includes('cleanTransactions(normalized).rows'), 'reports must reuse canonical deduplication');
+assert(html.includes('kpi("Movimentação total"'), 'gross sum must be labelled as movement');
+assert(html.includes('kpi("Saldo do período"'), 'canonical balance label must be explicit');
+assert(!html.includes('kpi("Resultado"'), 'movement or balance must not be labelled as result');
 
-console.log('report-layer: 26 assertions passed');
+console.log('report-layer: 40 assertions passed');
