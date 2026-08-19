@@ -26,8 +26,10 @@
 .dashboard-goals{display:grid;gap:9px}.dashboard-goal-row{padding:10px 0;border-bottom:1px solid #222}.dashboard-goal-row:last-of-type{border-bottom:0}.dashboard-goal-row .name{font-weight:800}.dashboard-goal-row .copy{color:#aaa;font-size:12px;margin-top:3px}.dashboard-goal-row .meta{display:flex;justify-content:space-between;gap:8px;align-items:center;margin-top:7px;font-size:11px;color:#aaa}.dashboard-goals-budget{margin-top:5px;padding-top:10px;border-top:1px solid #292929}.dashboard-goals-completed{margin-top:6px;padding:9px 10px;border:1px solid #3c5b42;border-radius:9px;background:#102015;color:#9fc7a5;font-size:12px}
 .modal{position:fixed;inset:0;background:#000b;display:grid;place-items:center;padding:16px;z-index:100}.modalbox{width:min(760px,100%);max-height:92vh;overflow:auto;background:#0c0c0c;border:1px solid #383838;border-radius:16px;padding:18px;box-shadow:var(--shadow)}.delete-choice{display:flex;flex-direction:column;gap:10px;margin-top:14px}.delete-option{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:15px;border:1px solid #2b2b2b;border-radius:12px;background:#111;cursor:pointer}.delete-option:hover{border-color:#555}.delete-option.active{border-color:#b18b2e;background:#17140d}.delete-option .copy{display:flex;flex-direction:column;gap:4px}.delete-option .title{font-size:14px;color:#eee}.delete-option .desc{font-size:11px;color:#888}.delete-radio{width:20px;height:20px;accent-color:#b18b2e}.danger-action{background:#191111!important;border-color:#6a3333!important;color:#e8a0a0!important}.modalbox h2{margin:0}.formgrid{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}.full{grid-column:1/-1}.modal-foot{display:flex;justify-content:flex-end;gap:8px;margin-top:15px;padding-top:12px;border-top:1px solid #252525}.preview{background:#111;border:1px solid #292929;border-radius:10px;padding:10px;margin-top:10px}.notice{padding:10px;border:1px solid #594a25;background:#18150c;border-radius:9px;color:#e1c978;font-size:12px}.errorbox{padding:10px;border:1px solid #5d3030;background:#1a0f0f;border-radius:9px;color:#e4a0a0;font-size:12px}
 .footer{border-top:1px solid var(--line);margin-top:18px;padding:14px 0;color:#666;font-size:10px;text-align:center}
+.report-filter-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.report-choice-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}.report-check{display:inline-flex;align-items:center;gap:5px;margin:5px 12px 5px 0;color:#ddd;font-size:12px;text-transform:none;letter-spacing:0}.report-check input{width:auto}.report-actions{justify-content:flex-end;margin-top:12px}.report-kpis{margin-top:14px}
 @media(max-width:1100px){.kpis{grid-template-columns:repeat(3,1fr)}.s8,.s6,.s4{grid-column:span 12}.filters{grid-template-columns:1fr 1fr}.goal-values{grid-template-columns:repeat(2,minmax(0,1fr))}.goal-details{grid-template-columns:1fr 1fr}}
-@media(max-width:650px){.wrap{padding:12px}.header .brand-full{grid-template-columns:1fr;grid-template-rows:auto;justify-content:center;justify-items:center;column-gap:0;gap:6px}.header .crest{width:84px;height:84px;grid-row:auto}.header .title{font-size:24px}.header .sub{font-size:9px;letter-spacing:.18em}.header .sub:before,.header .sub:after{display:block;width:28px}.kpis,.goals-summary{grid-template-columns:repeat(2,1fr)}.filters{grid-template-columns:1fr}.formgrid{grid-template-columns:1fr}.full{grid-column:auto}.pagehead{display:block}.pagehead .actions{margin-top:10px}.chartbox{height:280px}.auth-card .brand-full .title{font-size:24px}.auth-card .brand-full .crest{width:72px;height:72px}.goal-card-top{display:block}.goal-card-top>.tag{margin-top:8px}.goal-values,.goal-details{grid-template-columns:1fr 1fr}}
+@media(max-width:650px){.wrap{padding:12px}.header .brand-full{grid-template-columns:1fr;grid-template-rows:auto;justify-content:center;justify-items:center;column-gap:0;gap:6px}.header .crest{width:84px;height:84px;grid-row:auto}.header .title{font-size:24px}.header .sub{font-size:9px;letter-spacing:.18em}.header .sub:before,.header .sub:after{display:block;width:28px}.kpis,.goals-summary{grid-template-columns:repeat(2,1fr)}.filters{grid-template-columns:1fr}.formgrid{grid-template-columns:1fr}.full{grid-column:auto}.pagehead{display:block}.pagehead .actions{margin-top:10px}.chartbox{height:280px}.auth-card .brand-full .title{font-size:24px}.auth-card .brand-full .crest{width:72px;height:72px}.goal-card-top{display:block}.goal-card-top>.tag{margin-top:8px}.goal-values,.goal-details{grid-template-columns:1fr 1fr}.report-filter-grid,.report-choice-row{grid-template-columns:1fr}}
+@media print{body.report-print{background:#fff;color:#000}body.report-print .header,body.report-print .nav,body.report-print .footer,body.report-print .report-no-print,body.report-print #toast,body.report-print #modal{display:none!important}body.report-print .wrap{max-width:none;padding:0}body.report-print #view>*:not(#reportPrintArea){display:none!important}body.report-print #reportPrintArea{display:block!important}body.report-print .card,body.report-print .kpi{background:#fff!important;color:#000!important;border-color:#bbb;box-shadow:none;break-inside:avoid}body.report-print .muted,body.report-print .desc,body.report-print .small,body.report-print th{color:#444!important}body.report-print .grid{display:block}body.report-print .grid>.card{margin-bottom:12px}body.report-print .tablewrap{overflow:visible}body.report-print table{min-width:0;font-size:10px}body.report-print tr,body.report-print .statline,body.report-print .chartbox{break-inside:avoid}body.report-print .chartbox{height:260px}body.report-print .report-chart-card{page-break-inside:avoid}body.report-print .pagehead .actions{display:none!important}}
 
 /* V14 visual polish */
 .header .brand-full .title{font-weight:800;text-shadow:0 1px 10px rgba(201,162,39,.12)}
@@ -105,6 +107,8 @@ const DEFAULT_COLORS=["#d9ad37","#8e72d9","#4f9ed7","#7dbb72","#e48b3c","#48aaa5
 let USER=null,TAB="dashboard",CHARTS={};
 let DATA={accounts:[],cards:[],categories:[],transactions:[],goals:[],recurring:[],assets:[],liabilities:[],monthly:[],rules:[],imports:[]};
 let FILTERS={year:new Date().getFullYear(),month:new Date().getMonth()+1,txType:"",txCategory:"",txMonth:"",search:""};
+const defaultReportFilters=()=>({periodMode:"month",year:new Date().getFullYear(),month:new Date().getMonth()+1,years:[],dateFrom:"",dateTo:"",types:[],category:"",statuses:["realizado","pendente"],includeFuture:true,accountId:"",cardId:"",goalId:""});
+let REPORT_FILTERS=defaultReportFilters();
 
 function toast(msg,err=false){$("toastBox").textContent=msg;$("toastBox").className=err?"errorbox":"notice";$("toast").classList.remove("hidden");clearTimeout(window.__toast);window.__toast=setTimeout(()=>$("toast").classList.add("hidden"),3500)}
 function modal(title,html){$("modalTitle").textContent=title;$("modalBody").innerHTML=html;$("modal").classList.remove("hidden")}
@@ -673,7 +677,88 @@ function nextRecurringDateLabel(x){
  return d.toLocaleDateString("pt-BR");
 }
 function wealth(){const res=reserveInfo();let reserve="";if(res.target)reserve="<div class=\"bar\"><i style=\"width:"+res.pct+"%;background:var(--gold)\"></i></div><div>"+pct(res.pct)+" do objetivo</div>";const body="<div class=\"grid\"><section class=\"card s6\"><h2>Patrimônio líquido</h2><div style=\"font-size:30px;font-weight:850;margin-top:12px\">"+money(netWorth())+"</div></section><section class=\"card s6\"><h2>Reserva de emergência</h2><div style=\"font-size:30px;font-weight:850;margin-top:12px\">"+money(res.current)+"</div>"+reserve+"</section><section class=\"card s12\"><h2>Ativos</h2>"+simpleTable(DATA.assets,[["Nome",x=>esc(x.name)],["Instituição",x=>esc(x.institution||"—")],["Valor",x=>money(x.current_value)]],"assets")+"</section></div>";return pageHead("Patrimônio","Ativos, dívidas e reserva de emergência.",body)}
-function reports(){const rows=expensesByCat();return pageHead("Relatórios",`Análises de ${MONTHS[FILTERS.month-1]} de ${FILTERS.year}.`,`<button class="btn" onclick="window.print()">Imprimir</button>`)+`<div class="filters"><div class="filter"><label>Ano</label><select id="repYear">${yearOptions()}</select></div><div class="filter"><label>Mês</label><select id="repMonth">${monthOptions()}</select></div></div><div class="grid"><section class="card s8"><h2>Despesas por categoria</h2><div class="chartbox"><canvas id="reportCat"></canvas></div></section><section class="card s4"><h2>Resumo</h2>${rows.map(([c,v])=>`<div class="statline"><span><span class="dot" style="background:${categoryColor(c)}"></span>${c}</span><strong>${money(v)}</strong></div>`).join("")||`<div class="empty">Sem despesas.</div>`}</section></div>`}
+function reportStatus(t){
+ if(MBFinance.isCancelled(t))return "cancelado";
+ const s=String(t.status||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();
+ return ["pendente","pending","programado","scheduled"].includes(s)?"pendente":"realizado";
+}
+function matchesReportPeriod(transaction,filters=REPORT_FILTERS){
+ const date=MBFinance.financialDate(transaction);if(!date)return false;
+ const year=Number(date.slice(0,4)),month=Number(date.slice(5,7));
+ if(filters.periodMode==="custom")return (!filters.dateFrom||date>=filters.dateFrom)&&(!filters.dateTo||date<=filters.dateTo);
+ if(filters.periodMode==="multi")return !filters.years?.length||filters.years.map(Number).includes(year);
+ if(filters.periodMode==="year")return year===Number(filters.year);
+ return year===Number(filters.year)&&month===Number(filters.month);
+}
+function matchesReportType(transaction,filters=REPORT_FILTERS){return !filters.types?.length||filters.types.includes(MBFinance.kind(transaction.transaction_type||transaction.type))}
+function matchesReportCategory(transaction,filters=REPORT_FILTERS){
+ if(!filters.category)return true;
+ return categoryUiNameKey(MBFinance.category(transaction.category,transaction.transaction_type).name)===categoryUiNameKey(filters.category);
+}
+function matchesReportStatus(transaction,filters=REPORT_FILTERS){
+ const date=MBFinance.financialDate(transaction),today=new Date().toISOString().slice(0,10);
+ if(filters.includeFuture===false&&date>today)return false;
+ return !filters.statuses?.length||filters.statuses.includes(reportStatus(transaction));
+}
+function matchesReportAccount(transaction,filters=REPORT_FILTERS){
+ return (!filters.accountId||String(transaction.account_id||"")===String(filters.accountId))&&
+   (!filters.cardId||String(transaction.card_id||"")===String(filters.cardId))&&
+   (!filters.goalId||String(transaction.goal_id||"")===String(filters.goalId));
+}
+function buildReportDataset(filters=REPORT_FILTERS){
+ return (DATA.transactions||[]).map(MBFinance.normalizeTransaction).filter(t=>
+   matchesReportPeriod(t,filters)&&matchesReportType(t,filters)&&matchesReportCategory(t,filters)&&matchesReportStatus(t,filters)&&matchesReportAccount(t,filters)
+ ).sort((a,b)=>MBFinance.financialDate(b).localeCompare(MBFinance.financialDate(a)));
+}
+function aggregateReportBy(rows,keyFn){
+ const out={};for(const row of rows){const key=keyFn(row)||"Não informado";out[key]=(out[key]||0)+Number(row.amount||0)}return out;
+}
+function reportTotalsByType(rows){return aggregateReportBy(rows,t=>MBFinance.kind(t.transaction_type||t.type)||"sem_tipo")}
+function reportTotalsByCategory(rows){return aggregateReportBy(rows,t=>MBFinance.category(t.category,t.transaction_type).name||"Sem categoria")}
+function reportTotalsByMonth(rows){return aggregateReportBy(rows,t=>MBFinance.financialDate(t).slice(0,7))}
+function reportTotalsByYear(rows){return aggregateReportBy(rows,t=>MBFinance.financialDate(t).slice(0,4))}
+function reportTotalsByStatus(rows){return aggregateReportBy(rows,reportStatus)}
+function reportAggregations(rows){
+ const byType=reportTotalsByType(rows);
+ return {count:rows.length,total:rows.reduce((sum,t)=>sum+Number(t.amount||0),0),balance:Number(byType.receita||0)+Number(byType.resgate||0)-Number(byType.despesa||0)-Number(byType.investimento||0),byType,byCategory:reportTotalsByCategory(rows),byMonth:reportTotalsByMonth(rows),byYear:reportTotalsByYear(rows),byStatus:reportTotalsByStatus(rows)};
+}
+function reportExistingYears(){return [...new Set((DATA.transactions||[]).map(t=>MBFinance.period(t).year).filter(Number.isInteger))].sort((a,b)=>b-a)}
+function printReport(){
+ document.body.classList.add("report-print");
+ const cleanup=()=>document.body.classList.remove("report-print");
+ window.addEventListener("afterprint",cleanup,{once:true});
+ window.print();
+}
+function reportCheck(name,value,label){return `<label class="report-check"><input type="checkbox" name="${name}" value="${value}" ${REPORT_FILTERS[name]?.includes(value)?"checked":""}> ${label}</label>`}
+function reports(){
+ const rows=buildReportDataset(),agg=reportAggregations(rows),years=reportExistingYears();
+ const categoryList=[...new Set((DATA.transactions||[]).map(t=>MBFinance.category(t.category,t.transaction_type).name).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"pt-BR"));
+ const option=(value,label,selected)=>`<option value="${esc(value)}" ${selected?"selected":""}>${esc(label)}</option>`;
+ const periodLabel=REPORT_FILTERS.periodMode==="month"?`${MONTHS[REPORT_FILTERS.month-1]} de ${REPORT_FILTERS.year}`:REPORT_FILTERS.periodMode==="year"?`Ano de ${REPORT_FILTERS.year}`:REPORT_FILTERS.periodMode==="multi"?(REPORT_FILTERS.years.join(", ")||"Todos os anos"):`${REPORT_FILTERS.dateFrom||"início"} a ${REPORT_FILTERS.dateTo||"hoje"}`;
+ const table=rows.length?`<div class="tablewrap"><table><thead><tr><th>Data</th><th>Descrição</th><th>Categoria</th><th>Tipo</th><th>Status</th><th>Valor</th></tr></thead><tbody>${rows.map(t=>`<tr><td>${new Date(MBFinance.financialDate(t)+"T12:00:00").toLocaleDateString("pt-BR")}</td><td>${esc(t.description||"—")}</td><td>${esc(MBFinance.category(t.category,t.transaction_type).name)}</td><td>${esc(MBFinance.kind(t.transaction_type||t.type))}</td><td>${esc(reportStatus(t))}</td><td>${money(t.amount)}</td></tr>`).join("")}</tbody></table></div>`:`<div class="empty">Nenhum lançamento corresponde aos filtros.</div>`;
+ return `<div id="reportPrintArea">${pageHead("Relatórios",`Consulta independente • ${periodLabel}`,`<button class="btn report-no-print" onclick="printReport()">Imprimir relatório</button>`)}
+ <section class="card report-no-print"><div class="report-filter-grid">
+  <div class="filter"><label>Período</label><select id="reportPeriodMode">${[["month","Mês específico"],["year","Ano completo"],["multi","Múltiplos anos"],["custom","Intervalo personalizado"]].map(([v,l])=>option(v,l,REPORT_FILTERS.periodMode===v)).join("")}</select></div>
+  <div class="filter report-period report-period-month report-period-year"><label>Ano</label><select id="reportYear">${years.map(y=>option(y,y,Number(REPORT_FILTERS.year)===y)).join("")}</select></div>
+  <div class="filter report-period report-period-month"><label>Mês</label><select id="reportMonth">${MONTHS.map((m,i)=>option(i+1,m,Number(REPORT_FILTERS.month)===i+1)).join("")}</select></div>
+  <div class="filter report-period report-period-multi"><label>Anos (Ctrl/Cmd para combinar)</label><select id="reportYears" multiple size="4">${years.map(y=>option(y,y,REPORT_FILTERS.years.map(Number).includes(y))).join("")}</select></div>
+  <div class="filter report-period report-period-custom"><label>Data inicial</label><input id="reportDateFrom" type="date" value="${esc(REPORT_FILTERS.dateFrom)}"></div>
+  <div class="filter report-period report-period-custom"><label>Data final</label><input id="reportDateTo" type="date" value="${esc(REPORT_FILTERS.dateTo)}"></div>
+  <div class="filter"><label>Categoria</label><select id="reportCategory">${option("","Todas",!REPORT_FILTERS.category)}${categoryList.map(c=>option(c,c,REPORT_FILTERS.category===c)).join("")}</select></div>
+  <div class="filter"><label>Conta</label><select id="reportAccount">${option("","Todas",!REPORT_FILTERS.accountId)}${DATA.accounts.map(a=>option(a.id,a.name,REPORT_FILTERS.accountId===a.id)).join("")}</select></div>
+  <div class="filter"><label>Cartão</label><select id="reportCard">${option("","Todos",!REPORT_FILTERS.cardId)}${DATA.cards.map(c=>option(c.id,c.name,REPORT_FILTERS.cardId===c.id)).join("")}</select></div>
+  <div class="filter"><label>Meta vinculada</label><select id="reportGoal">${option("","Todas",!REPORT_FILTERS.goalId)}${DATA.goals.map(g=>option(g.id,g.name,REPORT_FILTERS.goalId===g.id)).join("")}</select></div>
+ </div><div class="report-choice-row"><div><label>Tipos</label>${[["receita","Receita"],["despesa","Despesa"],["investimento","Investimento"],["transferencia","Transferência"],["resgate","Resgate"]].map(([v,l])=>reportCheck("types",v,l)).join("")}</div><div><label>Status</label>${[["realizado","Realizado"],["pendente","Pendente/programado"],["cancelado","Cancelado"]].map(([v,l])=>reportCheck("statuses",v,l)).join("")}<label class="report-check"><input id="reportFuture" type="checkbox" ${REPORT_FILTERS.includeFuture?"checked":""}> Incluir futuros</label></div></div><div class="actions report-actions"><button class="btn gold" id="applyReportFilters">Aplicar filtros</button><button class="btn" id="clearReportFilters">Limpar filtros</button></div></section>
+ <div class="kpis report-kpis">${kpi("Lançamentos",agg.count,"registros filtrados")}${kpi("Valor total",money(agg.total),"soma sem alterar semântica")}${kpi("Resultado",money(agg.balance),"receitas + resgates − despesas − investimentos")}${Object.entries(agg.byType).slice(0,3).map(([k,v])=>kpi(k,money(v),"por tipo")).join("")}</div>
+ <div class="grid"><section class="card s8 report-chart-card"><h2>Totais por categoria</h2><div class="chartbox"><canvas id="reportCat"></canvas></div></section><section class="card s4"><h2>Resumo por tipo</h2>${Object.entries(agg.byType).map(([k,v])=>`<div class="statline"><span>${esc(k)}</span><strong>${money(v)}</strong></div>`).join("")||'<div class="empty">Sem dados.</div>'}</section><section class="card s12"><h2>Lançamentos filtrados</h2>${table}</section></div></div>`;
+}
+function bindReportFilters(){
+ const mode=$("reportPeriodMode");if(!mode)return;
+ document.querySelectorAll(".report-period").forEach(el=>el.classList.add("hidden"));document.querySelectorAll(`.report-period-${REPORT_FILTERS.periodMode}`).forEach(el=>el.classList.remove("hidden"));
+ mode.onchange=()=>{REPORT_FILTERS.periodMode=mode.value;render()};
+ $("applyReportFilters").onclick=()=>{REPORT_FILTERS={...REPORT_FILTERS,year:Number($("reportYear")?.value||REPORT_FILTERS.year),month:Number($("reportMonth")?.value||REPORT_FILTERS.month),years:[...($("reportYears")?.selectedOptions||[])].map(o=>Number(o.value)),dateFrom:$("reportDateFrom")?.value||"",dateTo:$("reportDateTo")?.value||"",category:$("reportCategory")?.value||"",accountId:$("reportAccount")?.value||"",cardId:$("reportCard")?.value||"",goalId:$("reportGoal")?.value||"",types:[...document.querySelectorAll('input[name="types"]:checked')].map(x=>x.value),statuses:[...document.querySelectorAll('input[name="statuses"]:checked')].map(x=>x.value),includeFuture:!!$("reportFuture")?.checked};render()};
+ $("clearReportFilters").onclick=()=>{REPORT_FILTERS=defaultReportFilters();render()};
+}
 function openAccount(id){const x=id?DATA.accounts.find(a=>a.id===id):{};modal(id?"Editar conta":"Nova conta",`<form id="f"><div class="formgrid"><div><label>Nome</label><input name="name" required value="${esc(x.name||"")}"></div><div><label>Instituição</label><input name="institution" value="${esc(x.institution||"")}"></div><div><label>Saldo atual</label><input name="statement_balance" class="money-field" value="${x.statement_balance??x.opening_balance??0}"></div><div><label>Tipo</label><select name="type"><option value="checking">Conta corrente</option><option value="savings">Poupança</option><option value="investment">Investimentos</option><option value="cash">Carteira / dinheiro</option></select></div></div><div id="formMsg" class="msg"></div><div class="modal-foot"><button type="button" class="btn" onclick="closeModal()">Cancelar</button><button class="btn primary">Salvar</button></div></form>`);document.querySelectorAll(".money-field").forEach(e=>e.addEventListener("blur",()=>formatMoneyInput(e)));$("f").onsubmit=async e=>{e.preventDefault();const fd=new FormData(e.target),o={name:fd.get("name"),institution:fd.get("institution"),statement_balance:parseMoney(fd.get("statement_balance")),account_type:fd.get("type")};const r=id?await sb.from("accounts").update(o).eq("id",id).eq("user_id",USER.id):await sb.from("accounts").insert({...o,user_id:USER.id});if(r.error){$("formMsg").textContent=r.error.message;return}closeModal();await reload();toast("Conta salva.")}}
 function openCard(id){const x=id?DATA.cards.find(a=>a.id===id):{};modal(id?"Editar cartão":"Novo cartão",`<form id="f"><div class="formgrid"><div><label>Nome</label><input name="name" required value="${esc(x.name||"")}"></div><div><label>Instituição</label><input name="institution" value="${esc(x.institution||"")}"></div><div><label>Limite</label><input name="limit_amount" class="money-field" value="${x.limit_amount??x.limit??0}"></div><div><label>Vencimento</label><input name="due_day" type="number" min="1" max="31" value="${x.due_day||""}"></div></div><div id="formMsg" class="msg"></div><div class="modal-foot"><button type="button" class="btn" onclick="closeModal()">Cancelar</button><button class="btn primary">Salvar</button></div></form>`);document.querySelectorAll(".money-field").forEach(e=>e.addEventListener("blur",()=>formatMoneyInput(e)));$("f").onsubmit=async e=>{e.preventDefault();const fd=new FormData(e.target),o={name:fd.get("name"),institution:fd.get("institution"),limit:parseMoney(fd.get("limit_amount")),due_day:Number(fd.get("due_day")||0)};const r=id?await sb.from("cards").update(o).eq("id",id).eq("user_id",USER.id):await sb.from("cards").insert({...o,user_id:USER.id});if(r.error){$("formMsg").textContent=r.error.message;return}closeModal();await reload();toast("Cartão salvo.")}}
 function openCategory(id){const x=id?DATA.categories.find(a=>a.id===id):{};modal(id?"Editar categoria":"Nova categoria",`<form id="f"><div class="formgrid"><div><label>Nome</label><input name="name" required value="${esc(x.name||"")}"></div><div><label>Cor</label><input name="color" type="color" value="${x.color||"#c9a227"}"></div><div><label>Subcategoria de</label><select name="parent"><option value="">Categoria principal</option>${DATA.categories.filter(c=>!c.parent&&c.id!==id).map(c=>`<option ${x.parent===c.name?"selected":""}>${esc(c.name)}</option>`).join("")}</select></div></div><div id="formMsg" class="msg"></div><div class="modal-foot"><button type="button" class="btn" onclick="closeModal()">Cancelar</button><button class="btn primary">Salvar</button></div></form>`);$("f").onsubmit=async e=>{e.preventDefault();const fd=new FormData(e.target),name=String(fd.get("name")).trim(),parent=String(fd.get("parent")||"").trim(),color=fd.get("color");if(!name){$("formMsg").textContent="Informe o nome.";return}const dup=DATA.categories.find(c=>c.id!==id&&c.name.toLowerCase()===name.toLowerCase()&&String(c.parent||"").toLowerCase()===parent.toLowerCase());if(dup){$("formMsg").textContent="Já existe uma categoria/subcategoria com esse nome.";return}const old=id?DATA.categories.find(c=>c.id===id):null,o={name,parent:parent||null,color};const r=id?await sb.from("categories").update(o).eq("id",id).eq("user_id",USER.id):await sb.from("categories").insert({...o,user_id:USER.id});if(r.error){$("formMsg").textContent=r.error.message;return}if(old&&old.name!==name){await sb.from("transactions").update({category:name}).eq("user_id",USER.id).eq("category",old.name);await sb.from("recurring").update({category:name}).eq("user_id",USER.id).eq("category",old.name)}closeModal();await reload();toast("Categoria salva.")}}
@@ -726,8 +811,9 @@ async function deleteRow(table,id){
  await reload();toast(table==="recurring"?"Recorrência excluída.":"Registro excluído.");
 }
 function bindFilters(){
- [["dashYear","dashMonth"],["planYear","planMonth"],["repYear","repMonth"]].forEach(([y,m])=>{const ys=$(y),ms=$(m);if(ys){ys.value=FILTERS.year;ys.onchange=()=>{FILTERS.year=Number(ys.value);render()}}if(ms){ms.value=FILTERS.month;ms.onchange=()=>{FILTERS.month=Number(ms.value);render()}}});
+ [["dashYear","dashMonth"],["planYear","planMonth"]].forEach(([y,m])=>{const ys=$(y),ms=$(m);if(ys){ys.value=FILTERS.year;ys.onchange=()=>{FILTERS.year=Number(ys.value);render()}}if(ms){ms.value=FILTERS.month;ms.onchange=()=>{FILTERS.month=Number(ms.value);render()}}});
  const s=$("txSearch"),typ=$("txType"),cat=$("txCategory");if(s)s.oninput=()=>{FILTERS.search=s.value;clearTimeout(window.__txDebounce);window.__txDebounce=setTimeout(()=>render(),180)};if(typ)typ.onchange=()=>{FILTERS.txType=typ.value;render()};if(cat)cat.onchange=()=>{FILTERS.txCategory=cat.value;render()};
+ if(TAB==="reports")bindReportFilters();
 }
 function render(){nav();$("view").innerHTML=TAB==="dashboard"?window.dashboard():TAB==="transactions"?window.transactions():TAB==="planning"?planning():TAB==="accounts"?accounts():TAB==="cards"?cards():TAB==="categories"?window.categories():TAB==="goals"?goals():TAB==="recurring"?recurring():TAB==="wealth"?wealth():reports();bindFilters();requestAnimationFrame(()=>window.drawCharts())}
 function drawCharts(){
@@ -748,8 +834,9 @@ function drawCharts(){
     chartBar("planChart",e,tot);
   }
 
-  if(TAB==="reports"&&rows.length){
-    chartBar("reportCat",rows,rows.reduce((a,b)=>a+b[1],0));
+  if(TAB==="reports"){
+    const reportRows=Object.entries(reportTotalsByCategory(buildReportDataset())).sort((a,b)=>b[1]-a[1]);
+    if(reportRows.length)chartBar("reportCat",reportRows,reportRows.reduce((a,b)=>a+b[1],0));
   }
 }
 async function reload(){await load();render()}
