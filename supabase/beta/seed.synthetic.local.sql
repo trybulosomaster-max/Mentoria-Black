@@ -22,10 +22,10 @@ insert into public.goals(id,user_id,name,target,current,deadline) values
   ('aaaaaaaa-1111-4111-8111-111111111107','aaaaaaaa-1111-4111-8111-111111111111','Viagem JP',8000,0,'2028-08-01'),
   ('aaaaaaaa-1111-4111-8111-111111111109','aaaaaaaa-1111-4111-8111-111111111111','Viagem sem prazo',8000,0,null);
 
-insert into public.recurring(id,user_id,name,type,amount,category,account_id,frequency,"interval",start_date,next_date,active,goal_id,goal_effect) values
-  ('aaaaaaaa-1111-4111-8111-111111111106','aaaaaaaa-1111-4111-8111-111111111111','Aporte Casamento','investimento',550,'Metas','aaaaaaaa-1111-4111-8111-111111111101','monthly',1,'2026-09-01','2026-09-01',true,'aaaaaaaa-1111-4111-8111-111111111105','contribution'),
-  ('aaaaaaaa-1111-4111-8111-111111111108','aaaaaaaa-1111-4111-8111-111111111111','Aporte Viagem JP','investimento',550,'Metas','aaaaaaaa-1111-4111-8111-111111111101','monthly',1,'2026-09-01','2026-09-01',true,'aaaaaaaa-1111-4111-8111-111111111107','contribution'),
-  ('aaaaaaaa-1111-4111-8111-111111111110','aaaaaaaa-1111-4111-8111-111111111111','Aporte Viagem sem prazo','investimento',550,'Metas','aaaaaaaa-1111-4111-8111-111111111101','monthly',1,'2026-09-01','2026-09-01',true,'aaaaaaaa-1111-4111-8111-111111111109','contribution');
+insert into public.recurring(id,user_id,name,type,amount,category,account_id,source_account_id,asset_id,frequency,"interval",start_date,next_date,active,goal_id,goal_effect) values
+  ('aaaaaaaa-1111-4111-8111-111111111106','aaaaaaaa-1111-4111-8111-111111111111','Aporte Casamento','investimento',550,'Metas','aaaaaaaa-1111-4111-8111-111111111101','aaaaaaaa-1111-4111-8111-111111111101','aaaaaaaa-1111-4111-8111-111111111104','monthly',1,'2026-09-01','2026-09-01',true,'aaaaaaaa-1111-4111-8111-111111111105','contribution'),
+  ('aaaaaaaa-1111-4111-8111-111111111108','aaaaaaaa-1111-4111-8111-111111111111','Aporte Viagem JP','investimento',550,'Metas','aaaaaaaa-1111-4111-8111-111111111101','aaaaaaaa-1111-4111-8111-111111111101','aaaaaaaa-1111-4111-8111-111111111104','monthly',1,'2026-09-01','2026-09-01',true,'aaaaaaaa-1111-4111-8111-111111111107','contribution'),
+  ('aaaaaaaa-1111-4111-8111-111111111110','aaaaaaaa-1111-4111-8111-111111111111','Aporte Viagem sem prazo','investimento',550,'Metas','aaaaaaaa-1111-4111-8111-111111111101','aaaaaaaa-1111-4111-8111-111111111101','aaaaaaaa-1111-4111-8111-111111111104','monthly',1,'2026-09-01','2026-09-01',true,'aaaaaaaa-1111-4111-8111-111111111109','contribution');
 
 insert into public.transactions(id,user_id,transaction_date,description,category,amount,transaction_type,status,account_id,source_account_id,asset_id,goal_id,goal_effect) values
   ('10000000-0000-4000-8000-000000000001','aaaaaaaa-1111-4111-8111-111111111111','2026-08-05','Receita Beta','Salário',8000,'receita','realizado','aaaaaaaa-1111-4111-8111-111111111101',null,null,null,null),

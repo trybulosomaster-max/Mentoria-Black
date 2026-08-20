@@ -27,14 +27,20 @@ Before deployment, run read-only diagnostics for zero amounts, invalid legacy ow
 
 ## Atomic operations
 
-The four V82 functions are `SECURITY INVOKER`, require an authenticated user, validate ownership, and insert one canonical ledger row:
+The V82 financial functions are `SECURITY INVOKER`, require an authenticated user, validate ownership, and insert canonical ledger rows:
 
 - `create_transfer_v82`: source account to destination account.
 - `create_investment_v82`: source account to asset.
 - `create_rescue_v82`: asset to destination account.
 - `reverse_structured_operation_v82`: creates the inverse operation and links it to the original.
+- `create_investment_entry_v82`: routes the common investment form through the canonical investment operation while preserving optional UI metadata atomically.
+- `materialize_recurring_occurrences_v82`: locks the authenticated user's eligible series, validates explicit ownership links, materializes all occurrences in one transaction, records the series/date identity, and advances schedules only after the batch succeeds.
 
 They do not mutate manual account/asset snapshots. Atomicity comes from one PostgreSQL transaction and one canonical row representing both conceptual legs. `(user_id, operation_id)` provides idempotency; the same ID with different payload is rejected.
+
+Structured recurring operations use nullable `source_account_id`, `destination_account_id`, and `asset_id` columns. Composite ownership foreign keys and `NOT VALID` type-shape checks preserve ambiguous legacy rows without inferring links, while rejecting incomplete new investment, transfer, and rescue rules. Materialized occurrences are idempotent on `(user_id, recurring_series_id, recurring_occurrence_date)`.
+
+`20260820195658_structure_recurring_financial_operations_v82.sql` is local-only pending a separate Beta deployment approval. It has not been added to an environment migration manifest and must not be applied remotely from this checkpoint.
 
 ## Product decisions intentionally deferred
 

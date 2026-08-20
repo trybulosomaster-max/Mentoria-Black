@@ -16,6 +16,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.9/dist/chart.umd.min.js"></script>
 <script src="js/financial-core.js"></script>
 <script src="js/recurrence-projection.js"></script>
+<script src="js/structured-recurring-v82.js"></script>
 <script src="js/planning-integration.js"></script>
 <script src="js/goal-projection.js"></script>
 <script src="js/goals-integration.js"></script>
@@ -420,6 +421,7 @@ function categoryOptions(value="",allowBlank=true){
 }
 function accountOptions(value=""){return `<option value="">Nenhuma</option>`+DATA.accounts.map(a=>`<option value="${a.id}" ${a.id===value?"selected":""}>${esc(a.name)}${a.institution?" — "+esc(a.institution):""}</option>`).join("")}
 function cardOptions(value=""){return `<option value="">Nenhum</option>`+DATA.cards.map(c=>`<option value="${c.id}" ${c.id===value?"selected":""}>${esc(c.name)}</option>`).join("")}
+function assetOptions(value=""){return `<option value="">Nenhum</option>`+(DATA.assets||[]).map(a=>`<option value="${a.id}" ${a.id===value?"selected":""}>${esc(a.name)}${a.institution?" — "+esc(a.institution):""}</option>`).join("")}
 function nav(){
  const tabs=[["dashboard","Dashboard"],["transactions","Lançamentos"],["planning","Planejamento"],["accounts","Contas"],["cards","Cartões"],["categories","Categorias"],["goals","Metas"],["recurring","Recorrências"],["wealth","Patrimônio"],["reports","Relatórios"]];
  $("nav").innerHTML=tabs.map(([id,l])=>`<button class="btn ${TAB===id?"active":""}" data-tab="${id}">${l}</button>`).join("");
@@ -1055,6 +1057,8 @@ if("serviceWorker" in navigator){
   window.addMonthsV17=addMonthsV17;
 
   function recurrenceSignature(t){
+    const canonical=window.MBStructuredRecurringV82.occurrenceKey(t);
+    if(canonical)return canonical;
     const note=String(t.note||"");
     const source=(note.match(/Recorrência automática • ([0-9a-f-]{8,})/i)||[])[1]||"";
     return [source,t.transaction_date,t.transaction_type,String(t.description||"").trim().toLowerCase(),String(t.category||"").trim().toLowerCase(),Number(t.amount||0).toFixed(2),t.account_id||"",t.card_id||""].join("|");
@@ -1063,50 +1067,12 @@ if("serviceWorker" in navigator){
   async function materializeRecurringV17(){
     if(!USER || !Array.isArray(DATA.recurring)) return {transactions:[],updated:[]};
     const today=new Date();today.setHours(12,0,0,0);
-    const horizon=new Date(today);horizon.setMonth(horizon.getMonth()+12);
+    const horizonEnd=addMonthsV17(today.toISOString().slice(0,10),12);
+    const result=await sb.rpc("materialize_recurring_occurrences_v82",{p_horizon_end:horizonEnd});
+    if(result.error)throw new Error("Falha ao gerar recorrências: "+result.error.message);
     const existing=new Set((DATA.transactions||[]).map(recurrenceSignature));
-    const pending=[], updated=[];
-    for(const r of DATA.recurring.filter(x=>x.active!==false)){
-      let cursor=r.next_date;
-      if(!cursor) continue;
-      let guard=0;
-      while(cursor && new Date(cursor+"T12:00:00")<=horizon && guard<240){
-        if(r.end_date && cursor>r.end_date) break;
-        const row={
-          user_id:USER.id, transaction_date:cursor, description:r.name,
-          category:r.category||null, subcategory:r.subcategory||null, amount:Number(r.amount||0),
-          transaction_type:r.type||"despesa",
-          status:new Date(cursor+"T12:00:00")<=today?"realizado":"pendente",
-          payment_method:r.card_id?"Cartão de crédito":"Conta",
-          account_id:r.account_id||null, card_id:r.card_id||null,
-          goal_id:r.goal_id||null, goal_effect:r.goal_id?(r.goal_effect||'contribution'):null,
-          note:(String(r.note||"").trim()?String(r.note).trim()+" • ":"")+`Recorrência automática • ${r.id}`
-        };
-        const sig=recurrenceSignature(row);
-        if(!existing.has(sig)){ pending.push(row); existing.add(sig); }
-        cursor=addMonthsV17(cursor,Number(r.interval||1)); guard++;
-      }
-      if(cursor && cursor!==r.next_date) updated.push({id:r.id,next_date:cursor});
-    }
-    if(pending.length){
-      const inserted=[];
-      for(let i=0;i<pending.length;i+=100){
-        const batch=pending.slice(i,i+100);
-        const ins=await sb.from("transactions").insert(batch).select();
-        if(ins.error) throw new Error("Falha ao gerar recorrências: "+ins.error.message);
-        if(ins.data?.length) inserted.push(...ins.data);
-      }
-      pending.length=0;
-      pending.push(...inserted);
-    }
-    if(updated.length){
-      await Promise.all(updated.map(async u=>{
-        const r=await sb.from("recurring").update({next_date:u.next_date}).eq("id",u.id).eq("user_id",USER.id);
-        if(r.error)console.error("V18 next_date",r.error);
-        const local=DATA.recurring.find(x=>x.id===u.id);if(local)local.next_date=u.next_date;
-      }));
-    }
-    return {transactions:pending,updated};
+    const inserted=(result.data||[]).filter(row=>{const key=recurrenceSignature(row);if(existing.has(key))return false;existing.add(key);return true});
+    return {transactions:inserted,updated:[]};
   }
   // V18 lifecycle: one parallel load + one batched materialization, avoiding the old double reload.
   window.reload=async function(){
@@ -1290,7 +1256,8 @@ if("serviceWorker" in navigator){
           <div><label id="v19DateLabel">Data do lançamento</label><input name="transaction_date" id="v19TransactionDate" type="date" value="${initialBilling}" required></div>
           <div><label>Descrição</label><input name="description" value="${esc(t?.description||'')}" placeholder="Ex.: Salário" required></div>
           <div><label>Categoria</label><select name="category" id="v19Category" required>${v19Opts(V19_CATS_FOR(initial),t?.category||'')}</select></div>
-          <div><label>Conta</label><select name="account_id" id="v19Account">${accountOptions(t?.account_id||'')}</select></div>
+          <div><label id="v19AccountLabel">Conta</label><select name="account_id" id="v19Account">${accountOptions(t?.source_account_id||t?.account_id||'')}</select></div>
+          <div id="v19AssetBox"><label>Ativo de destino</label><select name="asset_id" id="v19Asset">${assetOptions(t?.asset_id||'')}</select></div>
         </div>
         <div id="v19CardBox" class="full" style="display:${t?.card_id?'block':'none'}">
           <div class="notice"><b>Cartão de crédito:</b> a compra e a competência da fatura são datas diferentes. A competência é a data usada nos gráficos, planejamento e saldo do mês.</div>
@@ -1303,7 +1270,7 @@ if("serviceWorker" in navigator){
           <div><label>Cartão</label><select name="card_id" id="v19Card">${cardOptions(t?.card_id||'')}</select></div>
           <div><label>Subcategoria</label><input name="subcategory" value="${esc(t?.subcategory||'')}"></div>
         </div>
-        <div class="v38-status-row"><label>Status</label><select name="status"><option value="realizado">Realizado</option><option value="pendente" ${t?.status==='pendente'?'selected':''}>Pendente</option><option value="cancelado" ${t?.status==='cancelado'?'selected':''}>Cancelado</option></select></div>
+        <div class="v38-status-row"><label>Status</label><select name="status" id="v19Status"><option value="realizado">Realizado</option><option value="pendente" ${t?.status==='pendente'?'selected':''}>Pendente</option><option value="cancelado" ${t?.status==='cancelado'?'selected':''}>Cancelado</option></select></div>
         <details class="v15-details"><summary>Mais detalhes <span>Opcional</span></summary>
           <div class="v15-detail-grid">
             <div><label>Forma de pagamento</label><input name="payment_method" value="${esc(t?.payment_method||'')}"></div>
@@ -1321,8 +1288,9 @@ if("serviceWorker" in navigator){
 
     const form=$('v19TxForm'), amount=$('v19Amount'), typeButtons=document.querySelectorAll('#v19TxForm .v15-type'), typeInitial=initial;
     const typeState={value:typeInitial};
+    const operationId=!id&&globalThis.crypto?.randomUUID?globalThis.crypto.randomUUID():null;
     const typeEl=()=>typeState.value;
-    const category=$('v19Category'), account=$('v19Account'), card=$('v19Card'), cardBox=$('v19CardBox'), purchase=$('v19PurchaseDate'), billing=$('v19BillingDate'), billingMain=$('v19TransactionDate'), dateLabel=$('v19DateLabel'), install=$('v19Install'), installFields=$('v19InstallFields'), start=$('v19Start'), count=$('v19Count'), installPreview=$('v19InstallPreview'), recurring=$('v19Recurring'), goal=$('v19Goal'), goalEffect=$('v19GoalEffect');
+    const category=$('v19Category'), account=$('v19Account'), accountLabel=$('v19AccountLabel'), asset=$('v19Asset'), assetBox=$('v19AssetBox'), card=$('v19Card'), cardBox=$('v19CardBox'), purchase=$('v19PurchaseDate'), billing=$('v19BillingDate'), billingMain=$('v19TransactionDate'), dateLabel=$('v19DateLabel'), status=$('v19Status'), install=$('v19Install'), installFields=$('v19InstallFields'), start=$('v19Start'), count=$('v19Count'), installPreview=$('v19InstallPreview'), recurring=$('v19Recurring'), goal=$('v19Goal'), goalEffect=$('v19GoalEffect');
     function syncCategories(){
       const list=V19_CATS_FOR(typeEl());
       category.innerHTML=v19Opts(list,v19CategoryFor(typeEl(),category.value)?category.value:'');
@@ -1330,9 +1298,18 @@ if("serviceWorker" in navigator){
     }
     function syncAccountCard(){
       const revenue=typeEl()==='receita';
-      if(revenue) card.value='';
-      card.disabled=revenue;
+      const investment=typeEl()==='investimento';
+      if(revenue||investment) card.value='';
+      card.disabled=revenue||investment;
       account.disabled=!!card.value;
+      accountLabel.textContent=investment?'Conta de origem':'Conta';
+      assetBox.classList.toggle('hidden',!investment);
+      asset.disabled=!investment;
+      if(!investment)asset.value='';
+      install.disabled=investment;
+      if(investment)install.checked=false;
+      status.disabled=investment&&!id;
+      if(investment&&!id)status.value='realizado';
     }
     function syncDatesFromCard(){
       const hasCard=!!card.value && typeEl()!=='receita';
@@ -1404,7 +1381,9 @@ if("serviceWorker" in navigator){
       if(amountValue<=0)errors.push('valor');
       if(!String(fd.get('description')||'').trim())errors.push('descrição');
       if(!v19CategoryFor(type,cat))errors.push('selecione uma categoria compatível com o tipo');
-      if(['despesa','investimento'].includes(type)&&!accountId&&!cardId)errors.push('conta ou cartão');
+      if(type==='despesa'&&!accountId&&!cardId)errors.push('conta ou cartão');
+      if(type==='investimento'&&!accountId)errors.push('conta de origem');
+      if(type==='investimento'&&!asset.value)errors.push('ativo de destino');
       if(type==='receita'&&!accountId)errors.push('conta');
       if(accountId&&cardId)errors.push('escolha conta OU cartão');
       if(cardId&&type==='receita')errors.push('receita não pode usar cartão de crédito');
@@ -1417,6 +1396,8 @@ if("serviceWorker" in navigator){
         transaction_type:type, description:String(fd.get('description')).trim(), category:cat,
         subcategory:fd.get('subcategory')||null, amount:amountValue, status:fd.get('status')||'realizado',
         account_id:accountId, card_id:cardId,
+        source_account_id:type==='investimento'?accountId:null,
+        destination_account_id:null, asset_id:type==='investimento'?(asset.value||null):null,
         payment_method:fd.get('payment_method')||null, note:fd.get('note')||null,
         goal_id:goalId, goal_effect:goalEffectValue
       };
@@ -1439,6 +1420,15 @@ if("serviceWorker" in navigator){
         const r=await sb.from('transactions').insert(rows);
         if(r.error){$('v19TxMsg').textContent='Não foi possível criar as parcelas: '+r.error.message;return}
         createdInstallments=true;
+      }else if(type==='investimento'){
+        if(!operationId){$('v19TxMsg').textContent='Este navegador não oferece geração segura do identificador da operação.';return}
+        const r=await sb.rpc('create_investment_entry_v82',{
+          p_operation_id:operationId,p_source_account_id:accountId,p_asset_id:asset.value,
+          p_amount:amountValue,p_transaction_date:billingDate,p_category:cat,p_description:base.description,
+          p_subcategory:base.subcategory,p_payment_method:base.payment_method,p_note:base.note,
+          p_goal_id:base.goal_id,p_goal_effect:base.goal_effect
+        });
+        if(r.error){$('v19TxMsg').textContent='Não foi possível salvar: '+r.error.message;return}
       }else{
         const r=await sb.from('transactions').insert({...base,user_id:USER.id});
         if(r.error){$('v19TxMsg').textContent='Não foi possível salvar: '+r.error.message;return}
@@ -1450,7 +1440,9 @@ if("serviceWorker" in navigator){
           user_id:USER.id,name:base.description,frequency:'monthly',interval:1,next_date:recurringStart,
           start_date:base.transaction_date,day_of_month:Number(billingDate.slice(8,10))||1,
           amount:base.amount,type:base.transaction_type,category:base.category,subcategory:base.subcategory,
-          account_id:base.account_id,card_id:base.card_id,goal_id:base.goal_id,goal_effect:base.goal_effect,
+          account_id:base.account_id,card_id:base.card_id,
+          source_account_id:base.source_account_id,destination_account_id:base.destination_account_id,asset_id:base.asset_id,
+          goal_id:base.goal_id,goal_effect:base.goal_effect,
           active:true,auto_post:true,note:base.note||null
         });
         if(rr.error){$('v19TxMsg').textContent='Lançamento salvo, mas a recorrência não foi criada: '+rr.error.message;return}
@@ -1494,7 +1486,7 @@ if("serviceWorker" in navigator){
     const x=id?DATA.recurring.find(a=>a.id===id):{};
     if(!id) await v19EnsureIncomeCategories();
     const today=new Date().toISOString().slice(0,10);
-    const initialType=['despesa','receita','investimento'].includes(x?.type)?x.type:'despesa';
+    const initialType=['despesa','receita','investimento','transferencia','resgate'].includes(window.MBStructuredRecurringV82.normalizeType(x?.type))?window.MBStructuredRecurringV82.normalizeType(x?.type):'despesa';
     const startDate=x?.start_date||x?.next_date||today;
     const nextDate=x?.next_date||startDate;
     const frequency=String(x?.frequency||'monthly');
@@ -1505,7 +1497,7 @@ if("serviceWorker" in navigator){
         <div class="v15-essential">
           <div><label>Nome</label><input name="name" required value="${esc(x?.name||'')}"></div>
           <div><label>Valor</label><input name="amount" id="v19RecurringAmount" class="money-field" inputmode="decimal" value="${x?.amount?num(x.amount):''}" required></div>
-          <div><label>Tipo</label><select name="type" id="v19RecurringType">${['despesa','receita','investimento'].map(type=>`<option value="${type}" ${initialType===type?'selected':''}>${type[0].toUpperCase()+type.slice(1)}</option>`).join('')}</select></div>
+          <div><label>Tipo</label><select name="type" id="v19RecurringType">${[['despesa','Despesa'],['receita','Receita'],['investimento','Investimento'],['transferencia','Transferência'],['resgate','Resgate']].map(([type,label])=>`<option value="${type}" ${initialType===type?'selected':''}>${label}</option>`).join('')}</select></div>
           <div><label>Categoria</label><select name="category" id="v19RecurringCategory" required>${v19Opts(V19_CATS_FOR(initialType),x?.category||'')}</select></div>
           <div><label>Frequência</label><select name="frequency">${frequencies.map(([value,label])=>`<option value="${esc(value)}" ${frequency===value?'selected':''}>${esc(label)}</option>`).join('')}</select></div>
           <div><label>Intervalo</label><input name="interval" type="number" min="1" max="120" value="${Math.max(1,Number(x?.interval)||1)}" required></div>
@@ -1513,8 +1505,11 @@ if("serviceWorker" in navigator){
           <div><label>Próxima data</label><input name="next_date" id="v19RecurringNext" type="date" value="${nextDate}" required></div>
           <div><label>Dia do mês</label><input name="day_of_month" id="v19RecurringDay" type="number" min="1" max="31" value="${Math.min(31,Math.max(1,Number(x?.day_of_month)||Number(startDate.slice(8,10))||1))}" required></div>
           <div><label>Subcategoria</label><input name="subcategory" value="${esc(x?.subcategory||'')}"></div>
-          <div><label>Conta</label><select name="account_id" id="v19RecurringAccount">${accountOptions(x?.account_id||'')}</select></div>
-          <div><label>Cartão</label><select name="card_id" id="v19RecurringCard">${cardOptions(x?.card_id||'')}</select></div>
+          <div id="v19RecurringLegacyAccountBox"><label>Conta</label><select name="account_id" id="v19RecurringAccount">${accountOptions(x?.account_id||'')}</select></div>
+          <div id="v19RecurringCardBox"><label>Cartão</label><select name="card_id" id="v19RecurringCard">${cardOptions(x?.card_id||'')}</select></div>
+          <div id="v19RecurringSourceBox"><label>Conta de origem</label><select name="source_account_id" id="v19RecurringSource">${accountOptions(x?.source_account_id||'')}</select></div>
+          <div id="v19RecurringDestinationBox"><label>Conta de destino</label><select name="destination_account_id" id="v19RecurringDestination">${accountOptions(x?.destination_account_id||'')}</select></div>
+          <div id="v19RecurringAssetBox"><label id="v19RecurringAssetLabel">Ativo de destino</label><select name="asset_id" id="v19RecurringAsset">${assetOptions(x?.asset_id||'')}</select></div>
         </div>
         <details class="v15-details"><summary>Mais opções <span>Opcional</span></summary><div class="v15-detail-grid">
           <div><label>Vincular a uma meta</label><select name="goal_id" id="v19RecurringGoal">${v19GoalOptions(x?.goal_id)}</select></div>
@@ -1526,14 +1521,16 @@ if("serviceWorker" in navigator){
         <div id="v19RecurringMsg" class="msg"></div>
         <div class="modal-foot"><button type="button" class="btn" onclick="closeModal()">Cancelar</button><button class="btn primary">Salvar</button></div>
       </form>`);
-    const form=$('v19RecurringForm'), type=$('v19RecurringType'), category=$('v19RecurringCategory'), account=$('v19RecurringAccount'), card=$('v19RecurringCard'), start=$('v19RecurringStart'), next=$('v19RecurringNext'), day=$('v19RecurringDay'), amount=$('v19RecurringAmount'), goal=$('v19RecurringGoal'), goalEffect=$('v19RecurringGoalEffect');
+    const form=$('v19RecurringForm'), type=$('v19RecurringType'), category=$('v19RecurringCategory'), account=$('v19RecurringAccount'), accountBox=$('v19RecurringLegacyAccountBox'), card=$('v19RecurringCard'), cardBox=$('v19RecurringCardBox'), source=$('v19RecurringSource'), sourceBox=$('v19RecurringSourceBox'), destination=$('v19RecurringDestination'), destinationBox=$('v19RecurringDestinationBox'), asset=$('v19RecurringAsset'), assetBox=$('v19RecurringAssetBox'), assetLabel=$('v19RecurringAssetLabel'), start=$('v19RecurringStart'), next=$('v19RecurringNext'), day=$('v19RecurringDay'), amount=$('v19RecurringAmount'), goal=$('v19RecurringGoal'), goalEffect=$('v19RecurringGoalEffect');
     const syncType=()=>{
       const keep=category.value;
       category.innerHTML=v19Opts(V19_CATS_FOR(type.value),v19CategoryFor(type.value,keep)?keep:'');
-      const revenue=type.value==='receita';
-      if(revenue) card.value='';
-      card.disabled=revenue;
-      account.disabled=!!card.value;
+      const simple=['receita','despesa'].includes(type.value),investment=type.value==='investimento',transfer=type.value==='transferencia',rescue=type.value==='resgate';
+      accountBox.classList.toggle('hidden',!simple);cardBox.classList.toggle('hidden',!simple);
+      sourceBox.classList.toggle('hidden',!(investment||transfer));destinationBox.classList.toggle('hidden',!(transfer||rescue));assetBox.classList.toggle('hidden',!(investment||rescue));
+      account.disabled=!simple||!!card.value;card.disabled=!simple||type.value==='receita';source.disabled=!(investment||transfer);destination.disabled=!(transfer||rescue);asset.disabled=!(investment||rescue);
+      assetLabel.textContent=rescue?'Ativo de origem':'Ativo de destino';
+      if(type.value==='receita')card.value='';
     };
     type.onchange=async()=>{if(type.value==='receita')await v19EnsureIncomeCategories();syncType();};
     account.onchange=()=>{if(account.value)card.value='';syncType();};
@@ -1551,23 +1548,30 @@ if("serviceWorker" in navigator){
     form.onsubmit=async e=>{
       e.preventDefault();
       const fd=new FormData(form), amountValue=parseMoney(fd.get('amount')), selectedType=type.value, selectedCategory=String(fd.get('category')||'').trim(), accountId=account.value||null, cardId=card.value||null;
+      const draft={type:selectedType,source_account_id:source.value||null,destination_account_id:destination.value||null,asset_id:asset.value||null};
+      const structural=window.MBStructuredRecurringV82.validateRecurring(draft);
       const goalId=goal.value||null, goalEffectValue=goalId?(goalEffect.value==='withdrawal'?'withdrawal':'contribution'):null;
       const errors=[];
       if(!String(fd.get('name')||'').trim()) errors.push('nome');
       if(!Number.isFinite(amountValue)||amountValue<=0) errors.push('valor');
       if(!v19CategoryFor(selectedType,selectedCategory)) errors.push('categoria compatível com o tipo');
-      if(['despesa','investimento'].includes(selectedType)&&!accountId&&!cardId) errors.push('conta ou cartão');
+      if(selectedType==='despesa'&&!accountId&&!cardId) errors.push('conta ou cartão');
       if(selectedType==='receita'&&!accountId) errors.push('conta');
       if(accountId&&cardId) errors.push('escolha conta OU cartão');
       if(cardId&&selectedType==='receita') errors.push('receita não pode usar cartão de crédito');
+      if(!structural.valid) errors.push(...structural.errors);
       if(!fd.get('start_date')) errors.push('data inicial');
       if(!fd.get('next_date')) errors.push('próxima data');
       if(errors.length){$('v19RecurringMsg').textContent='Preencha/corrija: '+errors.join(', ')+'.';return}
+      const links=window.MBStructuredRecurringV82.canonicalLinks(draft);
       const o={
         name:String(fd.get('name')).trim(), frequency:String(fd.get('frequency')||'monthly'), interval:Math.max(1,Math.min(120,Number(fd.get('interval'))||1)),
         next_date:fd.get('next_date'), start_date:fd.get('start_date'), day_of_month:Math.min(31,Math.max(1,Number(fd.get('day_of_month'))||Number(String(fd.get('start_date')).slice(8,10))||1)),
         amount:amountValue, type:selectedType, category:selectedCategory, subcategory:fd.get('subcategory')||null,
-        account_id:accountId, card_id:cardId, goal_id:goalId, goal_effect:goalEffectValue,
+        account_id:window.MBStructuredRecurringV82.legacyAccountAlias(selectedType,links,accountId),
+        card_id:['receita','despesa'].includes(selectedType)?cardId:null,
+        source_account_id:links.source_account_id,destination_account_id:links.destination_account_id,asset_id:links.asset_id,
+        goal_id:goalId, goal_effect:goalEffectValue,
         active:fd.get('active')==='on', auto_post:fd.get('auto_post')==='on', note:fd.get('note')||null
       };
       const r=id?await sb.from('recurring').update(o).eq('id',id).eq('user_id',USER.id):await sb.from('recurring').insert({...o,user_id:USER.id});

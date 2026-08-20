@@ -53,7 +53,7 @@ test('anual preserva âncora de leap year quando aplicável',()=>{
 
 test('ocorrência virtual possui identidade e metadados determinísticos',()=>{
   const [item]=project({id:'abc',amount:'50.25',goal_id:'goal',goal_effect:'withdrawal'});
-  deepEqual(item,{kind:'projected_virtual',recurringSeriesId:'abc',occurrenceDate:'2026-01-01',amount:50.25,goalId:'goal',goalEffect:'withdrawal',sourceRuleId:'abc',key:'abc|2026-01-01'});
+  deepEqual(item,{kind:'projected_virtual',recurringSeriesId:'abc',occurrenceDate:'2026-01-01',amount:50.25,sourceAccountId:null,destinationAccountId:null,assetId:null,goalId:'goal',goalEffect:'withdrawal',sourceRuleId:'abc',key:'abc|2026-01-01'});
   ok(Object.isFrozen(item));
 });
 

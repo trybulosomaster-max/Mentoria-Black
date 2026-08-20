@@ -105,12 +105,13 @@ test('investimento troca disponibilidade por ativo sem despesa ou patrimônio', 
   deepEqual(result.warnings,[]);
 });
 
-test('investimento sem asset_id mantém efeito abstrato e emite warning', () => {
+test('investimento sem asset_id é inválido e não aplica perna parcial', () => {
   const result = effect({transaction_type:'investment',amount:80,status:'realizado',transaction_date:'2026-08-01',account_id:'cash'});
   equal(result.type,'investimento');
   equal(result.sourceAccountId,'cash');
-  equal(result.availableBalanceDelta,-80);
-  equal(result.assetDelta,80);
+  equal(result.valid,false);
+  equal(result.availableBalanceDelta,0);
+  equal(result.assetDelta,0);
   equal(result.netWorthDelta,0);
   equal(result.consumptionExpenseAmount,0);
   ok(result.warnings.includes('missing_asset_destination'));
@@ -155,12 +156,13 @@ test('resgate troca ativo por disponibilidade sem criar receita ou patrimônio',
   equal(result.consumptionExpenseAmount,0);
 });
 
-test('resgate sem asset_id mantém efeito abstrato e emite warning', () => {
+test('resgate sem asset_id é inválido e não aplica perna parcial', () => {
   const result = effect({transaction_type:'rescue',amount:40,status:'realizado',transaction_date:'2026-08-01',account_id:'cash'});
   equal(result.type,'resgate');
   equal(result.destinationAccountId,'cash');
-  equal(result.availableBalanceDelta,40);
-  equal(result.assetDelta,-40);
+  equal(result.valid,false);
+  equal(result.availableBalanceDelta,0);
+  equal(result.assetDelta,0);
   equal(result.netWorthDelta,0);
   equal(result.incomeAmount,0);
   ok(result.warnings.includes('missing_asset_source'));

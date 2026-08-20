@@ -301,8 +301,8 @@ function financialEffect(tx, options = {}) {
   if (type === 'receita' && !destinationAccountId) warnings.push('missing_destination_account');
   if (type === 'despesa' && !sourceAccountId) warnings.push('missing_source_account');
   if (type === 'investimento') {
-    if (!sourceAccountId) warnings.push('missing_source_account');
-    if (!tx?.asset_id) warnings.push('missing_asset_destination');
+    if (!sourceAccountId) { warnings.push('missing_source_account'); valid = false; }
+    if (!tx?.asset_id) { warnings.push('missing_asset_destination'); valid = false; }
   }
   if (type === 'transferencia') {
     const transferSource = tx?.source_account_id ?? null;
@@ -321,8 +321,8 @@ function financialEffect(tx, options = {}) {
     }
   }
   if (type === 'resgate') {
-    if (!destinationAccountId) warnings.push('missing_destination_account');
-    if (!tx?.asset_id) warnings.push('missing_asset_source');
+    if (!destinationAccountId) { warnings.push('missing_destination_account'); valid = false; }
+    if (!tx?.asset_id) { warnings.push('missing_asset_source'); valid = false; }
   }
 
   const effect = emptyEffect(tx, type, temporal, amount, warnings, valid);
