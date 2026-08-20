@@ -16,6 +16,7 @@
 <script src="js/planning-integration.js"></script>
 <script src="js/goal-projection.js"></script>
 <script src="js/goals-integration.js"></script>
+<script src="js/reports-integration.js"></script>
 <style>
 :root{--bg:#050505;--panel:#0d0d0d;--panel2:#111;--line:#2b2b2b;--text:#f5f5f5;--muted:#999;--gold:#c9a227;--gold2:#e4c55b;--danger:#d88b8b;--ok:#86bb91;--shadow:0 14px 45px #0008}
 *{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--text);font:14px Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}body{min-height:100vh}button,input,select,textarea{font:inherit}button{cursor:pointer}.hidden{display:none!important}
@@ -688,9 +689,10 @@ function nextRecurringDateLabel(x){
 }
 function wealth(){const res=reserveInfo();let reserve="";if(res.target)reserve="<div class=\"bar\"><i style=\"width:"+res.pct+"%;background:var(--gold)\"></i></div><div>"+pct(res.pct)+" do objetivo</div>";const body="<div class=\"grid\"><section class=\"card s6\"><h2>Patrimônio líquido</h2><div style=\"font-size:30px;font-weight:850;margin-top:12px\">"+money(netWorth())+"</div></section><section class=\"card s6\"><h2>Reserva de emergência</h2><div style=\"font-size:30px;font-weight:850;margin-top:12px\">"+money(res.current)+"</div>"+reserve+"</section><section class=\"card s12\"><h2>Ativos</h2>"+simpleTable(DATA.assets,[["Nome",x=>esc(x.name)],["Instituição",x=>esc(x.institution||"—")],["Valor",x=>money(x.current_value)]],"assets")+"</section></div>";return pageHead("Patrimônio","Ativos, dívidas e reserva de emergência.",body)}
 function reportStatus(t){
- if(MBFinance.isCancelled(t))return "cancelado";
- const s=String(t.status||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();
- return ["pendente","pending","programado","scheduled"].includes(s)?"pendente":"realizado";
+ if(t?.state)return t.state==='efetivado'?'realizado':t.state==='previsto_materializado'?'programado':t.state;
+ if(typeof window==='undefined'||!window.MBCanonicalFinance){if(MBFinance.isCancelled(t))return 'cancelado';const legacy=String(t.status||'').toLowerCase();return ['pendente','pending','programado','scheduled'].includes(legacy)?'pendente':'realizado'}
+ const state=window.MBCanonicalFinance.temporalState(t,new Date().toISOString().slice(0,10)).state;
+ return state==='efetivado'?'realizado':state==='previsto_materializado'?'programado':state;
 }
 function matchesReportPeriod(transaction,filters=REPORT_FILTERS){
  const date=MBFinance.financialDate(transaction);if(!date)return false;
@@ -716,6 +718,11 @@ function matchesReportAccount(transaction,filters=REPORT_FILTERS){
    (!filters.goalId||String(transaction.goal_id||"")===String(filters.goalId));
 }
 function buildReportDataset(filters=REPORT_FILTERS){
+ if(typeof window!=='undefined'&&window.MBReportsV82){
+  const now=new Date().toISOString().slice(0,10),states=(filters.statuses||[]).map(s=>s==='pendente'?'programado':s);
+  const result=window.MBReportsV82.projectReport(DATA.transactions||[],DATA.recurring||[],{...filters,states,now});
+  return result.rows.map(row=>({...row,transaction_date:row.date,status:row.state==='efetivado'?'realizado':row.state==='previsto_materializado'?'programado':row.state}));
+ }
  const normalized=(DATA.transactions||[]).map(MBFinance.normalizeTransaction);
  const source=typeof cleanTransactions==="function"?cleanTransactions(normalized).rows:normalized;
  return source.filter(t=>
@@ -731,6 +738,11 @@ function reportTotalsByMonth(rows){return aggregateReportBy(rows,t=>MBFinance.fi
 function reportTotalsByYear(rows){return aggregateReportBy(rows,t=>MBFinance.financialDate(t).slice(0,4))}
 function reportTotalsByStatus(rows){return aggregateReportBy(rows,reportStatus)}
 function reportAggregations(rows){
+ if(rows.some(row=>row?.state)){
+  const byType=reportTotalsByType(rows),realized=rows.filter(row=>row.state==='efetivado'),sum=(type)=>realized.filter(row=>MBFinance.kind(row.transaction_type||row.type)===type).reduce((total,row)=>total+Number(row.amount||0),0);
+  const income=sum('receita'),expense=sum('despesa'),investment=sum('investimento'),rescue=sum('resgate');
+  return {count:rows.length,movementTotal:rows.reduce((sum,row)=>sum+Number(row.amount||0),0),periodBalance:income-expense-investment+rescue,byType,byCategory:reportTotalsByCategory(rows),byMonth:reportTotalsByMonth(rows),byYear:reportTotalsByYear(rows),byStatus:reportTotalsByStatus(rows)};
+ }
  const byType=reportTotalsByType(rows),canonical=MBFinance.totals(rows);
  return {count:rows.length,movementTotal:rows.reduce((sum,t)=>sum+Number(t.amount||0),0),periodBalance:canonical.balance,byType,byCategory:reportTotalsByCategory(rows),byMonth:reportTotalsByMonth(rows),byYear:reportTotalsByYear(rows),byStatus:reportTotalsByStatus(rows)};
 }
@@ -760,7 +772,7 @@ function reports(){
   <div class="filter"><label>Conta</label><select id="reportAccount">${option("","Todas",!REPORT_FILTERS.accountId)}${DATA.accounts.map(a=>option(a.id,a.name,REPORT_FILTERS.accountId===a.id)).join("")}</select></div>
   <div class="filter"><label>Cartão</label><select id="reportCard">${option("","Todos",!REPORT_FILTERS.cardId)}${DATA.cards.map(c=>option(c.id,c.name,REPORT_FILTERS.cardId===c.id)).join("")}</select></div>
   <div class="filter"><label>Meta vinculada</label><select id="reportGoal">${option("","Todas",!REPORT_FILTERS.goalId)}${DATA.goals.map(g=>option(g.id,g.name,REPORT_FILTERS.goalId===g.id)).join("")}</select></div>
- </div><div class="report-choice-row"><div><label>Tipos</label>${[["receita","Receita"],["despesa","Despesa"],["investimento","Investimento"],["transferencia","Transferência"],["resgate","Resgate"]].map(([v,l])=>reportCheck("types",v,l)).join("")}</div><div><label>Status</label>${[["realizado","Realizado"],["pendente","Pendente/programado"],["cancelado","Cancelado"]].map(([v,l])=>reportCheck("statuses",v,l)).join("")}<label class="report-check"><input id="reportFuture" type="checkbox" ${REPORT_FILTERS.includeFuture?"checked":""}> Incluir futuros</label></div></div><div class="actions report-actions"><button class="btn gold" id="applyReportFilters">Aplicar filtros</button><button class="btn" id="clearReportFilters">Limpar filtros</button></div></section>
+ </div><div class="report-choice-row"><div><label>Tipos</label>${[["receita","Receita"],["despesa","Despesa"],["investimento","Investimento"],["transferencia","Transferência"],["resgate","Resgate"]].map(([v,l])=>reportCheck("types",v,l)).join("")}</div><div><label>Estado temporal</label>${[["realizado","Realizado"],["pendente","Programado materializado"],["projetado","Projetado virtual"],["cancelado","Cancelado"],["nao_classificado","Não classificado (auditoria)"]].map(([v,l])=>reportCheck("statuses",v,l)).join("")}</div></div><div class="actions report-actions"><button class="btn gold" id="applyReportFilters">Aplicar filtros</button><button class="btn" id="clearReportFilters">Limpar filtros</button></div></section>
  <div class="kpis report-kpis">${kpi("Lançamentos",agg.count,"registros filtrados")}${kpi("Movimentação total",money(agg.movementTotal),"soma dos valores filtrados")}${kpi("Saldo do período",money(agg.periodBalance),"receitas − despesas − investimentos")}${Object.entries(agg.byType).slice(0,3).map(([k,v])=>kpi(k,money(v),"por tipo")).join("")}</div>
  <div class="grid"><section class="card s8 report-chart-card"><h2>Totais por categoria</h2><div class="chartbox"><canvas id="reportCat"></canvas></div></section><section class="card s4"><h2>Resumo por tipo</h2>${Object.entries(agg.byType).map(([k,v])=>`<div class="statline"><span>${esc(k)}</span><strong>${money(v)}</strong></div>`).join("")||'<div class="empty">Sem dados.</div>'}</section><section class="card s12 report-table-card"><h2>Lançamentos filtrados</h2>${table}</section></div></div>`;
 }
