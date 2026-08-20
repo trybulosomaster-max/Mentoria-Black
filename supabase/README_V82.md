@@ -49,7 +49,7 @@ Gross rescue value is not income. Investment is not consumption expense. Gain/lo
 ## Future deployment plan — do not execute from this branch
 
 1. Take a platform backup and schema snapshot through an approved operational process.
-2. Build a production migration set that excludes the local baseline, or explicitly register the reviewed baseline version as already applied. The baseline has a guard and must never run against an existing application schema.
+2. Build a clean production migration set from `supabase/production-migrations.manifest`. The local baseline is not eligible, has a guard, and must never run against an existing application schema. Default `supabase db push` from this worktree is prohibited.
 3. Run read-only preflight diagnostics and archive aggregate counts only.
 4. Apply nullable columns and supporting unique ownership constraints.
 5. Add composite foreign keys and checks as `NOT VALID` so legacy rows are not scanned during the first deploy; new writes are still protected.
@@ -72,6 +72,8 @@ Rollback is application-first:
 6. Do not drop `operation_id` or reversal links after V82 writes exist; retain them for audit and idempotency.
 
 The local baseline can be recreated independently by resetting to the first migration version. That test is destructive only to the disposable local database.
+
+The real-concurrency gate is `supabase/tests/v82_operation_id_concurrency_test.sh`. It targets only the Docker container labelled for this local CLI project, creates synthetic `.invalid` fixtures, runs two simultaneous transfer requests with the same `operation_id`, and removes those fixtures afterward.
 
 ## Credential hygiene
 
