@@ -7,8 +7,11 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Mentoria Black">
-<title>Mentoria Black — Gestão Financeira V81 ESCUDO FINAL</title>
+<title>Mentoria Black — V82 BETA</title>
 <link rel="manifest" href="manifest.webmanifest">
+<script src="js/beta-environment.js"></script>
+<script src="js/beta-runtime.js"></script>
+<script src="js/beta-observability.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.9/dist/chart.umd.min.js"></script>
 <script src="js/financial-core.js"></script>
@@ -93,7 +96,7 @@
   </header>
   <nav id="nav" class="nav"></nav>
   <main id="view"></main>
-  <div class="footer">Mentoria Black — Gestão Financeira V81 ESCUDO FINAL • dados protegidos por usuário no Supabase</div>
+  <div class="footer">Mentoria Black — V82 BETA • ambiente isolado de homologação</div>
  </div>
 </section>
 
@@ -101,9 +104,12 @@
 <div id="toast" class="modal hidden" style="inset:auto 16px 16px auto;place-items:end;pointer-events:none"><div id="toastBox" class="notice"></div></div>
 
 <script>
-const SUPABASE_URL="https://mwjqfzbpjmwiscvtxvfc.supabase.co";
-const SUPABASE_ANON_KEY="sb_publishable_Bz8zOgsayn5KRDKBa0_u_A_TbvV_RuK";
-const sb=supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
+// Legacy names retained only for characterization harnesses; Beta never reads them.
+const SUPABASE_URL="";
+const SUPABASE_ANON_KEY="";
+const MB_BETA_RUNTIME=window.MBBetaRuntime.requireConfigured(document,window.MBBetaRuntime);
+const MB_BETA_FETCH=window.MBBetaObservability.monitoredFetch(window.fetch.bind(window));
+const sb=supabase.createClient(MB_BETA_RUNTIME.supabaseUrl,MB_BETA_RUNTIME.supabasePublishableKey,{global:{fetch:MB_BETA_FETCH}});
 const $=id=>document.getElementById(id);
 const money=v=>new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL"}).format(Number(v)||0);
 const num=v=>new Intl.NumberFormat("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2}).format(Number(v)||0);
@@ -3083,9 +3089,10 @@ migrateReserveGoals();
     return html;
   };
 
-  document.title='Mentoria Black — Gestão Financeira V81 ESCUDO FINAL';
+  document.title='Mentoria Black — V82 BETA';
+  if(window.MBBetaRuntime?.label) document.title=window.MBBetaRuntime.label;
   const footer=document.querySelector('.footer');
-  if(footer) footer.textContent='Mentoria Black — Gestão Financeira V81 ESCUDO FINAL';
+  if(footer) footer.textContent=`${window.MBBetaRuntime?.label||'Mentoria Black — V82 BETA'} • ambiente isolado de homologação`;
 })();
 
 </script>
