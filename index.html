@@ -17,6 +17,7 @@
 <script src="js/goal-projection.js"></script>
 <script src="js/goals-integration.js"></script>
 <script src="js/reports-integration.js"></script>
+<script src="js/dashboard-financial-integration.js"></script>
 <style>
 :root{--bg:#050505;--panel:#0d0d0d;--panel2:#111;--line:#2b2b2b;--text:#f5f5f5;--muted:#999;--gold:#c9a227;--gold2:#e4c55b;--danger:#d88b8b;--ok:#86bb91;--shadow:0 14px 45px #0008}
 *{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--text);font:14px Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}body{min-height:100vh}button,input,select,textarea{font:inherit}button{cursor:pointer}.hidden{display:none!important}
@@ -3037,11 +3038,14 @@ migrateReserveGoals();
     // KPIs únicos e coerentes com a regra financeira consolidada.
     const ts = typeof periodTx==='function' ? periodTx() : [];
     const total = typeof totals==='function' ? totals(ts) : {income:0,expense:0,invest:0,balance:0};
+    const now=new Date().toISOString().slice(0,10);
+    const financial=window.MBDashboardFinancialV82?.projectDashboardPeriod(DATA.transactions||[],DATA.recurring||[],{year:FILTERS.year,month:FILTERS.month,now});
     const reserve = typeof window.MB_V56_RESERVE_CURRENT==='function' ? window.MB_V56_RESERVE_CURRENT() : 0;
     const patrimonio = typeof netWorth==='function' ? netWorth() : 0;
     const kpiBlock = html.match(/<div class="kpis">[\s\S]*?(?=<div class="grid">)/);
     if(kpiBlock){
-      const replacement=`<div class="kpis">${kpi('Receitas',money(total.income),'período selecionado')}${kpi('Despesas',money(total.expense),'saídas do período')}${kpi('Saldo',money(total.balance),total.balance>=0?'positivo':'atenção')}${kpi('Investimentos',money(total.invest),'período selecionado')}${kpi('Reserva de Emergência',money(reserve),'valor acumulado / disponível')}${kpi('Patrimônio Líquido',money(patrimonio),'estimativa atual')}</div>`;
+      const realized=financial?.realized||{income:total.income,consumptionExpense:total.expense,investment:total.invest,availableBalance:total.balance};const forecast=financial?.forecast||{};
+      const replacement=`<div class="kpis">${kpi('Receitas',money(realized.income),'realizado')}${kpi('Despesas',money(realized.consumptionExpense),'consumo realizado')}${kpi('Saldo',money(realized.availableBalance),realized.availableBalance>=0?'realizado':'atenção')}${kpi('Investimentos',money(realized.investment),'realizado')}${kpi('Reserva de Emergência',money(reserve),'valor acumulado / disponível')}${kpi('Patrimônio Líquido',money(patrimonio),'estimativa atual')}</div>${financial?`<section class="card s12 dashboard-financial-v82"><div class="desc">Previsão separada: Programado + Projetado; não compõe o saldo realizado.</div><div class="statline"><span>Programado</span><strong>${money(financial.scheduled.availableBalanceEffect)}</strong></div><div class="statline"><span>Projetado</span><strong>${money(financial.projected.availableBalanceEffect)}</strong></div><div class="statline"><span>Previsão</span><strong>${money(forecast.availableBalanceEffect)}</strong></div></section>`:''}`;
       html=html.replace(kpiBlock[0],replacement);
     }
 
