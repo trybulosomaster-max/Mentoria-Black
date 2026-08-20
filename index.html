@@ -2212,8 +2212,8 @@ setTimeout(()=>{
 
 
   window.openV50Analysis=function(){
-    const h=health();
-    modal('Análise financeira',`<section class="card" style="background:#0d0d0d"><div class="row" style="justify-content:space-between"><div><div class="small muted">SAÚDE FINANCEIRA</div><div style="font-size:42px;font-weight:900;margin:4px 0">${h.score}/100</div></div><span class="tag ${h.score>=75?'ok':'warn'}">${h.label}</span></div><div class="notice" style="margin-top:12px;line-height:1.7">${esc(analysisText(h))}</div><h3 style="margin:18px 0 8px">O que está indo bem</h3><ul style="line-height:1.8;color:#ddd"><li>Controle do orçamento: ${Math.round(h.budgetScore)}/100</li><li>Investimentos: ${Math.round(h.investScore)}/100</li><li>Metas: ${Math.round(h.goalScore)}/100</li></ul><h3 style="margin:18px 0 8px">Reserva</h3><div class="statline"><span>Cobertura</span><strong>${h.cov.toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1})} meses</strong></div><div class="statline"><span>Meta</span><strong>${h.mt} meses</strong></div><div class="statline"><span>Gastos Fixos</span><strong>${money(h.fixed)}/mês</strong></div><div class="statline"><span>Valor necessário</span><strong>${money(reserveTargetValue())}</strong></div><div class="statline"><span>Falta</span><strong>${money(remaining())}</strong></div><div class="modal-foot"><button class="btn" onclick="closeModal()">Fechar</button></div></section>`);
+    const h=typeof window.MB_V50_HEALTH==='function'?window.MB_V50_HEALTH():health(),metric=value=>value===null||value===undefined?'Sem dados suficientes':`${Math.round(value)}/100`,score=h.score===null?'Sem avaliação':`${h.score}/100`,target=window.MB_V56_RESERVE_TARGET?.()||reserveTargetValue(),current=window.MB_V56_RESERVE_CURRENT?.()||0;
+    modal('Análise financeira',`<section class="card" style="background:#0d0d0d"><div class="row" style="justify-content:space-between"><div><div class="small muted">SAÚDE FINANCEIRA</div><div style="font-size:42px;font-weight:900;margin:4px 0">${score}</div></div><span class="tag ${h.score!==null&&h.score>=75?'ok':'warn'}">${h.label}</span></div><div class="notice" style="margin-top:12px;line-height:1.7">${esc(h.message||analysisText(h))}</div><h3 style="margin:18px 0 8px">Indicadores</h3><ul style="line-height:1.8;color:#ddd"><li>Controle do orçamento: ${metric(h.budgetScore)}</li><li>Investimentos: ${metric(h.investScore)}</li><li>Metas: ${metric(h.goalScore)}</li></ul><h3 style="margin:18px 0 8px">Reserva</h3><div class="statline"><span>Cobertura</span><strong>${Number(h.cov||0).toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1})} meses</strong></div><div class="statline"><span>Meta</span><strong>${h.mt} meses</strong></div><div class="statline"><span>Gastos Fixos</span><strong>${money(h.fixed)}/mês</strong></div><div class="statline"><span>Valor necessário</span><strong>${money(target)}</strong></div><div class="statline"><span>Falta</span><strong>${money(Math.max(0,target-current))}</strong></div><div class="modal-foot"><button class="btn" onclick="closeModal()">Fechar</button></div></section>`);
   };
 
   const style=document.createElement('style');
@@ -2506,6 +2506,7 @@ setTimeout(()=>{
   const pctV53=n=>typeof pct==='function'?pct(n):`${safeV53(n).toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1})}%`;
 
   function healthAnalysisV53(h){
+    if(h.evaluable===false)return h.message||'Ainda sem dados suficientes para calcular sua Saúde Financeira.';
     const parts=[];
     if(h.budgetScore>=75) parts.push('Você mantém bom controle do orçamento.');
     if(h.investScore>=75) parts.push('Sua construção patrimonial está avançando bem.');
@@ -2528,9 +2529,12 @@ setTimeout(()=>{
 
   function healthPageV53(){
     const h=healthV53();
-    const score=safeV53(h.score);
-    const label=h.label||'Crítica';
-    const cls=score>=75?'ok':'warn';
+    const score=h.evaluable===false?null:safeV53(h.score);
+    const label=h.label||(score===null?'Dados insuficientes':'Crítica');
+    const cls=score!==null&&score>=75?'ok':'warn';
+    const metric=value=>value===null||value===undefined?'Sem dados suficientes':`${Math.round(value)}/100`;
+    const scoreText=score===null?'Sem avaliação':`${score}/100`;
+    const availability=h.message||'';
     const periodText=(typeof selectedKey==='function'&&typeof monthLabelKey==='function')?monthLabelKey(selectedKey()):'';
     const yearHtml=typeof yearOptions==='function'?yearOptions():`<option value="${FILTERS.year}">${FILTERS.year}</option>`;
     const monthHtml=typeof monthOptions==='function'?monthOptions():`<option value="${FILTERS.month}">${MONTHS[FILTERS.month-1]}</option>`;
@@ -2547,12 +2551,12 @@ setTimeout(()=>{
       </div>
 
       <div class="kpis">
-        ${k('Saúde financeira',`${score}/100`,label)}
-        ${k('Orçamento',`${Math.round(h.budgetScore)}/100`,'controle do orçamento')}
-        ${k('Investimentos',`${Math.round(h.investScore)}/100`,'constância dos investimentos')}
-        ${k('Reserva',`${Math.round(h.reserveScore)}/100`,'proteção financeira')}
-        ${k('Comprometimento',`${Math.round(h.commitmentScore)}/100`,'peso da estrutura financeira')}
-        ${k('Metas',`${Math.round(h.goalScore)}/100`,'evolução das metas')}
+        ${k('Saúde financeira',scoreText,availability||label)}
+        ${k('Orçamento',metric(h.budgetScore),'controle do orçamento')}
+        ${k('Investimentos',metric(h.investScore),'constância dos investimentos')}
+        ${k('Reserva',metric(h.reserveScore),'proteção financeira')}
+        ${k('Comprometimento',metric(h.commitmentScore),'peso da estrutura financeira')}
+        ${k('Metas',metric(h.goalScore),'evolução das metas')}
       </div>
 
       <div class="grid">
@@ -2565,14 +2569,15 @@ setTimeout(()=>{
             <span class="tag ${cls}">${label}</span>
           </div>
 
-          <div style="font-size:52px;font-weight:900;margin:16px 0">${score}<span style="font-size:20px;color:#888">/100</span></div>
-          <div class="bar"><i style="width:${Math.min(100,score)}%;background:var(--gold)"></i></div>
+          <div style="font-size:${score===null?'24px':'52px'};font-weight:900;margin:16px 0">${score===null?'Ainda sem dados suficientes':`${score}<span style="font-size:20px;color:#888">/100</span>`}</div>
+          ${availability?`<div class="notice" style="margin-bottom:12px">${esc(availability)}</div>`:''}
+          ${score===null?'':`<div class="bar"><i style="width:${Math.min(100,score)}%;background:var(--gold)"></i></div>`}
 
-          <div class="statline"><span>Controle do orçamento</span><strong>${Math.round(h.budgetScore)}/100</strong></div>
-          <div class="statline"><span>Investimentos</span><strong>${Math.round(h.investScore)}/100</strong></div>
-          <div class="statline"><span>Reserva</span><strong>${Math.round(h.reserveScore)}/100</strong></div>
-          <div class="statline"><span>Comprometimento</span><strong>${Math.round(h.commitmentScore)}/100</strong></div>
-          <div class="statline"><span>Metas</span><strong>${Math.round(h.goalScore)}/100</strong></div>
+          <div class="statline"><span>Controle do orçamento</span><strong>${metric(h.budgetScore)}</strong></div>
+          <div class="statline"><span>Investimentos</span><strong>${metric(h.investScore)}</strong></div>
+          <div class="statline"><span>Reserva</span><strong>${metric(h.reserveScore)}</strong></div>
+          <div class="statline"><span>Comprometimento</span><strong>${metric(h.commitmentScore)}</strong></div>
+          <div class="statline"><span>Metas</span><strong>${metric(h.goalScore)}</strong></div>
         </section>
 
         <section class="card s4">
