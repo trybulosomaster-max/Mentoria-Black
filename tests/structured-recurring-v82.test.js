@@ -105,6 +105,14 @@ test('investimento comum usa a RPC estruturada e exige ativo',()=>{
   ok(html.includes('p_source_account_id:accountId'));ok(html.includes('p_asset_id:asset.value'));
 });
 
+test('frontend normaliza status programado como pendente nas ações e rótulos',()=>{
+  const html=fs.readFileSync(path.join(__dirname,'..','index.html'),'utf8');
+  ok(html.includes('function isPendingTransaction(t)'));
+  ok(html.includes('"programado","scheduled"'));
+  equal((html.match(/const pending=isPendingTransaction\(t\);/g)||[]).length,2);
+  ok(html.includes('linked.filter(t=>isPendingTransaction(t)'));
+});
+
 test('módulo de contrato não persiste nem acessa rede',()=>{
   const source=fs.readFileSync(path.join(__dirname,'..','js','structured-recurring-v82.js'),'utf8');
   ok(!source.includes('supabase'));ok(!source.includes('fetch('));ok(!source.includes('.insert('));ok(!source.includes('.update('));

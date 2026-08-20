@@ -573,11 +573,14 @@ const valueLabelPlugin={id:"valueLabel",afterDatasetsDraw(chart){
  });
 }};
 Chart.register(valueLabelPlugin);
+function isPendingTransaction(t){
+ return ["pendente","pending","programado","scheduled"].includes(String(t?.status||"").toLowerCase());
+}
 function transactionTable(rows){
  if(!rows.length)return `<div class="empty">Nenhum lançamento encontrado para os filtros atuais.</div>`;
  return `<div class="tablewrap"><table><thead><tr><th>Data</th><th>Descrição</th><th>Categoria</th><th>Tipo</th><th>Conta/Cartão</th><th>Valor</th><th>Status</th><th></th></tr></thead><tbody>${rows.map(t=>{
    const rel=t.account_id?DATA.accounts.find(a=>a.id===t.account_id)?.name:t.card_id?DATA.cards.find(c=>c.id===t.card_id)?.name:"";
-   const pending=t.status==="pendente";
+   const pending=isPendingTransaction(t);
    return `<tr><td>${t.transaction_date?new Date(t.transaction_date+"T12:00:00").toLocaleDateString("pt-BR"):""}</td><td>${esc(t.description)}</td><td>${esc(canonicalCategoryName(t.category,t.transaction_type)||"—")}${t.subcategory?" / "+esc(t.subcategory):""}</td><td>${esc(t.transaction_type)}</td><td>${esc(rel||"—")}</td><td class="${t.transaction_type==="receita"||t.transaction_type==="resgate"?"positive":"negative"}">${money(t.amount)}</td><td>${pending?'<span class="tag warn">Pendente</span>':'<span class="tag ok">Realizado</span>'}</td><td><div class="actions">${pending?`<button class="btn gold" onclick="markPaid('${t.id}')">Pagar</button>`:""}<button class="btn" onclick="openTransaction('${t.id}')">Editar</button><button class="btn danger" onclick="deleteTransactionSmart('${t.id}')">Excluir</button></div></td></tr>`
  }).join("")}</tbody></table></div>`
 }
@@ -828,7 +831,7 @@ async function deleteRow(table,id){
    if(!choice)return;
    if(choice==="future"&&linked.length){
      const today=new Date(); today.setHours(0,0,0,0);
-     const ids=linked.filter(t=>t.status==="pendente"&&new Date(t.transaction_date+"T12:00:00")>=today).map(t=>t.id);
+     const ids=linked.filter(t=>isPendingTransaction(t)&&new Date(t.transaction_date+"T12:00:00")>=today).map(t=>t.id);
      if(ids.length){
        const dr=await sb.from("transactions").delete().in("id",ids).eq("user_id",USER.id);
        if(dr.error){toast("Regra não excluída: "+dr.error.message,true);return}
@@ -2029,7 +2032,7 @@ setTimeout(()=>{
       const parcelInfo=parcelMatch?`<div class="small v23-parcel-tag"><b>Parcela ${parcelMatch[1]}/${parcelMatch[2]}</b> · ${rem?`${rem} parcela${rem>1?'s':''} restante${rem>1?'s':''}`:'última parcela'}</div>`:'';
       const recurringMatch=String(t.note||'').match(/Recorrência automática\s+•\s+([^\s•]+)/i);
       const recurringInfo=recurringMatch||/recorr[eê]ncia/i.test(String(t.note||''))?'<div class="small v38-recurring-tag"><b>↻ Recorrente</b> · mensal</div>':'';
-      const pending=t.status==='pendente';
+      const pending=isPendingTransaction(t);
       return `<tr><td>${t.transaction_date?new Date(t.transaction_date+'T12:00:00').toLocaleDateString('pt-BR'):''}${purchase}${invoice}${parcelInfo}${recurringInfo}</td><td>${esc(t.description)}</td><td>${esc(canonicalCategoryName(t.category,t.transaction_type)||'—')}${t.subcategory?' / '+esc(t.subcategory):''}</td><td>${esc(t.transaction_type)}</td><td>${esc(rel||'—')}</td><td class="${t.transaction_type==='receita'||t.transaction_type==='resgate'?'positive':'negative'}">${money(t.amount)}</td><td>${pending?'<span class="tag warn">Pendente</span>':'<span class="tag ok">Realizado</span>'}</td><td><div class="actions">${pending?`<button class="btn gold" onclick="markPaid('${t.id}')">Pagar</button>`:''}<button class="btn" onclick="openTransaction('${t.id}')">Editar</button><button class="btn danger" onclick="deleteTransactionSmart('${t.id}')">Excluir</button></div></td></tr>`;
     }).join('')}</tbody></table></div>`;
   };
