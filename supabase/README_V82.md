@@ -40,7 +40,10 @@ They do not mutate manual account/asset snapshots. Atomicity comes from one Post
 
 Structured recurring operations use nullable `source_account_id`, `destination_account_id`, and `asset_id` columns. Composite ownership foreign keys and `NOT VALID` type-shape checks preserve ambiguous legacy rows without inferring links, while rejecting incomplete new investment, transfer, and rescue rules. Materialized occurrences are idempotent on `(user_id, recurring_series_id, recurring_occurrence_date)`.
 
-`20260820195658_structure_recurring_financial_operations_v82.sql` is local-only pending a separate Beta deployment approval. It has not been added to an environment migration manifest and must not be applied remotely from this checkpoint.
+Both V82 migrations are now listed, in order, in the production allowlist. They were
+reconciled locally for atomic execution, semantic retry and explicit drift failure.
+This is preparation only: neither file has been applied to production. Follow
+`supabase/production/README.md`; the local baseline remains prohibited remotely.
 
 ## Product decisions intentionally deferred
 
@@ -52,10 +55,13 @@ Structured recurring operations use nullable `source_account_id`, `destination_a
 
 Gross rescue value is not income. Investment is not consumption expense. Gain/loss must be a separate future patrimonial event.
 
-## Future deployment plan — do not execute from this branch
+## Controlled deployment plan — separate authorization required
 
 1. Take a platform backup and schema snapshot through an approved operational process.
-2. Build a clean production migration set from `supabase/production-migrations.manifest`. The local baseline is not eligible, has a guard, and must never run against an existing application schema. Default `supabase db push` from this worktree is prohibited.
+2. Run the read-only production preflight, then build a clean production migration set
+   from `supabase/production-migrations.manifest`. The local baseline is not eligible,
+   has a guard, and must never run against an existing application schema. Default
+   `supabase db push` or `migration up --linked` from this worktree is prohibited.
 3. Run read-only preflight diagnostics and archive aggregate counts only.
 4. Apply nullable columns and supporting unique ownership constraints.
 5. Add composite foreign keys and checks as `NOT VALID` so legacy rows are not scanned during the first deploy; new writes are still protected.

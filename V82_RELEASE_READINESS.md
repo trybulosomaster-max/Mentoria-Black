@@ -32,8 +32,9 @@ These boundaries are release limitations, not alternate canonical engines.
 
 - `20260820161844_local_v81_structural_baseline.sql` is local-only and must never
   be included in a remote migration chain. Its guard rejects an existing app schema.
-- `20260820161846_add_v82_structured_financial_operations.sql` is the only current
-  production-eligible candidate.
+- `20260820161846_add_v82_structured_financial_operations.sql` followed by
+  `20260820195658_structure_recurring_financial_operations_v82.sql` is the reviewed
+  production chain. Both files are atomic, retryable and reject semantic drift.
 - `supabase/production-migrations.manifest` is the reviewed allowlist. A future
   deploy must build a clean environment-specific migration chain from that manifest
   after reconciling the remote migration history.
@@ -191,7 +192,7 @@ unvalidated constraints/indexes, and restore reviewed policies from the snapshot
 | Atomicity | Locally ready | No for Beta | One canonical row per RPC | Target-environment validation |
 | Idempotency | Locally ready | No for Beta | Unique index, sequential and concurrent retry | Monitor conflicts |
 | Temporary credential | Unconfirmed | Yes for remote operations | Prior CLI incident | Confirm expiry/revocation |
-| Production migration set | Candidate ready | Yes for production | Explicit allowlist excludes baseline | Reconcile remote history and review |
+| Production migration set | Locally reconciled | Remote pre-flight required | Ordered allowlist, recovery test and runbook exclude baseline | Run approved read-only pre-flight, backup and controlled window |
 | Rollback | Designed/local-tested | Production yes | Baseline reset and application-first plan | Rehearse in isolated Beta |
 | Liabilities | Manual only | Scope-dependent | No automatic amortization | Implement before claiming automation |
 | Investment gain/loss | Deferred | Scope-dependent | Gross rescue separated from income | Implement before P&L/tax claims |

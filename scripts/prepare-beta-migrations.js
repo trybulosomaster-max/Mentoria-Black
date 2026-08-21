@@ -14,6 +14,18 @@ function eligibleMigrations(rootDir,manifestPath='supabase/production-migrations
     if(!absolute.startsWith(path.resolve(rootDir)+path.sep)||!fs.existsSync(absolute))throw new Error(`invalid migration entry: ${entry}`);
     if(/^\s*create\s+table\b/im.test(fs.readFileSync(absolute,'utf8')))throw new Error(`table-creating migration requires separate approval: ${entry}`);
   }
+  const expected=[
+    'supabase/migrations/20260820161846_add_v82_structured_financial_operations.sql',
+    'supabase/migrations/20260820195658_structure_recurring_financial_operations_v82.sql'
+  ];
+  if(entries.length!==expected.length||entries.some((entry,index)=>entry!==expected[index])){
+    throw new Error('production migration manifest does not match the reviewed V82 order');
+  }
+  for(const entry of entries){
+    const sql=fs.readFileSync(path.resolve(rootDir,entry),'utf8');
+    if(!/^\s*begin\s*;/im.test(sql)||!/^\s*commit\s*;/im.test(sql))throw new Error(`migration is not explicitly transactional: ${entry}`);
+    if(!sql.includes('pg_advisory_xact_lock')||!sql.includes('V82 schema drift'))throw new Error(`migration lacks recovery/drift guards: ${entry}`);
+  }
   return entries;
 }
 
@@ -29,7 +41,7 @@ function prepareMigrationChain({rootDir,pathOut}){
 if(require.main===module){
   const rootDir=path.resolve(__dirname,'..'),pathOut=process.argv[2]||path.join(rootDir,'dist-beta','supabase','migrations');
   const result=prepareMigrationChain({rootDir,pathOut});
-  console.log(`Prepared ${result.entries.length} reviewed Beta migration(s).`);
+  console.log(`Prepared ${result.entries.length} reviewed production migration(s).`);
 }
 
 module.exports=Object.freeze({eligibleMigrations,prepareMigrationChain});

@@ -1,54 +1,127 @@
--- Canonical structured references for recurring V82 operations.
--- Columns stay nullable so ambiguous legacy rows are preserved. NOT VALID checks
--- protect every new or updated row without attempting to infer legacy links.
+-- Canonical structured references for recurring V82 operations. This file is
+-- transaction-safe, retryable, and rejects incompatible catalog drift.
+begin;
+set local lock_timeout='15s';
+set local statement_timeout='5min';
+select pg_advisory_xact_lock(hashtextextended('mentoria-black:v82:production-chain',0));
 
-alter table public.recurring
-  add column source_account_id uuid,
-  add column destination_account_id uuid,
-  add column asset_id uuid;
+create or replace function pg_temp.mb_v82_normalize(p_value text) returns text
+language sql immutable as $$
+  select regexp_replace(lower(trim(p_value)),'[[:space:]]+',' ','g')
+$$;
 
-alter table public.recurring
-  add constraint recurring_source_account_user_fkey
-    foreign key (source_account_id,user_id) references public.accounts(id,user_id)
-    on delete set null (source_account_id) not valid,
-  add constraint recurring_destination_account_user_fkey
-    foreign key (destination_account_id,user_id) references public.accounts(id,user_id)
-    on delete set null (destination_account_id) not valid,
-  add constraint recurring_asset_user_fkey
-    foreign key (asset_id,user_id) references public.assets(id,user_id)
-    on delete set null (asset_id) not valid;
+create or replace function pg_temp.mb_v82_ensure_column(
+  p_table regclass,p_column name,p_type regtype
+) returns void language plpgsql as $$
+declare v_type oid;v_not_null boolean;v_has_default boolean;
+begin
+  select atttypid,attnotnull,atthasdef into v_type,v_not_null,v_has_default
+  from pg_attribute where attrelid=p_table and attname=p_column and attnum>0 and not attisdropped;
+  if not found then
+    execute format('alter table %s add column %I %s',p_table,p_column,p_type::text);
+    select atttypid,attnotnull,atthasdef into v_type,v_not_null,v_has_default
+    from pg_attribute where attrelid=p_table and attname=p_column and attnum>0 and not attisdropped;
+  end if;
+  if v_type<>p_type::oid or v_not_null or v_has_default then
+    raise exception 'V82 schema drift: %.% must be nullable %, without default',p_table,p_column,p_type using errcode='P0001';
+  end if;
+end$$;
 
-alter table public.recurring
-  add constraint recurring_amount_positive_v82 check (amount>0) not valid,
-  add constraint recurring_investment_shape_v82 check (
-    lower(type) not in ('investimento','investment') or
-    (source_account_id is not null and asset_id is not null)
-  ) not valid,
-  add constraint recurring_transfer_shape_v82 check (
-    lower(type) not in ('transferencia','transferência','transfer') or
-    (
-      source_account_id is not null and
-      destination_account_id is not null and
-      source_account_id<>destination_account_id
-    )
-  ) not valid,
-  add constraint recurring_rescue_shape_v82 check (
-    lower(type) not in ('resgate','rescue','withdrawal') or
-    (asset_id is not null and destination_account_id is not null)
-  ) not valid;
+create or replace function pg_temp.mb_v82_ensure_constraint(
+  p_table regclass,p_name name,p_type "char",p_expected text,p_create text,p_not_valid boolean default false
+) returns void language plpgsql as $$
+declare v_type "char";v_definition text;v_validated boolean;
+begin
+  select contype,pg_get_constraintdef(oid),convalidated into v_type,v_definition,v_validated
+  from pg_constraint where conrelid=p_table and conname=p_name;
+  if not found then
+    execute p_create;
+    select contype,pg_get_constraintdef(oid),convalidated into v_type,v_definition,v_validated
+    from pg_constraint where conrelid=p_table and conname=p_name;
+  end if;
+  if v_type<>p_type or pg_temp.mb_v82_normalize(v_definition)<>pg_temp.mb_v82_normalize(p_expected)
+     or (p_not_valid and v_validated) then
+    raise exception 'V82 schema drift: constraint %.% is incompatible: %',p_table,p_name,v_definition using errcode='P0001';
+  end if;
+end$$;
 
-create index recurring_user_source_account_v82_idx
-  on public.recurring(user_id,source_account_id)
-  where source_account_id is not null;
-create index recurring_user_destination_account_v82_idx
-  on public.recurring(user_id,destination_account_id)
-  where destination_account_id is not null;
-create index recurring_user_asset_v82_idx
-  on public.recurring(user_id,asset_id)
-  where asset_id is not null;
-create index recurring_user_active_next_date_v82_idx
-  on public.recurring(user_id,next_date)
-  where active is true;
+create or replace function pg_temp.mb_v82_ensure_index(
+  p_table regclass,p_name name,p_expected text,p_create text
+) returns void language plpgsql as $$
+declare v_table oid;v_definition text;
+begin
+  select i.indrelid,pg_get_indexdef(c.oid) into v_table,v_definition
+  from pg_class c join pg_namespace n on n.oid=c.relnamespace join pg_index i on i.indexrelid=c.oid
+  where n.nspname='public' and c.relname=p_name;
+  if not found then
+    execute p_create;
+    select i.indrelid,pg_get_indexdef(c.oid) into v_table,v_definition
+    from pg_class c join pg_namespace n on n.oid=c.relnamespace join pg_index i on i.indexrelid=c.oid
+    where n.nspname='public' and c.relname=p_name;
+  end if;
+  if v_table<>p_table::oid or pg_temp.mb_v82_normalize(v_definition)<>pg_temp.mb_v82_normalize(p_expected) then
+    raise exception 'V82 schema drift: index public.% is incompatible: %',p_name,v_definition using errcode='P0001';
+  end if;
+end$$;
+
+create or replace function pg_temp.mb_v82_assert_function(
+  p_signature text,p_body_md5 text,p_return regtype,p_setof boolean
+) returns void language plpgsql as $$
+declare v_oid regprocedure;v_name name;v_body text;v_security_definer boolean;v_config text[];v_return oid;v_setof boolean;v_language name;
+begin
+  v_oid:=to_regprocedure(p_signature);
+  v_name:=split_part(split_part(p_signature,'(',1),'.',2);
+  if v_oid is null then
+    if exists(select 1 from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname=v_name) then
+      raise exception 'V82 schema drift: function %.% exists with an unexpected signature','public',v_name using errcode='P0001';
+    end if;
+    return;
+  end if;
+  select md5(p.prosrc),p.prosecdef,p.proconfig,p.prorettype,p.proretset,l.lanname
+    into v_body,v_security_definer,v_config,v_return,v_setof,v_language
+  from pg_proc p join pg_language l on l.oid=p.prolang where p.oid=v_oid;
+  if v_body<>p_body_md5 or v_security_definer or v_config<>array['search_path=public, pg_temp']::text[]
+     or v_return<>p_return::oid or v_setof<>p_setof or v_language<>'plpgsql' then
+    raise exception 'V82 schema drift: function % is incompatible',p_signature using errcode='P0001';
+  end if;
+end$$;
+
+do $preflight$
+declare v_table text;
+begin
+  foreach v_table in array array['accounts','assets','goals','recurring','transactions'] loop
+    if to_regclass('public.'||v_table) is null then
+      raise exception 'V82 recurring preflight drift: required table public.% is missing',v_table using errcode='P0001';
+    end if;
+    if not (select relrowsecurity from pg_class where oid=to_regclass('public.'||v_table)) then
+      raise exception 'V82 recurring preflight drift: RLS is disabled on public.%',v_table using errcode='P0001';
+    end if;
+  end loop;
+  if to_regprocedure('public.create_investment_v82(uuid,uuid,uuid,numeric,date,text,text)') is null
+     or to_regclass('public.transactions_user_recurring_occurrence_uidx') is null then
+    raise exception 'V82 recurring preflight drift: migration 20260820161846 is not complete' using errcode='P0001';
+  end if;
+end$preflight$;
+
+select pg_temp.mb_v82_ensure_column('public.recurring','source_account_id','uuid');
+select pg_temp.mb_v82_ensure_column('public.recurring','destination_account_id','uuid');
+select pg_temp.mb_v82_ensure_column('public.recurring','asset_id','uuid');
+
+select pg_temp.mb_v82_ensure_constraint('public.recurring','recurring_source_account_user_fkey','f','foreign key (source_account_id, user_id) references accounts(id, user_id) on delete set null (source_account_id) not valid','alter table public.recurring add constraint recurring_source_account_user_fkey foreign key (source_account_id,user_id) references public.accounts(id,user_id) on delete set null (source_account_id) not valid',true);
+select pg_temp.mb_v82_ensure_constraint('public.recurring','recurring_destination_account_user_fkey','f','foreign key (destination_account_id, user_id) references accounts(id, user_id) on delete set null (destination_account_id) not valid','alter table public.recurring add constraint recurring_destination_account_user_fkey foreign key (destination_account_id,user_id) references public.accounts(id,user_id) on delete set null (destination_account_id) not valid',true);
+select pg_temp.mb_v82_ensure_constraint('public.recurring','recurring_asset_user_fkey','f','foreign key (asset_id, user_id) references assets(id, user_id) on delete set null (asset_id) not valid','alter table public.recurring add constraint recurring_asset_user_fkey foreign key (asset_id,user_id) references public.assets(id,user_id) on delete set null (asset_id) not valid',true);
+select pg_temp.mb_v82_ensure_constraint('public.recurring','recurring_amount_positive_v82','c','check ((amount > (0)::numeric)) not valid','alter table public.recurring add constraint recurring_amount_positive_v82 check (amount>0) not valid',true);
+select pg_temp.mb_v82_ensure_constraint('public.recurring','recurring_investment_shape_v82','c',$d$check (((lower(type) <> all (array['investimento'::text, 'investment'::text])) or ((source_account_id is not null) and (asset_id is not null)))) not valid$d$,$d$alter table public.recurring add constraint recurring_investment_shape_v82 check (lower(type) not in ('investimento','investment') or (source_account_id is not null and asset_id is not null)) not valid$d$,true);
+select pg_temp.mb_v82_ensure_constraint('public.recurring','recurring_transfer_shape_v82','c',$d$check (((lower(type) <> all (array['transferencia'::text, 'transferência'::text, 'transfer'::text])) or ((source_account_id is not null) and (destination_account_id is not null) and (source_account_id <> destination_account_id)))) not valid$d$,$d$alter table public.recurring add constraint recurring_transfer_shape_v82 check (lower(type) not in ('transferencia','transferência','transfer') or (source_account_id is not null and destination_account_id is not null and source_account_id<>destination_account_id)) not valid$d$,true);
+select pg_temp.mb_v82_ensure_constraint('public.recurring','recurring_rescue_shape_v82','c',$d$check (((lower(type) <> all (array['resgate'::text, 'rescue'::text, 'withdrawal'::text])) or ((asset_id is not null) and (destination_account_id is not null)))) not valid$d$,$d$alter table public.recurring add constraint recurring_rescue_shape_v82 check (lower(type) not in ('resgate','rescue','withdrawal') or (asset_id is not null and destination_account_id is not null)) not valid$d$,true);
+
+-- recovery-test-checkpoint: migration-2-mid
+select pg_temp.mb_v82_ensure_index('public.recurring','recurring_user_source_account_v82_idx','create index recurring_user_source_account_v82_idx on public.recurring using btree (user_id, source_account_id) where (source_account_id is not null)','create index recurring_user_source_account_v82_idx on public.recurring(user_id,source_account_id) where source_account_id is not null');
+select pg_temp.mb_v82_ensure_index('public.recurring','recurring_user_destination_account_v82_idx','create index recurring_user_destination_account_v82_idx on public.recurring using btree (user_id, destination_account_id) where (destination_account_id is not null)','create index recurring_user_destination_account_v82_idx on public.recurring(user_id,destination_account_id) where destination_account_id is not null');
+select pg_temp.mb_v82_ensure_index('public.recurring','recurring_user_asset_v82_idx','create index recurring_user_asset_v82_idx on public.recurring using btree (user_id, asset_id) where (asset_id is not null)','create index recurring_user_asset_v82_idx on public.recurring(user_id,asset_id) where asset_id is not null');
+select pg_temp.mb_v82_ensure_index('public.recurring','recurring_user_active_next_date_v82_idx','create index recurring_user_active_next_date_v82_idx on public.recurring using btree (user_id, next_date) where (active is true)','create index recurring_user_active_next_date_v82_idx on public.recurring(user_id,next_date) where active is true');
+
+select pg_temp.mb_v82_assert_function('public.materialize_recurring_occurrences_v82(date)','9d5d8239ef4e434a63f89d44e8ad3ce2','public.transactions',true);
 
 create or replace function public.materialize_recurring_occurrences_v82(
   p_horizon_end date
@@ -224,6 +297,8 @@ begin
 end
 $$;
 
+select pg_temp.mb_v82_assert_function('public.create_investment_entry_v82(uuid,uuid,uuid,numeric,date,text,text,text,text,text,uuid,text)','136dbe1155585e6b2f7ec4c4e6746837','public.transactions',false);
+
 create or replace function public.create_investment_entry_v82(
   p_operation_id uuid,
   p_source_account_id uuid,
@@ -294,3 +369,22 @@ revoke all on function public.materialize_recurring_occurrences_v82(date) from p
 revoke all on function public.create_investment_entry_v82(uuid,uuid,uuid,numeric,date,text,text,text,text,text,uuid,text) from public,anon;
 grant execute on function public.materialize_recurring_occurrences_v82(date) to authenticated;
 grant execute on function public.create_investment_entry_v82(uuid,uuid,uuid,numeric,date,text,text,text,text,text,uuid,text) to authenticated;
+
+select pg_temp.mb_v82_assert_function('public.materialize_recurring_occurrences_v82(date)','9d5d8239ef4e434a63f89d44e8ad3ce2','public.transactions',true);
+select pg_temp.mb_v82_assert_function('public.create_investment_entry_v82(uuid,uuid,uuid,numeric,date,text,text,text,text,text,uuid,text)','136dbe1155585e6b2f7ec4c4e6746837','public.transactions',false);
+
+do $grants$
+declare v_signature text;
+begin
+  foreach v_signature in array array[
+    'public.materialize_recurring_occurrences_v82(date)',
+    'public.create_investment_entry_v82(uuid,uuid,uuid,numeric,date,text,text,text,text,text,uuid,text)'
+  ] loop
+    if has_function_privilege('anon',v_signature,'execute')
+       or not has_function_privilege('authenticated',v_signature,'execute') then
+      raise exception 'V82 privilege drift on function %',v_signature using errcode='P0001';
+    end if;
+  end loop;
+end$grants$;
+
+commit;
