@@ -71,7 +71,15 @@ create_v81_database() {
   psql_db "$database" >/dev/null <<'SQL'
 create schema auth;
 create schema extensions;
+create schema supabase_migrations;
 create table auth.users(id uuid primary key,email text);
+create table supabase_migrations.schema_migrations(
+  version text primary key,
+  statements text[],
+  name text
+);
+insert into supabase_migrations.schema_migrations(version,name)
+values ('20260820000000','v81_production_checkpoint');
 create or replace function auth.uid() returns uuid language sql stable as $$
   select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid
 $$;
@@ -109,6 +117,8 @@ create_v81_database "$normal_db"
 apply_file "$normal_db" "$preflight_sql"
 apply_file "$normal_db" "$migration_one"
 apply_file "$normal_db" "$migration_two"
+psql_db "$normal_db" -qc "insert into supabase_migrations.schema_migrations(version,name) values ('20260820161846','add_v82_structured_financial_operations'),('20260820195658','structure_recurring_financial_operations_v82')" >/dev/null
+apply_file "$normal_db" "$preflight_sql"
 apply_file "$normal_db" "$migration_one"
 apply_file "$normal_db" "$migration_two"
 assert_sql "$normal_db" "select count(*) from pg_proc where proname in ('create_transfer_v82','materialize_recurring_occurrences_v82')" "2" "normal/retry function state"

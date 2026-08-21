@@ -43,19 +43,63 @@ and foreign keys for new or changed rows.
 
 ## Pre-flight and application
 
+Client prerequisite on macOS (client libraries and `psql` only; no PostgreSQL server
+or service is installed):
+
+```sh
+brew install libpq
+brew link --force libpq
+psql --version
+```
+
 1. Take the approved platform backup and record the production project ref.
-2. Run `supabase/production/preflight_v82.sql` through a read-only connection to the
-   explicitly selected production database. Archive only its schema-state result.
-3. Compare remote migration history with `supabase/production-migrations.manifest`.
+2. Obtain a newly issued read-only production database URL from the Supabase Dashboard
+   **Connect** panel, using an approved administrator channel. Confirm the project shown
+   in the Dashboard is `mwjqfzbpjmwiscvtxvfc`. Do not retrieve it from chat, shell
+   history, an old `.env`, the linked CLI project, or a previously exposed credential.
+3. Paste it without terminal echo into a session-only variable. The following gate does
+   not print the value and rejects the Beta ref or any URL that does not contain the
+   production ref:
+
+   ```sh
+   read -rs 'MB_V82_PRODUCTION_DB_URL?Temporary production DB URL: '
+   export MB_V82_PRODUCTION_DB_URL
+   case "$MB_V82_PRODUCTION_DB_URL" in
+     *amzgqfvyjaiaoohnbcfl*) unset MB_V82_PRODUCTION_DB_URL; return 1 ;;
+     *mwjqfzbpjmwiscvtxvfc*) ;;
+     *) unset MB_V82_PRODUCTION_DB_URL; return 1 ;;
+   esac
+   ```
+
+   Use this in an interactive `zsh` session so `return 1` stops the sourced/pasted
+   gate. Never place the URL in `.env`, a command file, Git, logs, clipboard history,
+   or a report.
+4. Confirm the client and run only the reviewed read-only pre-flight:
+
+   ```sh
+   psql --version
+   psql "$MB_V82_PRODUCTION_DB_URL" -X -v ON_ERROR_STOP=1 \
+     -f supabase/production/preflight_v82.sql
+   preflight_status=$?
+   unset MB_V82_PRODUCTION_DB_URL
+   test -z "${MB_V82_PRODUCTION_DB_URL+x}"
+   ```
+
+   `MB_V82_PREFLIGHT_RESULT=GO` plus exit status zero is the only passing result.
+   `NO-GO`, a SQL error, timeout, missing identity gate, or nonzero exit status blocks
+   promotion. Archive only `MB_V82_PREFLIGHT_REPORT`, which contains aggregate counts
+   and technical object names. The script itself uses a repeatable-read, read-only
+   transaction and rolls it back.
+5. Compare remote migration history with `supabase/production-migrations.manifest`.
    Neither V82 version may already be recorded unless its catalog state is complete.
-4. Build an empty chain directory:
+6. Build an empty chain directory:
 
    ```sh
    task_chain_dir="$(mktemp -d "${TMPDIR:-/tmp}/mb-v82-production.XXXXXX")"
    node scripts/prepare-production-migrations.js "$task_chain_dir/supabase/migrations"
    ```
 
-5. Under a separately approved production window, apply the clean directory with a
+7. Under a separately approved production window, apply the clean directory with a
    production-specific database URL held only in the process environment:
 
    ```sh
@@ -64,7 +108,7 @@ and foreign keys for new or changed rows.
 
    Do not use `--linked`, `db push`, `--include-all`, or the repository migration
    directory. Verify the target ref independently before supplying the URL.
-6. Re-list migration history and run catalog-only postchecks for columns, constraints,
+8. Re-list migration history and run catalog-only postchecks for columns, constraints,
    indexes, RPC properties, privileges and RLS. Deploy the V82 frontend only after both
    versions are recorded and postchecks pass.
 
@@ -96,4 +140,12 @@ incompatible drift rejection, writer-disable rollback, grant restoration and pgT
 
 ```sh
 bash supabase/tests/v82_production_migration_recovery_test.sh
+```
+
+The dedicated pre-flight test proves a compatible V81 `GO`, explicit `NO-GO` for
+column drift, incorrect FK, cross-user references, zero amount, incompatible recurring
+legacy, partial V82 state and incompatible RPC, plus enforcement of read-only mode:
+
+```sh
+bash supabase/tests/v82_production_preflight_test.sh
 ```
