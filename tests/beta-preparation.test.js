@@ -62,12 +62,13 @@ await test('gerador rejeita credencial privilegiada',()=>{
 
 await test('cadeia de produção contém somente migrations elegíveis na ordem e exclui baseline',()=>{
   const rootDir=path.resolve(__dirname,'..'),entries=migrations.eligibleMigrations(rootDir);
-  equal(entries.length,2);
+  equal(entries.length,3);
   equal(entries[0],'supabase/migrations/20260820161846_add_v82_structured_financial_operations.sql');
   equal(entries[1],'supabase/migrations/20260820195658_structure_recurring_financial_operations_v82.sql');
+  equal(entries[2],'supabase/migrations/20260821205630_reconcile_v82_production_access_contract.sql');
   ok(!entries.some(entry=>/baseline|local|beta\//i.test(entry)));
   const temp=fs.mkdtempSync(path.join(os.tmpdir(),'mb-beta-migrations-'));
-  try{const result=migrations.prepareMigrationChain({rootDir,pathOut:path.join(temp,'migrations')});equal(fs.readdirSync(result.output).length,2);for(const entry of entries)ok(!fs.readFileSync(path.join(result.output,path.basename(entry)),'utf8').match(/^\s*create\s+table\b/im))}finally{fs.rmSync(temp,{recursive:true,force:true})}
+  try{const result=migrations.prepareMigrationChain({rootDir,pathOut:path.join(temp,'migrations')});equal(fs.readdirSync(result.output).length,3);for(const entry of entries)ok(!fs.readFileSync(path.join(result.output,path.basename(entry)),'utf8').match(/^\s*create\s+table\b/im))}finally{fs.rmSync(temp,{recursive:true,force:true})}
 });
 
 await test('index e PWA exibem identidade Beta',()=>{

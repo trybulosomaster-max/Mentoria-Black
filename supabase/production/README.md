@@ -9,8 +9,9 @@ Apply exactly, and only, this order:
 
 1. `20260820161846_add_v82_structured_financial_operations.sql`
 2. `20260820195658_structure_recurring_financial_operations_v82.sql`
+3. `20260821205630_reconcile_v82_production_access_contract.sql`
 
-Both files acquire the same transaction-scoped advisory lock, set bounded lock and
+All three files acquire the same transaction-scoped advisory lock, set bounded lock and
 statement timeouts, and commit all DDL atomically. A SQL error rolls the whole file
 back. Reapplying a completed file is supported: compatible objects are verified and
 retained, functions are replaced only after their signature/body/security contract
@@ -34,7 +35,10 @@ and “incompatible” means raise `V82 schema drift` and roll the whole migrati
 | Recurring indexes | Source, destination, asset and active schedule indexes | Missing or exact index | Exact columns and partial predicate | Compatible index is retained; same-name drift fails |
 | RPCs | Four structured-operation RPCs, recurring materializer and investment-entry wrapper | Missing or exact reviewed body/signature/security contract | `plpgsql`, `SECURITY INVOKER`, controlled `search_path`, reviewed return shape | Missing RPC is created; exact RPC may be replaced; body/property/signature drift fails before replacement |
 | RPC privileges | `anon`, `authenticated`, `PUBLIC` execution | Any state after RPC contract passes | `anon`/`PUBLIC` revoked; `authenticated` granted | `REVOKE`/`GRANT` are repeatable and verified before commit |
-| RLS/policies | Existing V81 tables and policies | RLS enabled on all required tables | Unchanged | Preflight rejects disabled RLS; these migrations neither replace nor weaken policies |
+| Table/column grants | Nine private frontend tables | Any state, including known excessive V81 grants | No `PUBLIC`/`anon`; `authenticated` has only `SELECT`, `INSERT`, `UPDATE`, `DELETE`; no column ACL | Migration 3 revokes all API-role grants then restores exact CRUD in one transaction; retry verifies the final ACL |
+| RLS/policies | Ownership policies on nine private frontend tables | One or more policies, only if every API-facing expression is provably owner-only and combined CRUD coverage already exists | One `mb_v82_own_rows` policy per table, `TO authenticated`, explicit `USING` + `WITH CHECK`, `(select auth.uid())=user_id` | Equivalent duplicates/direct calls are consolidated atomically; broader/custom/restrictive semantics fail before any mutation |
+| Future defaults | `categories.kind`, `recurring.type` | Exact legacy `expense` or reconciled `despesa` default | `despesa` default; historical rows unchanged | Retry accepts the final default; any other existing default fails as drift |
+| Vocabulary checks | Category kind and recurring type | Missing or exact reviewed check | Reviewed `NOT VALID` checks | Legacy English rows remain; incompatible same-name constraint or validated-state drift fails |
 | Recovery helpers | `pg_temp.mb_v82_*` | Absent or session-local | Session-local only | Disappear with the connection; never become public API objects |
 
 All new relationship fields remain nullable. `NOT VALID` avoids scanning or rejecting
@@ -53,6 +57,9 @@ psql --version
 ```
 
 1. Take the approved platform backup and record the production project ref.
+   Before the change window, enable leaked-password protection in production Auth and
+   record the Security Advisor result. This is a platform Auth setting, not SQL, and is
+   therefore intentionally outside the migration files.
 2. Obtain a newly issued read-only production database URL from the Supabase Dashboard
    **Connect** panel, using an approved administrator channel. Confirm the project shown
    in the Dashboard is `mwjqfzbpjmwiscvtxvfc`. Do not retrieve it from chat, shell
@@ -91,7 +98,7 @@ psql --version
    and technical object names. The script itself uses a repeatable-read, read-only
    transaction and rolls it back.
 5. Compare remote migration history with `supabase/production-migrations.manifest`.
-   Neither V82 version may already be recorded unless its catalog state is complete.
+   No V82 version may be recorded unless its corresponding catalog state is complete.
 6. Build an empty chain directory:
 
    ```sh
@@ -109,8 +116,8 @@ psql --version
    Do not use `--linked`, `db push`, `--include-all`, or the repository migration
    directory. Verify the target ref independently before supplying the URL.
 8. Re-list migration history and run catalog-only postchecks for columns, constraints,
-   indexes, RPC properties, privileges and RLS. Deploy the V82 frontend only after both
-   versions are recorded and postchecks pass.
+   indexes, RPC properties, privileges and RLS. Deploy the V82 frontend only after all
+   three versions are recorded and postchecks pass.
 
 ## Retry and partial-state detection
 
@@ -121,6 +128,10 @@ psql --version
   objects and restore grants without duplicating schema objects.
 - A `partial-compatible-or-drift` preflight result requires rerunning the relevant file;
   its semantic checks decide whether the subset is recoverable or incompatible.
+- Migration 3 first proves every existing API-facing policy is owner-only and already
+  covers CRUD. It refuses to consolidate a broader, restrictive, custom-role or
+  incomplete policy. Excess grants and equivalent duplicate policies are known,
+  recoverable pre-state; any failure rolls back their reconciliation atomically.
 - Never mark history as applied merely because some columns exist. Only repair history
   after the complete catalog contract and file SHA are independently verified.
 
@@ -132,6 +143,8 @@ Database rollback is application-first and non-destructive:
 2. Run `supabase/production/rollback_v82_writers.sql` only under separate approval to
    revoke the six V82 RPCs from API roles.
 3. Preserve all structural columns, IDs, constraints and financial rows for audit.
+   Keep migration 3's least-privilege grants and owner-only policies: they remain
+   compatible with the V81 frontend and are security hardening, not V82 data writers.
 4. Restore execution by rerunning the reviewed migrations after the defect is fixed.
 5. Do not drop `operation_id`, recurrence identity, reversal links or user data.
 

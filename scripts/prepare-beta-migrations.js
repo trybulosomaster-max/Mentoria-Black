@@ -16,7 +16,8 @@ function eligibleMigrations(rootDir,manifestPath='supabase/production-migrations
   }
   const expected=[
     'supabase/migrations/20260820161846_add_v82_structured_financial_operations.sql',
-    'supabase/migrations/20260820195658_structure_recurring_financial_operations_v82.sql'
+    'supabase/migrations/20260820195658_structure_recurring_financial_operations_v82.sql',
+    'supabase/migrations/20260821205630_reconcile_v82_production_access_contract.sql'
   ];
   if(entries.length!==expected.length||entries.some((entry,index)=>entry!==expected[index])){
     throw new Error('production migration manifest does not match the reviewed V82 order');

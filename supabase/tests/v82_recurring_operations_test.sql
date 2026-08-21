@@ -48,12 +48,11 @@ select throws_ok($$insert into recurring(user_id,name,type,amount,asset_id,next_
 select throws_ok($$insert into recurring(user_id,name,type,amount,source_account_id,asset_id,next_date) values('61111111-1111-4111-8111-111111111111','Cross investment','investimento',10,'6aaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1','6fffffff-ffff-4fff-8fff-fffffffffff1',current_date)$$,'23503',null,'cross-user asset FK rejected');
 select throws_ok($$insert into recurring(user_id,name,type,amount,source_account_id,destination_account_id,next_date) values('61111111-1111-4111-8111-111111111111','Cross transfer','transferencia',10,'6aaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1','6bbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1',current_date)$$,'23503',null,'cross-user account FK rejected');
 
-insert into recurring(id,user_id,name,type,amount,frequency,"interval",start_date,next_date,end_date,active)
-values('61ffffff-ffff-4fff-8fff-ffffffffffff','61111111-1111-4111-8111-111111111111','Unsupported legacy type','misterio',1,'monthly',1,current_date,current_date,current_date,true);
-select throws_ok($$select materialize_recurring_occurrences_v82(current_date)$$,'23514',null,'one invalid series aborts the materialization batch');
-select results_eq($$select count(*) from transactions where recurring_series_id::text like '61%'$$,'values (0::bigint)','atomic failure leaves no occurrence rows');
-select results_eq($$select count(*) from recurring where id::text like '61000000%' and next_date=current_date$$,'values (5::bigint)','atomic failure does not advance schedules');
-delete from recurring where id='61ffffff-ffff-4fff-8fff-ffffffffffff';
+select throws_ok($$insert into recurring(id,user_id,name,type,amount,frequency,"interval",start_date,next_date,end_date,active)
+  values('61ffffff-ffff-4fff-8fff-ffffffffffff','61111111-1111-4111-8111-111111111111','Unsupported type','misterio',1,'monthly',1,current_date,current_date,current_date,true)$$,
+  '23514',null,'new unsupported recurring type is rejected');
+select results_eq($$select count(*) from transactions where recurring_series_id::text like '61%'$$,'values (0::bigint)','rejected recurring type leaves no occurrence rows');
+select results_eq($$select count(*) from recurring where id::text like '61000000%' and next_date=current_date$$,'values (5::bigint)','rejected recurring type does not change valid schedules');
 
 select results_eq($$select count(*) from materialize_recurring_occurrences_v82(current_date)$$,'values (5::bigint)','five canonical occurrences materialize together');
 select results_eq($$select count(*) from transactions where recurring_series_id::text like '61000000%'$$,'values (5::bigint)','one occurrence exists for each series');

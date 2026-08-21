@@ -31,16 +31,25 @@ declare
   v_latest_migration text;
   v_m1_history boolean:=false;
   v_m2_history boolean:=false;
+  v_m3_history boolean:=false;
   v_m1_presence integer:=0;
   v_m2_presence integer:=0;
+  v_m3_presence integer:=0;
   v_m1_function_issues integer:=0;
   v_m2_function_issues integer:=0;
   v_m1_complete boolean:=false;
   v_m2_complete boolean:=false;
+  v_m3_complete boolean:=false;
   v_bad_data bigint:=0;
   v_cross_user bigint:=0;
   v_policy_issues bigint:=0;
   v_grant_issues bigint:=0;
+  v_policy_duplicate_count bigint:=0;
+  v_direct_auth_uid_policy_count bigint:=0;
+  v_excess_grant_count bigint:=0;
+  v_m3_canonical_policy_count bigint:=0;
+  v_m3_constraint_count bigint:=0;
+  v_m3_new_default_count bigint:=0;
 begin
   if current_setting('transaction_read_only')<>'on'
      or current_setting('default_transaction_read_only')<>'on' then
@@ -89,28 +98,33 @@ begin
   ) then
     v_blockers:=v_blockers||jsonb_build_array('history:version_column_incompatible');
   else
-    execute 'select count(*),max(version),bool_or(version=$1),bool_or(version=$2) from supabase_migrations.schema_migrations'
-      into v_count,v_latest_migration,v_m1_history,v_m2_history
-      using '20260820161846','20260820195658';
+    execute 'select count(*),max(version),bool_or(version=$1),bool_or(version=$2),bool_or(version=$3) from supabase_migrations.schema_migrations'
+      into v_count,v_latest_migration,v_m1_history,v_m2_history,v_m3_history
+      using '20260820161846','20260820195658','20260821205630';
     v_m1_history:=coalesce(v_m1_history,false);
     v_m2_history:=coalesce(v_m2_history,false);
+    v_m3_history:=coalesce(v_m3_history,false);
     v_metrics:=v_metrics||jsonb_build_object(
       'migration_history_count',v_count,
       'latest_migration_version',v_latest_migration,
       'migration_20260820161846_recorded',v_m1_history,
       'migration_20260820195658_recorded',v_m2_history
+      ,'migration_20260821205630_recorded',v_m3_history
     );
-    execute 'select count(*) from supabase_migrations.schema_migrations where version in ($1,$2)'
-      into v_count using '20260820161846','20260820195658';
-    if v_count<>(case when v_m1_history then 1 else 0 end)+(case when v_m2_history then 1 else 0 end) then
+    execute 'select count(*) from supabase_migrations.schema_migrations where version in ($1,$2,$3)'
+      into v_count using '20260820161846','20260820195658','20260821205630';
+    if v_count<>(case when v_m1_history then 1 else 0 end)+(case when v_m2_history then 1 else 0 end)+(case when v_m3_history then 1 else 0 end) then
       v_blockers:=v_blockers||jsonb_build_array('history:duplicate_v82_version');
     end if;
     if v_m2_history and not v_m1_history then
       v_blockers:=v_blockers||jsonb_build_array('history:migration_2_without_migration_1');
     end if;
+    if v_m3_history and (not v_m1_history or not v_m2_history) then
+      v_blockers:=v_blockers||jsonb_build_array('history:migration_3_without_structural_chain');
+    end if;
   end if;
 
-  foreach v_table in array array['accounts','cards','goals','assets','liabilities','recurring','transactions'] loop
+  foreach v_table in array array['accounts','cards','categories','goals','assets','liabilities','recurring','transactions','monthly_plans'] loop
     if to_regclass('public.'||v_table) is null then
       v_blockers:=v_blockers||jsonb_build_array('table:'||v_table||':missing');
     elsif not (select relrowsecurity from pg_class where oid=to_regclass('public.'||v_table)) then
@@ -124,6 +138,8 @@ begin
       ('accounts','id','uuid',true,'gen_random_uuid()'),('accounts','user_id','uuid',true,null),
       ('accounts','opening_balance','numeric',true,'0'),('accounts','created_at','timestamp with time zone',true,'now()'),
       ('cards','id','uuid',true,'gen_random_uuid()'),('cards','user_id','uuid',true,null),
+      ('categories','id','uuid',true,'gen_random_uuid()'),('categories','user_id','uuid',true,null),
+      ('categories','kind','text',true,$d$'expense'::text$d$),
       ('goals','id','uuid',true,'gen_random_uuid()'),('goals','user_id','uuid',true,null),
       ('assets','id','uuid',true,'gen_random_uuid()'),('assets','user_id','uuid',true,null),
       ('assets','current_value','numeric',true,'0'),('assets','created_at','timestamp with time zone',true,'now()'),
@@ -138,7 +154,8 @@ begin
       ('transactions','transaction_date','date',true,null),('transactions','description','text',true,null),
       ('transactions','amount','numeric',true,null),('transactions','account_id','uuid',false,null),
       ('transactions','card_id','uuid',false,null),('transactions','transaction_type','text',true,$d$'despesa'::text$d$),
-      ('transactions','status','text',false,$d$'realizado'::text$d$)
+      ('transactions','status','text',false,$d$'realizado'::text$d$),
+      ('monthly_plans','id','uuid',true,'gen_random_uuid()'),('monthly_plans','user_id','uuid',true,null)
     ) as expected(table_name,column_name,type_name,not_null,default_expression)
   loop
     if to_regclass('public.'||v_row.table_name) is null then continue; end if;
@@ -152,8 +169,18 @@ begin
     if not found then
       v_blockers:=v_blockers||jsonb_build_array('column:'||v_row.table_name||'.'||v_row.column_name||':missing');
     elsif v_text<>v_row.type_name or v_bool is distinct from v_row.not_null
-       or regexp_replace(lower(coalesce(v_text_two,'')),'[[:space:]]+','','g')
-          <>regexp_replace(lower(coalesce(v_row.default_expression,'')),'[[:space:]]+','','g') then
+       or (
+         not ((v_row.table_name='recurring' and v_row.column_name='type')
+              or (v_row.table_name='categories' and v_row.column_name='kind'))
+         and regexp_replace(lower(coalesce(v_text_two,'')),'[[:space:]]+','','g')
+             <>regexp_replace(lower(coalesce(v_row.default_expression,'')),'[[:space:]]+','','g')
+       )
+       or (
+         ((v_row.table_name='recurring' and v_row.column_name='type')
+          or (v_row.table_name='categories' and v_row.column_name='kind'))
+         and regexp_replace(lower(coalesce(v_text_two,'')),'[[:space:]]+','','g')
+             not in ($d$'expense'::text$d$,$d$'despesa'::text$d$)
+       ) then
       v_blockers:=v_blockers||jsonb_build_array('column:'||v_row.table_name||'.'||v_row.column_name||':incompatible_contract');
     end if;
   end loop;
@@ -360,69 +387,104 @@ begin
     end if;
   end loop;
 
-  -- Complete CRUD ownership policies for authenticated; no anon/public policies.
-  foreach v_table in array array['accounts','cards','goals','assets','liabilities','recurring','transactions'] loop
+  -- API-facing policies may be duplicated, use PUBLIC, or call auth.uid() directly
+  -- before migration 3. They are reconcilable only when every expression is exactly
+  -- owner-only and the combined policies already cover CRUD without broadening access.
+  foreach v_table in array array['accounts','cards','categories','goals','assets','liabilities','recurring','transactions','monthly_plans'] loop
     if to_regclass('public.'||v_table) is null then continue; end if;
-    select count(*) into v_count from pg_policies where schemaname='public' and tablename=v_table;
+    select count(*) into v_count from pg_policies
+    where schemaname='public' and tablename=v_table
+      and roles&&array['public','anon','authenticated']::name[];
     if v_count=0 then
       v_blockers:=v_blockers||jsonb_build_array('policy:'||v_table||':missing');
       v_policy_issues:=v_policy_issues+1;
       continue;
     end if;
+    v_policy_duplicate_count:=v_policy_duplicate_count+greatest(v_count-1,0);
+    select count(*) into v_count_two
+    from pg_policies where schemaname='public' and tablename=v_table
+      and roles&&array['public','anon','authenticated']::name[]
+      and (
+        regexp_replace(lower(coalesce(qual,'')),'[[:space:]()]','','g') in ('auth.uid=user_id','user_id=auth.uid')
+        or regexp_replace(lower(coalesce(with_check,'')),'[[:space:]()]','','g') in ('auth.uid=user_id','user_id=auth.uid')
+      );
+    v_direct_auth_uid_policy_count:=v_direct_auth_uid_policy_count+v_count_two;
     select count(*) into v_count
     from pg_policies
     where schemaname='public' and tablename=v_table
-      and (('anon'=any(roles)) or ('public'=any(roles))
-        or ('authenticated'=any(roles) and (
-          ((cmd in ('ALL','SELECT','UPDATE','DELETE')) and
+      and roles&&array['public','anon','authenticated']::name[]
+      and (
+          permissive<>'PERMISSIVE' or not (roles<@array['public','anon','authenticated']::name[])
+          or ((cmd in ('ALL','SELECT','UPDATE','DELETE')) and
             regexp_replace(lower(coalesce(qual,'')),'[[:space:]()]','','g') not in
               ('selectauth.uidasuid=user_id','selectauth.uid=user_id','auth.uid=user_id',
                'user_id=selectauth.uidasuid','user_id=selectauth.uid','user_id=auth.uid'))
-          or ((cmd in ('ALL','INSERT','UPDATE')) and
-            regexp_replace(lower(coalesce(with_check,'')),'[[:space:]()]','','g') not in
+          or (cmd='INSERT' and regexp_replace(lower(coalesce(with_check,'')),'[[:space:]()]','','g') not in
               ('selectauth.uidasuid=user_id','selectauth.uid=user_id','auth.uid=user_id',
                'user_id=selectauth.uidasuid','user_id=selectauth.uid','user_id=auth.uid'))
-        )));
+          or (cmd in ('ALL','UPDATE') and with_check is not null
+              and regexp_replace(lower(with_check),'[[:space:]()]','','g') not in
+                ('selectauth.uidasuid=user_id','selectauth.uid=user_id','auth.uid=user_id',
+                 'user_id=selectauth.uidasuid','user_id=selectauth.uid','user_id=auth.uid'))
+      );
     if v_count>0 then
       v_blockers:=v_blockers||jsonb_build_array('policy:'||v_table||':unsafe_or_incomplete_expression');
       v_policy_issues:=v_policy_issues+v_count;
     end if;
-    foreach v_operation in array array['SELECT','INSERT','UPDATE','DELETE'] loop
-      if not exists(
-        select 1 from pg_policies
-        where schemaname='public' and tablename=v_table and 'authenticated'=any(roles)
-          and cmd in ('ALL',v_operation)
-          and (v_operation='INSERT' or
-            regexp_replace(lower(coalesce(qual,'')),'[[:space:]()]','','g') in
-              ('selectauth.uidasuid=user_id','selectauth.uid=user_id','auth.uid=user_id',
-               'user_id=selectauth.uidasuid','user_id=selectauth.uid','user_id=auth.uid'))
-          and (v_operation not in ('INSERT','UPDATE') or
-            regexp_replace(lower(coalesce(with_check,'')),'[[:space:]()]','','g') in
-              ('selectauth.uidasuid=user_id','selectauth.uid=user_id','auth.uid=user_id',
-               'user_id=selectauth.uidasuid','user_id=selectauth.uid','user_id=auth.uid'))
-      ) then
-        v_blockers:=v_blockers||jsonb_build_array('policy:'||v_table||':'||lower(v_operation)||'_ownership_missing');
-        v_policy_issues:=v_policy_issues+1;
-      end if;
-    end loop;
-  end loop;
-
-  -- Frontend CRUD grants and aggregate anon/public grant visibility.
-  foreach v_table in array array['accounts','cards','goals','assets','liabilities','recurring','transactions'] loop
-    select count(distinct privilege_type) into v_count
-    from information_schema.role_table_grants
-    where table_schema='public' and table_name=v_table and grantee='authenticated'
-      and privilege_type in ('SELECT','INSERT','UPDATE','DELETE');
-    if v_count<>4 then
-      v_blockers:=v_blockers||jsonb_build_array('grant:'||v_table||':authenticated_crud_incomplete');
-      v_grant_issues:=v_grant_issues+1;
+    if not exists(select 1 from pg_policies where schemaname='public' and tablename=v_table
+      and roles&&array['public','authenticated']::name[] and cmd in ('ALL','SELECT')
+      and regexp_replace(lower(coalesce(qual,'')),'[[:space:]()]','','g') in
+        ('selectauth.uidasuid=user_id','selectauth.uid=user_id','auth.uid=user_id','user_id=selectauth.uidasuid','user_id=selectauth.uid','user_id=auth.uid'))
+      or not exists(select 1 from pg_policies where schemaname='public' and tablename=v_table
+      and roles&&array['public','authenticated']::name[] and cmd in ('ALL','INSERT')
+      and regexp_replace(lower(coalesce(with_check,qual,'')),'[[:space:]()]','','g') in
+        ('selectauth.uidasuid=user_id','selectauth.uid=user_id','auth.uid=user_id','user_id=selectauth.uidasuid','user_id=selectauth.uid','user_id=auth.uid'))
+      or not exists(select 1 from pg_policies where schemaname='public' and tablename=v_table
+      and roles&&array['public','authenticated']::name[] and cmd in ('ALL','UPDATE')
+      and regexp_replace(lower(coalesce(qual,'')),'[[:space:]()]','','g') in
+        ('selectauth.uidasuid=user_id','selectauth.uid=user_id','auth.uid=user_id','user_id=selectauth.uidasuid','user_id=selectauth.uid','user_id=auth.uid')
+      and regexp_replace(lower(coalesce(with_check,qual,'')),'[[:space:]()]','','g') in
+        ('selectauth.uidasuid=user_id','selectauth.uid=user_id','auth.uid=user_id','user_id=selectauth.uidasuid','user_id=selectauth.uid','user_id=auth.uid'))
+      or not exists(select 1 from pg_policies where schemaname='public' and tablename=v_table
+      and roles&&array['public','authenticated']::name[] and cmd in ('ALL','DELETE')
+      and regexp_replace(lower(coalesce(qual,'')),'[[:space:]()]','','g') in
+        ('selectauth.uidasuid=user_id','selectauth.uid=user_id','auth.uid=user_id','user_id=selectauth.uidasuid','user_id=selectauth.uid','user_id=auth.uid')) then
+      v_blockers:=v_blockers||jsonb_build_array('policy:'||v_table||':owner_crud_coverage_missing');
+      v_policy_issues:=v_policy_issues+1;
+    end if;
+    if (select count(*) from pg_policies where schemaname='public' and tablename=v_table
+          and roles&&array['public','anon','authenticated']::name[])=1 and exists(
+      select 1 from pg_policies where schemaname='public' and tablename=v_table
+        and policyname='mb_v82_own_rows' and roles=array['authenticated']::name[] and cmd='ALL'
+        and regexp_replace(lower(coalesce(qual,'')),'[[:space:]()]','','g')='selectauth.uidasuid=user_id'
+        and regexp_replace(lower(coalesce(with_check,'')),'[[:space:]()]','','g')='selectauth.uidasuid=user_id'
+    ) then
+      v_m3_canonical_policy_count:=v_m3_canonical_policy_count+1;
+      v_m3_presence:=v_m3_presence+1;
     end if;
   end loop;
+
+  -- Excess grants are a known, recoverable production fact handled by migration 3.
   select count(*) into v_count
   from information_schema.role_table_grants
   where table_schema='public' and grantee in ('anon','PUBLIC')
-    and table_name=any(array['accounts','cards','goals','assets','liabilities','recurring','transactions']);
-  v_metrics:=v_metrics||jsonb_build_object('anon_or_public_table_grants',v_count);
+    and table_name=any(array['accounts','cards','categories','goals','assets','liabilities','recurring','transactions','monthly_plans']);
+  select count(*) into v_count_two
+  from information_schema.role_table_grants
+  where table_schema='public' and grantee='authenticated'
+    and privilege_type in ('TRUNCATE','REFERENCES','TRIGGER')
+    and table_name=any(array['accounts','cards','categories','goals','assets','liabilities','recurring','transactions','monthly_plans']);
+  v_excess_grant_count:=v_count+v_count_two;
+  select v_excess_grant_count+count(*) into v_excess_grant_count
+  from pg_attribute a
+  join pg_class c on c.oid=a.attrelid
+  join pg_namespace n on n.oid=c.relnamespace
+  cross join lateral aclexplode(a.attacl) acl
+  left join pg_roles r on r.oid=acl.grantee
+  where n.nspname='public' and c.relname=any(array['accounts','cards','categories','goals','assets','liabilities','recurring','transactions','monthly_plans'])
+    and a.attnum>0 and not a.attisdropped
+    and (acl.grantee=0 or r.rolname in ('anon','authenticated'));
+  v_metrics:=v_metrics||jsonb_build_object('excess_table_or_column_grant_count',v_excess_grant_count);
 
   -- Aggregate-only legacy data checks.
   if to_regclass('public.transactions') is not null then
@@ -509,11 +571,52 @@ begin
     v_metrics:=v_metrics||jsonb_build_object('assets_partial_snapshot_count','columns_pending');
   end if;
 
+  -- Migration 3 access/default contract.
+  select count(*) into v_m3_new_default_count
+  from (
+    select pg_get_expr(d.adbin,d.adrelid) as expression
+    from pg_attribute a join pg_attrdef d on d.adrelid=a.attrelid and d.adnum=a.attnum
+    where (a.attrelid='public.categories'::regclass and a.attname='kind')
+       or (a.attrelid='public.recurring'::regclass and a.attname='type')
+  ) defaults
+  where regexp_replace(lower(expression),'[[:space:]]+','','g')=$d$'despesa'::text$d$;
+  v_m3_presence:=v_m3_presence+v_m3_new_default_count;
+
+  select count(*) into v_m3_constraint_count
+  from pg_constraint
+  where (conrelid='public.categories'::regclass and conname='categories_kind_v82' and contype='c' and not convalidated
+         and regexp_replace(lower(pg_get_constraintdef(oid)),'[[:space:]]+',' ','g')=
+             regexp_replace(lower($d$check ((lower(kind) = any (array['receita'::text, 'despesa'::text, 'income'::text, 'expense'::text]))) not valid$d$),'[[:space:]]+',' ','g'))
+     or (conrelid='public.recurring'::regclass and conname='recurring_type_v82' and contype='c' and not convalidated
+         and regexp_replace(lower(pg_get_constraintdef(oid)),'[[:space:]]+',' ','g')=
+             regexp_replace(lower($d$check ((lower(type) = any (array['receita'::text, 'income'::text, 'revenue'::text, 'despesa'::text, 'expense'::text, 'investimento'::text, 'investment'::text, 'transferencia'::text, 'transferência'::text, 'transfer'::text, 'resgate'::text, 'rescue'::text, 'withdrawal'::text]))) not valid$d$),'[[:space:]]+',' ','g'));
+  if exists(select 1 from pg_constraint where conname in ('categories_kind_v82','recurring_type_v82'))
+     and v_m3_constraint_count<>2 then
+    v_blockers:=v_blockers||jsonb_build_array('migration_3:default_constraint_drift');
+  end if;
+  v_m3_presence:=v_m3_presence+v_m3_constraint_count;
+
   -- Component totals are explicit and covered by the loops above.
   v_m1_complete:=v_m1_presence=47
     and not exists(select 1 from pg_constraint where conname in ('transactions_account_id_fkey','transactions_card_id_fkey','recurring_account_id_fkey','recurring_card_id_fkey'))
     and v_m1_function_issues=0;
   v_m2_complete:=v_m2_presence=16 and v_m2_function_issues=0;
+  v_m3_complete:=v_m3_canonical_policy_count=9
+    and v_m3_new_default_count=2 and v_m3_constraint_count=2
+    and v_excess_grant_count=0
+    and not exists(
+      select 1 from information_schema.role_table_grants
+      where table_schema='public' and grantee='authenticated'
+        and table_name=any(array['accounts','cards','categories','goals','assets','liabilities','recurring','transactions','monthly_plans'])
+        and privilege_type in ('TRUNCATE','REFERENCES','TRIGGER')
+    )
+    and not exists(
+      select t.name
+      from unnest(array['accounts','cards','categories','goals','assets','liabilities','recurring','transactions','monthly_plans']) as t(name)
+      where (select count(distinct privilege_type) from information_schema.role_table_grants g
+             where g.table_schema='public' and g.table_name=t.name
+               and g.grantee='authenticated' and g.privilege_type in ('SELECT','INSERT','UPDATE','DELETE'))<>4
+    );
 
   if v_m1_presence>0 and not v_m1_complete then
     v_blockers:=v_blockers||jsonb_build_array('migration_1:partial_or_incompatible_catalog_state');
@@ -521,24 +624,33 @@ begin
   if v_m2_presence>0 and not v_m2_complete then
     v_blockers:=v_blockers||jsonb_build_array('migration_2:partial_or_incompatible_catalog_state');
   end if;
+  if v_m3_presence>0 and not v_m3_complete then
+    v_blockers:=v_blockers||jsonb_build_array('migration_3:partial_or_incompatible_catalog_state');
+  end if;
   if v_m1_history<>v_m1_complete then
     v_blockers:=v_blockers||jsonb_build_array('migration_1:history_catalog_mismatch');
   end if;
   if v_m2_history<>v_m2_complete then
     v_blockers:=v_blockers||jsonb_build_array('migration_2:history_catalog_mismatch');
   end if;
+  if v_m3_history<>v_m3_complete then
+    v_blockers:=v_blockers||jsonb_build_array('migration_3:history_catalog_mismatch');
+  end if;
   if v_m2_complete and not v_m1_complete then
     v_blockers:=v_blockers||jsonb_build_array('migration_2:catalog_without_migration_1');
   end if;
 
   v_metrics:=v_metrics||jsonb_build_object(
-    'required_tables',7,
+    'required_tables',9,
     'policy_issue_count',v_policy_issues,
     'grant_issue_count',v_grant_issues,
     'rpc_issue_count',v_m1_function_issues+v_m2_function_issues,
     'legacy_incompatible_total',v_bad_data,
     'migration_1_state',case when v_m1_complete then 'complete' when v_m1_presence=0 then 'pending' else 'partial' end,
     'migration_2_state',case when v_m2_complete then 'complete' when v_m2_presence=0 then 'pending' else 'partial' end,
+    'migration_3_state',case when v_m3_complete then 'complete' when v_m3_presence=0 then 'pending' else 'partial' end,
+    'duplicate_api_policy_count',v_policy_duplicate_count,
+    'direct_auth_uid_policy_count',v_direct_auth_uid_policy_count,
     'future_constraints_mode','NOT VALID for reviewed legacy-preserving checks/FKs'
   );
 

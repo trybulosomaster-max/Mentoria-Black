@@ -74,6 +74,29 @@ grant usage on schema extensions to anon,authenticated;
 grant select on auth.users to authenticated;
 SQL
   psql_db "$database" < "$baseline" >/dev/null
+  psql_db "$database" >/dev/null <<'SQL'
+create table public.categories(
+  id uuid primary key default gen_random_uuid(),user_id uuid not null references auth.users(id),
+  name text not null,kind text not null default 'expense' check(kind in ('receita','despesa','income','expense'))
+);
+create table public.monthly_plans(
+  id uuid primary key default gen_random_uuid(),user_id uuid not null references auth.users(id),
+  year integer not null,month integer not null
+);
+alter table public.categories enable row level security;
+alter table public.monthly_plans enable row level security;
+create policy categories_own_rows on public.categories for all to authenticated
+  using (auth.uid()=user_id) with check (auth.uid()=user_id);
+create policy monthly_plans_own_rows on public.monthly_plans for all to authenticated
+  using (auth.uid()=user_id) with check (auth.uid()=user_id);
+create policy monthly_plans_own_rows_duplicate on public.monthly_plans for all to public
+  using (auth.uid()=user_id) with check (auth.uid()=user_id);
+create policy transactions_own_rows_duplicate on public.transactions for all to public
+  using (auth.uid()=user_id) with check (auth.uid()=user_id);
+grant all privileges on table public.accounts,public.cards,public.categories,public.goals,
+  public.assets,public.liabilities,public.recurring,public.transactions,public.monthly_plans
+  to anon,authenticated;
+SQL
 }
 
 run_go() {

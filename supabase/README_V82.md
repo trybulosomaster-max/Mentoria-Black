@@ -40,9 +40,9 @@ They do not mutate manual account/asset snapshots. Atomicity comes from one Post
 
 Structured recurring operations use nullable `source_account_id`, `destination_account_id`, and `asset_id` columns. Composite ownership foreign keys and `NOT VALID` type-shape checks preserve ambiguous legacy rows without inferring links, while rejecting incomplete new investment, transfer, and rescue rules. Materialized occurrences are idempotent on `(user_id, recurring_series_id, recurring_occurrence_date)`.
 
-Both V82 migrations are now listed, in order, in the production allowlist. They were
+All three V82 production migrations are now listed, in order, in the production allowlist. They were
 reconciled locally for atomic execution, semantic retry and explicit drift failure.
-This is preparation only: neither file has been applied to production. Follow
+This is preparation only: none of these files has been applied to production. Follow
 `supabase/production/README.md`; the local baseline remains prohibited remotely.
 
 ## Product decisions intentionally deferred
@@ -51,7 +51,9 @@ This is preparation only: neither file has been applied to production. Follow
 - Realized gain/loss, income distributions, valuation changes, and cost-basis accounting.
 - Whether a structured operation may be physically deleted after it has been reversed.
 - The date and evidence required to promote manual snapshots into reconstruction bases.
-- Resolution of legacy English defaults (`categories.kind = expense`, `recurring.type = expense`) before hardening their constraints.
+- Validation of any legacy English category/recurring values before eventually marking
+  the new vocabulary constraints valid; migration 3 changes only future defaults and
+  keeps those checks `NOT VALID`.
 
 Gross rescue value is not income. Investment is not consumption expense. Gain/loss must be a separate future patrimonial event.
 
@@ -80,7 +82,8 @@ Rollback is application-first:
 2. Revoke RPC execution if a write-path defect exists.
 3. Keep nullable columns and successfully written structural IDs; do not delete financial data.
 4. Drop only unvalidated checks/FKs or new indexes that cause an operational problem.
-5. Restore prior policies from the reviewed schema snapshot if policy behavior changes.
+5. Retain migration 3's least-privilege grants and owner-only policies during an
+   application rollback; restore an older policy only after a separate security review.
 6. Do not drop `operation_id` or reversal links after V82 writes exist; retain them for audit and idempotency.
 
 The local baseline can be recreated independently by resetting to the first migration version. That test is destructive only to the disposable local database.
