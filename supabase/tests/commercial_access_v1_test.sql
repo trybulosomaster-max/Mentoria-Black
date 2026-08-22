@@ -88,16 +88,28 @@ select ok(public.has_active_access('APP') and public.has_active_access('KNOWLEDG
 
 insert into public.billing_orders(id,user_id,offer_id,provider,environment,status,external_payment_id,external_subscription_id,paid_through)
 select '10000000-0000-4000-8000-000000000001','b0000000-0000-4000-8000-000000000002',id,'asaas','sandbox','pending','pay-app','sub-app',clock_timestamp()+interval '30 days' from public.commercial_offers where code='APP_MONTHLY';
+set local role authenticated; set local request.jwt.claim.sub='b0000000-0000-4000-8000-000000000002';
+select is((select result from public.start_my_app_trial()),'started','monthly buyer begins as an APP trial'); reset role;
 insert into public.payment_events(id,provider,environment,external_event_id,event_type,payload_hash,external_payment_id)
 values ('20000000-0000-4000-8000-000000000001','asaas','sandbox','evt-confirm','PAYMENT_CONFIRMED',repeat('a',64),'pay-app');
 select is(public.process_payment_event_v1('20000000-0000-4000-8000-000000000001'),'processed','confirmed payment processes');
 select is(public.process_payment_event_v1('20000000-0000-4000-8000-000000000001'),'processed','processed event retry is no-op');
 select is((select count(*) from public.billing_order_grants where order_id='10000000-0000-4000-8000-000000000001'),1::bigint,'event creates one APP grant once');
+select is((select state from public.product_trials where user_id='b0000000-0000-4000-8000-000000000002'),'converted','monthly payment converts the server-side trial');
+select is((select status from public.access_grants where user_id='b0000000-0000-4000-8000-000000000002' and access_type='trial'),'expired','conversion retires the trial grant without deleting it');
 set local role authenticated; set local request.jwt.claim.sub='b0000000-0000-4000-8000-000000000002'; select ok(public.has_active_access('APP'),'paid APP grants finance'); reset role;
 update public.billing_orders set paid_through=clock_timestamp()+interval '60 days' where id='10000000-0000-4000-8000-000000000001';
 insert into public.payment_events(id,provider,environment,external_event_id,event_type,payload_hash,external_subscription_id) values ('20000000-0000-4000-8000-000000000008','asaas','sandbox','evt-renewal','PAYMENT_RECEIVED',repeat('8',64),'sub-app');
 select is(public.process_payment_event_v1('20000000-0000-4000-8000-000000000008'),'processed','renewal processes idempotently');
 select ok((select g.expires_at>clock_timestamp()+interval '59 days' from public.access_grants g join public.billing_order_grants bog on bog.grant_id=g.id where bog.order_id='10000000-0000-4000-8000-000000000001'),'renewal advances APP paid period');
+
+insert into public.billing_orders(id,user_id,offer_id,provider,environment,status,external_payment_id,external_subscription_id,paid_through)
+select '10000000-0000-4000-8000-000000000005','a0000000-0000-4000-8000-000000000001',id,'asaas','sandbox','pending','pay-app-annual','sub-app-annual',clock_timestamp()+interval '365 days' from public.commercial_offers where code='APP_ANNUAL';
+insert into public.payment_events(id,provider,environment,external_event_id,event_type,payload_hash,external_payment_id)
+values ('20000000-0000-4000-8000-000000000013','asaas','sandbox','evt-confirm-annual','PAYMENT_RECEIVED',repeat('4',64),'pay-app-annual');
+select is(public.process_payment_event_v1('20000000-0000-4000-8000-000000000013'),'processed','annual APP payment processes');
+select is((select state from public.product_trials where user_id='a0000000-0000-4000-8000-000000000001'),'converted','annual payment converts an expired trial');
+select ok((select g.expires_at>clock_timestamp()+interval '364 days' from public.access_grants g join public.billing_order_grants bog on bog.grant_id=g.id where bog.order_id='10000000-0000-4000-8000-000000000005'),'annual APP grant uses the authorized paid period');
 
 insert into public.payment_events(id,provider,environment,external_event_id,event_type,payload_hash,external_payment_id) values ('20000000-0000-4000-8000-000000000002','asaas','sandbox','evt-overdue','PAYMENT_OVERDUE',repeat('b',64),'pay-app');
 select is(public.process_payment_event_v1('20000000-0000-4000-8000-000000000002'),'processed','overdue enters configured grace');

@@ -4,7 +4,7 @@ Status: implementation and tests are local only. This document authorizes no rem
 migration, Auth change, webhook registration, checkout, billing, merge or deploy.
 
 Proposed migration: `20260822212119_commercial_access_v1.sql`  
-SHA-256: `8663df19dd1a16992cc87e0d1d2aad3588b57332c8cacf3e5bc097fd739a8c53`
+SHA-256: `4b9934b7e9431fabe96c219b02221bc794611035afdc675deb4a922eecb1cfad`
 
 ## Functional contract
 
@@ -78,6 +78,8 @@ not partially mutate the order and is reconciled after the confirmation event.
 Policy implemented locally:
 
 - confirmed/received: activate or renew linked grants;
+- a confirmed APP purchase changes an active/expired trial to `converted`, retires
+  the trial grant and preserves its original timestamps/history;
 - overdue: APP grace ends exactly 72 hours after the paid period;
 - normal subscription cancellation: no early revocation;
 - full refund: revoke all grants from that order;

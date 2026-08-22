@@ -69,6 +69,6 @@ The clone suite covers V82 financial integrity, structured recurrence, Commercia
 Access trial/admin/payment behavior, preservation of all nine legacy tables,
 bootstrap-before-enforcement, expiry without deletion, policy rollback, migration
 partial failure/retry, table/function drift refusal and indexed/RLS execution plans.
-The focused SQL suite also covers concurrent trial and payment-event replay. Related
-JavaScript and V82 regression suites must be green before this candidate can move to
-an Asaas Sandbox preflight.
+The focused SQL suite also covers monthly and annual trial conversion, concurrent
+trial start and concurrent payment-event replay. Related JavaScript and V82 regression
+suites must be green before this candidate can move to an Asaas Sandbox preflight.

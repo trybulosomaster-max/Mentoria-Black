@@ -774,6 +774,15 @@ begin
           expires_at=case when v_product.code='APP' then v_order.paid_through else null end
         where id=v_grant_id;
       end if;
+      if v_product.code='APP' then
+        update public.product_trials
+        set state='converted',converted_at=coalesce(converted_at,clock_timestamp())
+        where user_id=v_order.user_id and product_id=v_product.id and state in ('active','expired');
+        update public.access_grants
+        set status='expired'
+        where user_id=v_order.user_id and product_id=v_product.id and access_type='trial'
+          and status in ('active','grace_period','past_due');
+      end if;
     end loop;
     v_state:='processed';
   elsif v_event.event_type='PAYMENT_OVERDUE' then
