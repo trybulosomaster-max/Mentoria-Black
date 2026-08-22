@@ -1,4 +1,4 @@
-const CACHE_NAME = 'mentoria-black-v82-beta';
+const CACHE_NAME = 'mentoria-black-v82-production';
 const APP_SHELL = ['./','./index.html'];
 self.addEventListener('install', event => {
   event.waitUntil(
