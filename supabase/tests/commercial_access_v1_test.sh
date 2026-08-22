@@ -92,5 +92,19 @@ done
 wait
 assert_sql "$concurrent_db" "select count(*) from public.product_trials where user_id='f0000000-0000-4000-8000-000000000006'" "1" "concurrent start creates one trial"
 assert_sql "$concurrent_db" "select count(*) from public.access_grants where user_id='f0000000-0000-4000-8000-000000000006' and access_type='trial'" "1" "concurrent start creates one grant"
+psql_db "$concurrent_db" >/dev/null <<'SQL'
+insert into auth.users(id,email,email_confirmed_at) values ('f0000000-0000-4000-8000-000000000007','event-race@example.invalid',now());
+insert into public.billing_orders(id,user_id,offer_id,provider,environment,status,external_payment_id,paid_through)
+select 'f1000000-0000-4000-8000-000000000007','f0000000-0000-4000-8000-000000000007',id,'asaas','sandbox','pending','pay-event-race',clock_timestamp()+interval '30 days'
+from public.commercial_offers where code='APP_MONTHLY';
+insert into public.payment_events(id,provider,environment,external_event_id,event_type,payload_hash,external_payment_id)
+values ('f2000000-0000-4000-8000-000000000007','asaas','sandbox','evt-event-race','PAYMENT_CONFIRMED',repeat('7',64),'pay-event-race');
+SQL
+for run in 1 2; do
+  psql_db "$concurrent_db" -Atqc "select public.process_payment_event_v1('f2000000-0000-4000-8000-000000000007')" >"$tmp_dir/event-race-${run}.out" &
+done
+wait
+assert_sql "$concurrent_db" "select count(*) from public.billing_order_grants where order_id='f1000000-0000-4000-8000-000000000007'" "1" "concurrent event processing creates one linked grant"
+assert_sql "$concurrent_db" "select processing_attempts from public.payment_events where id='f2000000-0000-4000-8000-000000000007'" "1" "event replay observes processed state without a second mutation"
 
-echo "commercial access v2 SQL: ${test_assertions} pgTAP assertions; normal, RLS/trial/admin/events, concurrency, partial rollback and drift refusal passed"
+echo "commercial access v2 SQL: ${test_assertions} pgTAP assertions; normal, RLS/trial/admin/events, trial/event concurrency, partial rollback and drift refusal passed"

@@ -16,7 +16,7 @@ begin
 
   foreach v_object in array array[
     'products', 'product_components', 'commercial_offers', 'product_trials',
-    'access_grants', 'commercial_admin_audit', 'billing_customers', 'billing_orders',
+    'access_grants', 'commercial_admin_audit', 'commercial_enforcement_state', 'billing_customers', 'billing_orders',
     'billing_order_grants', 'billing_subscriptions', 'payment_events'
   ] loop
     if to_regclass('public.' || v_object) is not null then
@@ -31,6 +31,8 @@ begin
      or to_regprocedure('public.start_my_app_trial()') is not null
      or to_regprocedure('public.admin_grant_commercial_access_v1(uuid,text[],text,timestamptz,uuid,text)') is not null
      or to_regprocedure('public.admin_get_commercial_access_v1(uuid)') is not null
+     or to_regprocedure('public.activate_commercial_enforcement_v1(uuid,text)') is not null
+     or to_regprocedure('public.rollback_commercial_enforcement_v1(uuid,text)') is not null
      or to_regprocedure('public.process_payment_event_v1(uuid)') is not null then
     raise exception 'commercial access v1 found an existing access RPC; semantic reconciliation is required'
       using errcode = 'P0001';
@@ -158,11 +160,24 @@ create table public.commercial_admin_audit (
   grant_id uuid references public.access_grants(id) on delete set null,
   reason text not null,
   created_at timestamptz not null default now(),
-  constraint commercial_admin_audit_action_check check (action in ('bootstrap','grant','revoke')),
+  constraint commercial_admin_audit_action_check check (action in ('bootstrap','grant','revoke','activate_enforcement','rollback_enforcement')),
   constraint commercial_admin_audit_reason_check check (length(trim(reason)) between 3 and 500)
 );
 create index commercial_admin_audit_target_idx on public.commercial_admin_audit(target_user_id, created_at desc);
 create index commercial_admin_audit_actor_idx on public.commercial_admin_audit(actor_user_id, created_at desc);
+
+create table public.commercial_enforcement_state (
+  singleton boolean primary key default true check (singleton),
+  enforced boolean not null default false,
+  enforced_at timestamptz,
+  enforced_by uuid references auth.users(id) on delete restrict,
+  updated_at timestamptz not null default now(),
+  constraint commercial_enforcement_timeline_check check (
+    (not enforced and enforced_at is null and enforced_by is null)
+    or (enforced and enforced_at is not null and enforced_by is not null)
+  )
+);
+insert into public.commercial_enforcement_state(singleton,enforced) values(true,false);
 
 create table public.billing_customers (
   id uuid primary key default gen_random_uuid(),
@@ -343,6 +358,7 @@ alter table public.commercial_offers enable row level security;
 alter table public.product_trials enable row level security;
 alter table public.access_grants enable row level security;
 alter table public.commercial_admin_audit enable row level security;
+alter table public.commercial_enforcement_state enable row level security;
 alter table public.billing_customers enable row level security;
 alter table public.billing_orders enable row level security;
 alter table public.billing_order_grants enable row level security;
@@ -362,7 +378,7 @@ for select to authenticated using ((select auth.uid()) = user_id);
 
 revoke all privileges on table public.products, public.product_components,
   public.commercial_offers, public.product_trials, public.access_grants,
-  public.commercial_admin_audit, public.billing_customers, public.billing_orders,
+  public.commercial_admin_audit, public.commercial_enforcement_state, public.billing_customers, public.billing_orders,
   public.billing_order_grants, public.billing_subscriptions,
   public.payment_events from public, anon, authenticated;
 grant select on table public.products, public.product_components,
@@ -761,6 +777,14 @@ begin
     end loop;
     v_state:='processed';
   elsif v_event.event_type='PAYMENT_OVERDUE' then
+    if v_offer.billing_mode='subscription' and not exists(
+      select 1 from public.billing_order_grants bog
+      join public.products p on p.id=bog.product_id
+      where bog.order_id=v_order.id and p.code='APP'
+    ) then
+      update public.payment_events set status='failed',error_code='grant_link_not_found',last_error_at=clock_timestamp(),next_retry_at=clock_timestamp()+interval '15 minutes' where id=p_event_id;
+      return 'retryable';
+    end if;
     update public.billing_orders set status='past_due' where id=v_order.id;
     update public.access_grants g set status='grace_period',grace_until=v_order.paid_through+make_interval(hours=>v_offer.grace_period_hours)
     from public.billing_order_grants bog,public.products p
@@ -770,11 +794,19 @@ begin
     update public.billing_orders set status='cancelled' where id=v_order.id;
     v_state:='processed';
   elsif v_event.event_type in ('PAYMENT_REFUNDED','PAYMENT_RECEIVED_IN_CASH_UNDONE') then
+    if not exists(select 1 from public.billing_order_grants where order_id=v_order.id) then
+      update public.payment_events set status='failed',error_code='grant_link_not_found',last_error_at=clock_timestamp(),next_retry_at=clock_timestamp()+interval '15 minutes' where id=p_event_id;
+      return 'retryable';
+    end if;
     update public.billing_orders set status='refunded' where id=v_order.id;
     update public.access_grants g set status='refunded',revoked_at=clock_timestamp()
     from public.billing_order_grants bog where bog.order_id=v_order.id and bog.grant_id=g.id;
     v_state:='processed';
   elsif v_event.event_type in ('PAYMENT_CHARGEBACK_REQUESTED','PAYMENT_CHARGEBACK_DISPUTE','PAYMENT_AWAITING_CHARGEBACK_REVERSAL') then
+    if not exists(select 1 from public.billing_order_grants where order_id=v_order.id) then
+      update public.payment_events set status='failed',error_code='grant_link_not_found',last_error_at=clock_timestamp(),next_retry_at=clock_timestamp()+interval '15 minutes' where id=p_event_id;
+      return 'retryable';
+    end if;
     update public.billing_orders set status='chargeback' where id=v_order.id;
     update public.access_grants g set status='chargeback',revoked_at=clock_timestamp()
     from public.billing_order_grants bog where bog.order_id=v_order.id and bog.grant_id=g.id;
@@ -812,9 +844,11 @@ grant execute on function public.admin_revoke_commercial_access_v1(uuid,uuid,tex
 grant execute on function public.admin_get_commercial_access_v1(uuid) to service_role;
 grant execute on function public.process_payment_event_v1(uuid) to service_role;
 
--- Financial data remains intact at trial expiry. The database gate blocks API
--- reads and writes unless the caller has a current APP entitlement.
-do $financial_policies$
+-- Phase 1 deliberately preserves the canonical V82 ownership policies. This lets
+-- an authorized server bootstrap every legacy owner before the entitlement gate is
+-- activated. The activation RPC repeats these checks under one transaction and
+-- refuses to lock out any user who already owns financial data.
+do $financial_policy_preflight$
 declare
   v_table text;
   v_policy record;
@@ -855,16 +889,132 @@ begin
       raise exception 'commercial access v1 refuses policy drift on public.%', v_table using errcode = 'P0001';
     end if;
 
-    execute format('drop policy mb_v82_own_rows on public.%I', v_table);
-    execute format(
-      'create policy mb_commercial_app_access on public.%I for all to authenticated '
-      'using ((select auth.uid()) = user_id and (select public.has_active_access(''APP''))) '
-      'with check ((select auth.uid()) = user_id and (select public.has_active_access(''APP'')))',
-      v_table
-    );
   end loop;
 end
-$financial_policies$;
+$financial_policy_preflight$;
+
+create or replace function public.activate_commercial_enforcement_v1(
+  p_actor_user_id uuid, p_reason text
+)
+returns boolean
+language plpgsql
+volatile
+security definer
+set search_path = pg_catalog
+as $$
+declare
+  v_table text;
+  v_policy record;
+  v_normalized_qual text;
+  v_normalized_check text;
+  v_unentitled bigint;
+  v_enforced boolean;
+begin
+  if not exists (select 1 from auth.users where id=p_actor_user_id)
+     or length(trim(coalesce(p_reason,''))) < 3 then
+    raise exception 'valid actor and reason are required' using errcode='22023';
+  end if;
+  perform pg_advisory_xact_lock(hashtextextended('mentoria-black:commercial-enforcement-v1',0));
+  select enforced into v_enforced from public.commercial_enforcement_state where singleton for update;
+  if v_enforced then return false; end if;
+
+  foreach v_table in array array[
+    'accounts','cards','categories','goals','assets','liabilities',
+    'recurring','transactions','monthly_plans'
+  ] loop
+    if to_regclass('public.'||v_table) is null
+       or not (select relrowsecurity from pg_class where oid=to_regclass('public.'||v_table)) then
+      raise exception 'commercial enforcement requires RLS table public.%',v_table using errcode='P0001';
+    end if;
+    select * into v_policy from pg_policies
+      where schemaname='public' and tablename=v_table and policyname='mb_v82_own_rows';
+    if not found then
+      raise exception 'commercial enforcement requires canonical V82 policy on public.%',v_table using errcode='P0001';
+    end if;
+    v_normalized_qual:=regexp_replace(lower(coalesce(v_policy.qual,'')),'[[:space:]()]','','g');
+    v_normalized_check:=regexp_replace(lower(coalesce(v_policy.with_check,'')),'[[:space:]()]','','g');
+    if v_policy.cmd<>'ALL' or v_policy.roles<>array['authenticated']::name[]
+       or v_normalized_qual not in ('selectauth.uidasuid=user_id','selectauth.uid=user_id')
+       or v_normalized_check not in ('selectauth.uidasuid=user_id','selectauth.uid=user_id')
+       or exists(select 1 from pg_policies p where p.schemaname='public' and p.tablename=v_table
+          and p.policyname<>'mb_v82_own_rows' and p.roles&&array['public','anon','authenticated']::name[]) then
+      raise exception 'commercial enforcement refuses policy drift on public.%',v_table using errcode='P0001';
+    end if;
+    execute format(
+      'select count(*) from (select distinct source.user_id from public.%I source '
+      'where not exists (select 1 from public.access_grants g join public.products p on p.id=g.product_id '
+      'where g.user_id=source.user_id and p.code=''APP'' and p.active and g.starts_at<=statement_timestamp() '
+      'and ((g.status=''active'' and (g.expires_at is null or g.expires_at>statement_timestamp())) '
+      'or (g.status=''grace_period'' and g.grace_until>statement_timestamp())))) missing',v_table
+    ) into v_unentitled;
+    if v_unentitled<>0 then
+      raise exception 'commercial enforcement would lock % legacy owner(s) on public.%',v_unentitled,v_table using errcode='P0001';
+    end if;
+  end loop;
+
+  foreach v_table in array array[
+    'accounts','cards','categories','goals','assets','liabilities',
+    'recurring','transactions','monthly_plans'
+  ] loop
+    execute format('drop policy mb_v82_own_rows on public.%I',v_table);
+    execute format(
+      'create policy mb_commercial_app_access on public.%I for all to authenticated '
+      'using ((select auth.uid())=user_id and (select public.has_active_access(''APP''))) '
+      'with check ((select auth.uid())=user_id and (select public.has_active_access(''APP'')))',v_table
+    );
+  end loop;
+  update public.commercial_enforcement_state set enforced=true,enforced_at=clock_timestamp(),
+    enforced_by=p_actor_user_id,updated_at=clock_timestamp() where singleton;
+  insert into public.commercial_admin_audit(actor_user_id,target_user_id,action,reason)
+  values(p_actor_user_id,p_actor_user_id,'activate_enforcement',trim(p_reason));
+  return true;
+end
+$$;
+
+create or replace function public.rollback_commercial_enforcement_v1(
+  p_actor_user_id uuid, p_reason text
+)
+returns boolean
+language plpgsql
+volatile
+security definer
+set search_path = pg_catalog
+as $$
+declare v_table text; v_enforced boolean;
+begin
+  if not exists(select 1 from auth.users where id=p_actor_user_id)
+     or length(trim(coalesce(p_reason,'')))<3 then
+    raise exception 'valid actor and reason are required' using errcode='22023';
+  end if;
+  perform pg_advisory_xact_lock(hashtextextended('mentoria-black:commercial-enforcement-v1',0));
+  select enforced into v_enforced from public.commercial_enforcement_state where singleton for update;
+  if not v_enforced then return false; end if;
+  foreach v_table in array array[
+    'accounts','cards','categories','goals','assets','liabilities',
+    'recurring','transactions','monthly_plans'
+  ] loop
+    if not exists(select 1 from pg_policies where schemaname='public' and tablename=v_table
+      and policyname='mb_commercial_app_access') then
+      raise exception 'commercial rollback requires canonical access policy on public.%',v_table using errcode='P0001';
+    end if;
+    execute format('drop policy mb_commercial_app_access on public.%I',v_table);
+    execute format(
+      'create policy mb_v82_own_rows on public.%I for all to authenticated '
+      'using ((select auth.uid())=user_id) with check ((select auth.uid())=user_id)',v_table
+    );
+  end loop;
+  update public.commercial_enforcement_state set enforced=false,enforced_at=null,enforced_by=null,
+    updated_at=clock_timestamp() where singleton;
+  insert into public.commercial_admin_audit(actor_user_id,target_user_id,action,reason)
+  values(p_actor_user_id,p_actor_user_id,'rollback_enforcement',trim(p_reason));
+  return true;
+end
+$$;
+
+revoke all on function public.activate_commercial_enforcement_v1(uuid,text) from public,anon,authenticated;
+revoke all on function public.rollback_commercial_enforcement_v1(uuid,text) from public,anon,authenticated;
+grant execute on function public.activate_commercial_enforcement_v1(uuid,text) to service_role;
+grant execute on function public.rollback_commercial_enforcement_v1(uuid,text) to service_role;
 
 do $verify$
 declare
@@ -878,7 +1028,7 @@ begin
 
   foreach v_table in array array[
     'products', 'product_components', 'commercial_offers', 'product_trials',
-    'access_grants', 'commercial_admin_audit', 'billing_customers', 'billing_orders',
+    'access_grants', 'commercial_admin_audit', 'commercial_enforcement_state', 'billing_customers', 'billing_orders',
     'billing_order_grants', 'billing_subscriptions', 'payment_events'
   ] loop
     if not (select c.relrowsecurity from pg_class c where c.oid = to_regclass('public.' || v_table)) then
@@ -889,11 +1039,18 @@ begin
   if exists (
     select 1 from information_schema.role_table_grants
     where table_schema = 'public'
-      and table_name in ('product_trials', 'access_grants', 'commercial_admin_audit', 'billing_customers', 'billing_orders', 'billing_order_grants', 'billing_subscriptions', 'payment_events')
+      and table_name in ('product_trials', 'access_grants', 'commercial_admin_audit', 'commercial_enforcement_state', 'billing_customers', 'billing_orders', 'billing_order_grants', 'billing_subscriptions', 'payment_events')
       and grantee in ('anon', 'authenticated')
       and privilege_type in ('INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'REFERENCES', 'TRIGGER')
   ) then
     raise exception 'commercial access v1 client write grant verification failed' using errcode = 'P0001';
+  end if;
+
+  if (select count(*) from pg_policies where schemaname='public'
+      and tablename in ('accounts','cards','categories','goals','assets','liabilities','recurring','transactions','monthly_plans')
+      and policyname='mb_v82_own_rows')<>9
+     or (select enforced from public.commercial_enforcement_state where singleton) then
+    raise exception 'commercial access v1 must preserve V82 policies until explicit activation' using errcode='P0001';
   end if;
 end
 $verify$;

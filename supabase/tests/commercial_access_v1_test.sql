@@ -9,7 +9,7 @@ select is((select grace_period_hours from public.commercial_offers where code='A
 select is((select knowledge_cancellation_policy from public.commercial_offers where code='COMPLETE_MONTHLY'),'KNOWLEDGE_LIFETIME_AFTER_VALID_ACQUISITION','COMPLETE decision is explicit');
 select ok((select bool_and(relrowsecurity) from pg_class where oid in (
   'public.products'::regclass,'public.product_trials'::regclass,'public.access_grants'::regclass,
-  'public.commercial_admin_audit'::regclass,'public.billing_customers'::regclass,
+  'public.commercial_admin_audit'::regclass,'public.commercial_enforcement_state'::regclass,'public.billing_customers'::regclass,
   'public.billing_orders'::regclass,'public.billing_order_grants'::regclass,
   'public.billing_subscriptions'::regclass,'public.payment_events'::regclass
 )),'commercial tables have RLS');
@@ -20,6 +20,10 @@ select is((select proconfig[1] from pg_proc where oid='public.start_my_app_trial
 select ok(not has_function_privilege('authenticated','public.admin_grant_commercial_access_v1(uuid,text[],text,timestamptz,uuid,text)','EXECUTE'),'authenticated cannot call admin grant');
 select ok(not has_function_privilege('authenticated','public.admin_get_commercial_access_v1(uuid)','EXECUTE'),'authenticated cannot enumerate admin access');
 select ok(not has_function_privilege('authenticated','public.process_payment_event_v1(uuid)','EXECUTE'),'authenticated cannot process payment events');
+select ok(not has_function_privilege('authenticated','public.activate_commercial_enforcement_v1(uuid,text)','EXECUTE'),'authenticated cannot activate enforcement');
+select ok(has_function_privilege('service_role','public.bootstrap_commercial_admin_v1(uuid,uuid,text)','EXECUTE'),'service role can perform approved bootstrap');
+select ok(has_function_privilege('service_role','public.activate_commercial_enforcement_v1(uuid,text)','EXECUTE'),'service role can activate approved enforcement');
+select is((select proconfig[1] from pg_proc where oid='public.activate_commercial_enforcement_v1(uuid,text)'::regprocedure),'search_path=pg_catalog','enforcement search_path is controlled');
 select is((select count(*) from information_schema.role_table_grants where table_schema='public' and table_name in ('product_trials','access_grants','commercial_admin_audit','billing_customers','billing_orders','billing_order_grants','billing_subscriptions','payment_events') and grantee in ('anon','authenticated') and privilege_type in ('INSERT','UPDATE','DELETE')),0::bigint,'clients cannot write commercial ledgers');
 
 insert into auth.users(id,email,email_confirmed_at) values
@@ -45,6 +49,9 @@ select ok((public.get_my_entitlements()->'app'->>'trial_remaining_seconds')::big
 reset role;
 select is((select count(*) from public.product_trials where user_id='a0000000-0000-4000-8000-000000000001'),1::bigint,'one trial per user product');
 select is((select extract(epoch from(expires_at-started_at))::bigint from public.product_trials where user_id='a0000000-0000-4000-8000-000000000001'),604800::bigint,'trial lasts exactly 168h');
+select is((select count(*) from pg_policies where schemaname='public' and policyname='mb_v82_own_rows'),9::bigint,'migration phase 1 preserves V82 ownership policies');
+select ok(public.activate_commercial_enforcement_v1('d0000000-0000-4000-8000-000000000004','Synthetic commercial activation'),'service backend activates enforcement');
+select ok(not public.activate_commercial_enforcement_v1('d0000000-0000-4000-8000-000000000004','Synthetic commercial activation retry'),'activation retry is idempotent');
 
 insert into public.accounts(id,user_id,name) values
  ('aa000000-0000-4000-8000-000000000001','a0000000-0000-4000-8000-000000000001','A'),
@@ -54,6 +61,10 @@ select is((select count(*) from public.accounts),1::bigint,'APP active reads onl
 set local role authenticated; set local request.jwt.claim.sub='b0000000-0000-4000-8000-000000000002';
 select is((select count(*) from public.accounts),0::bigint,'no APP cannot load finance');
 select throws_ok($$insert into public.access_grants(user_id,product_id,access_type,source_provider) select auth.uid(),id,'paid','asaas' from public.products where code='APP'$$,'42501',null,'client cannot self elevate'); reset role;
+set local role authenticated; set local request.jwt.claim.sub='a0000000-0000-4000-8000-000000000001';
+select throws_ok($$update public.access_grants set expires_at=clock_timestamp()+interval '1 year' where user_id=auth.uid()$$,'42501',null,'client cannot extend entitlement');
+select throws_ok($$insert into public.product_trials(user_id,product_id,state,started_at,expires_at) select auth.uid(),id,'active',clock_timestamp(),clock_timestamp()+interval '1 year' from public.products where code='APP'$$,'42501',null,'client cannot forge trial');
+select throws_ok($$update public.access_grants set product_id=(select id from public.products where code='KNOWLEDGE') where user_id=auth.uid()$$,'42501',null,'client cannot switch grant product'); reset role;
 
 update public.product_trials set started_at=statement_timestamp()-interval '167 hours 59 minutes',expires_at=statement_timestamp()+interval '1 minute' where user_id='a0000000-0000-4000-8000-000000000001';
 update public.access_grants set starts_at=statement_timestamp()-interval '167 hours 59 minutes',expires_at=statement_timestamp()+interval '1 minute' where user_id='a0000000-0000-4000-8000-000000000001' and access_type='trial';
@@ -129,8 +140,22 @@ insert into public.payment_events(id,provider,environment,external_event_id,even
 select is(public.process_payment_event_v1('20000000-0000-4000-8000-000000000007'),'retryable','unmatched event remains retryable');
 select ok((select status='failed' and next_retry_at is not null and processing_attempts=1 from public.payment_events where id='20000000-0000-4000-8000-000000000007'),'failed processing remains reconciliable');
 
+insert into public.billing_orders(id,user_id,offer_id,provider,environment,status,external_payment_id,external_subscription_id,paid_through)
+select '10000000-0000-4000-8000-000000000004','b0000000-0000-4000-8000-000000000002',id,'asaas','sandbox','pending','pay-out-of-order','sub-out-of-order',clock_timestamp()+interval '30 days' from public.commercial_offers where code='APP_MONTHLY';
+insert into public.payment_events(id,provider,environment,external_event_id,event_type,payload_hash,external_payment_id) values ('20000000-0000-4000-8000-000000000011','asaas','sandbox','evt-overdue-early','PAYMENT_OVERDUE',repeat('2',64),'pay-out-of-order');
+select is(public.process_payment_event_v1('20000000-0000-4000-8000-000000000011'),'retryable','out-of-order overdue remains retryable until grant exists');
+select is((select error_code from public.payment_events where id='20000000-0000-4000-8000-000000000011'),'grant_link_not_found','out-of-order event records a non-sensitive reconciliation code');
+insert into public.payment_events(id,provider,environment,external_event_id,event_type,payload_hash,external_payment_id) values ('20000000-0000-4000-8000-000000000012','asaas','sandbox','evt-confirm-late','PAYMENT_CONFIRMED',repeat('3',64),'pay-out-of-order');
+select is(public.process_payment_event_v1('20000000-0000-4000-8000-000000000012'),'processed','late confirmation creates the canonical grant');
+select is(public.process_payment_event_v1('20000000-0000-4000-8000-000000000011'),'processed','retry reconciles earlier overdue event');
+select is((select count(*) from public.billing_order_grants where order_id='10000000-0000-4000-8000-000000000004'),1::bigint,'out-of-order reconciliation creates no duplicate grant');
+
 select is((select count(*) from pg_policies where schemaname='public' and tablename in ('accounts','cards','categories','goals','assets','liabilities','recurring','transactions','monthly_plans') and policyname='mb_commercial_app_access'),9::bigint,'nine financial tables are entitlement gated');
-set local role anon; select throws_ok($$select public.get_my_entitlements()$$,'42501',null,'anon cannot resolve'); reset role;
+set local role anon;
+select throws_ok($$select public.get_my_entitlements()$$,'42501',null,'anon cannot resolve');
+select throws_ok($$select * from public.accounts$$,'42501',null,'anon has no financial table access'); reset role;
+select ok(public.rollback_commercial_enforcement_v1('d0000000-0000-4000-8000-000000000004','Synthetic rollback verification'),'application-first policy rollback succeeds');
+select is((select count(*) from pg_policies where schemaname='public' and policyname='mb_v82_own_rows'),9::bigint,'rollback restores canonical V82 policies');
 
 select * from finish();
 rollback;

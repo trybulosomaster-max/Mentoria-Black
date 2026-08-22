@@ -4,7 +4,7 @@ Status: implementation and tests are local only. This document authorizes no rem
 migration, Auth change, webhook registration, checkout, billing, merge or deploy.
 
 Proposed migration: `20260822212119_commercial_access_v1.sql`  
-SHA-256: `12c0824b59d1933214b66a4085923439765f30f432ceb917c1bedb814d01052a`
+SHA-256: `8663df19dd1a16992cc87e0d1d2aad3588b57332c8cacf3e5bc097fd739a8c53`
 
 ## Functional contract
 
@@ -50,9 +50,16 @@ server adapter exists. Backend-only RPCs are granted solely to `service_role`:
 Future promotion procedure (never run from the browser): an approved administrator
 backend resolves the owner's Auth UUID, calls `bootstrap_commercial_admin_v1(target,
 actor, reason)` once, verifies two lifetime grants, then verifies the corresponding
-audit rows. The function is idempotent, contains no hardcoded identity and ordinary
-authenticated users cannot execute it. The caller must retain the external admin
-authorization evidence; being the target is not itself authorization.
+audit rows. Every distinct owner already present in any of the nine financial tables
+must receive an explicitly authorized APP grant before enforcement. Only after that
+verification may the backend call `activate_commercial_enforcement_v1(actor, reason)`.
+Activation is transactional, takes an advisory lock, verifies the nine canonical V82
+policies, refuses unsafe policy drift, and aborts if even one legacy data owner lacks
+APP access. `rollback_commercial_enforcement_v1(actor, reason)` restores the canonical
+V82 owner policies application-first without deleting commercial or financial rows.
+Both transitions are idempotent and audit logged. The functions contain no hardcoded
+identity and ordinary authenticated users cannot execute them. The caller must retain
+the external admin authorization evidence; being the target is not itself authorization.
 
 ## Payment pipeline
 
@@ -64,7 +71,9 @@ Raw webhook payloads are not stored. `(provider, environment, external_event_id)
 unique. `process_payment_event_v1()` is backend-only, locks an event, resolves a
 server-created order, links grants through `billing_order_grants`, and is retry-safe.
 Unmatched/malformed commercial state becomes `failed` with a retry time. Duplicate
-processed events are no-ops.
+processed events are no-ops. An overdue, refund or chargeback arriving before its
+canonical order-to-grant link remains retryable with `grant_link_not_found`; it does
+not partially mutate the order and is reconciled after the confirmation event.
 
 Policy implemented locally:
 
@@ -82,8 +91,10 @@ monthly, APP annual, KNOWLEDGE and COMPLETE.
 
 ## RLS and threats
 
-The nine financial tables require both `(select auth.uid()) = user_id` and a live APP
-entitlement. KNOWLEDGE-only, expired APP, anonymous and cross-user callers are denied.
+The migration initially preserves the nine canonical V82 ownership policies. After
+the controlled legacy bootstrap, the nine financial tables require both
+`(select auth.uid()) = user_id` and a live APP entitlement. KNOWLEDGE-only, expired
+APP, anonymous and cross-user callers are denied.
 Commercial tables use RLS; clients can read only their own trial/grants and have no
 write grants. The resolver reads the caller's own rows, avoiding a policy recursion.
 Narrow definer functions use `search_path = pg_catalog`, explicit table names and
@@ -105,5 +116,8 @@ checkout endpoint, webhook URL registration, signature/token validation exercise
 retry/reconciliation schedule and end-to-end Pix/card tests.
 
 Remote promotion later requires a read-only catalog preflight for any unversioned
-Kiwify objects, backup, explicit migration approval, owner bootstrap authorization,
-Sandbox acceptance and a separate production rollout plan.
+Kiwify objects, backup, explicit migration approval, authorization for every legacy
+owner grant, Sandbox acceptance and a separate production rollout plan. The required
+sequence is: apply schema migration while V82 policies remain active; bootstrap and
+verify every legacy owner; activate enforcement; deploy the gated frontend. Never
+activate enforcement and then attempt the bootstrap.
