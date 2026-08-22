@@ -1,0 +1,20 @@
+{
+  "checkoutResponses": {
+    "appMonthly": {"id":"chk_sandbox_monthly_001","link":"https://sandbox.asaas.com/checkoutSession/show/chk_sandbox_monthly_001","status":"ACTIVE","externalReference":"mbo_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"},
+    "appAnnual": {"id":"chk_sandbox_annual_001","link":"https://sandbox.asaas.com/checkoutSession/show/chk_sandbox_annual_001","status":"ACTIVE","externalReference":"mbo_BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"},
+    "knowledge": {"id":"chk_sandbox_knowledge_001","link":"https://sandbox.asaas.com/checkoutSession/show/chk_sandbox_knowledge_001","status":"ACTIVE","externalReference":"mbo_CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC"},
+    "complete": {"id":"chk_sandbox_complete_001","link":"https://sandbox.asaas.com/checkoutSession/show/chk_sandbox_complete_001","status":"ACTIVE","externalReference":"mbo_DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD"}
+  },
+  "events": {
+    "created":{"id":"evt_created_001","event":"PAYMENT_CREATED","payment":{"id":"pay_sandbox_001","customer":"cus_sandbox_001","subscription":"sub_sandbox_001","externalReference":"mbo_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA","dueDate":"2026-08-22"}},
+    "confirmed":{"id":"evt_confirmed_001","event":"PAYMENT_CONFIRMED","payment":{"id":"pay_sandbox_001","customer":"cus_sandbox_001","subscription":"sub_sandbox_001","externalReference":"mbo_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA","dueDate":"2026-08-22"}},
+    "received":{"id":"evt_received_001","event":"PAYMENT_RECEIVED","payment":{"id":"pay_sandbox_001","customer":"cus_sandbox_001","subscription":"sub_sandbox_001","externalReference":"mbo_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA","dueDate":"2026-08-22"}},
+    "renewal":{"id":"evt_renewal_001","event":"PAYMENT_RECEIVED","payment":{"id":"pay_sandbox_002","customer":"cus_sandbox_001","subscription":"sub_sandbox_001","externalReference":"mbo_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA","dueDate":"2026-09-22"}},
+    "overdue":{"id":"evt_overdue_001","event":"PAYMENT_OVERDUE","payment":{"id":"pay_sandbox_001","customer":"cus_sandbox_001","subscription":"sub_sandbox_001","externalReference":"mbo_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA","dueDate":"2026-08-22"}},
+    "refund":{"id":"evt_refund_001","event":"PAYMENT_REFUNDED","payment":{"id":"pay_sandbox_001","customer":"cus_sandbox_001","subscription":"sub_sandbox_001","externalReference":"mbo_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA","dueDate":"2026-08-22"}},
+    "partialRefund":{"id":"evt_partial_refund_001","event":"PAYMENT_PARTIALLY_REFUNDED","payment":{"id":"pay_sandbox_001","customer":"cus_sandbox_001","subscription":"sub_sandbox_001","externalReference":"mbo_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA","dueDate":"2026-08-22"}},
+    "chargeback":{"id":"evt_chargeback_001","event":"PAYMENT_CHARGEBACK_REQUESTED","payment":{"id":"pay_sandbox_001","customer":"cus_sandbox_001","subscription":"sub_sandbox_001","externalReference":"mbo_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA","dueDate":"2026-08-22"}},
+    "checkoutCanceled":{"id":"evt_checkout_cancel_001","event":"CHECKOUT_CANCELED","checkout":{"id":"chk_sandbox_001","status":"CANCELED"}},
+    "checkoutExpired":{"id":"evt_checkout_expired_001","event":"CHECKOUT_EXPIRED","checkout":{"id":"chk_sandbox_001","status":"EXPIRED"}}
+  }
+}

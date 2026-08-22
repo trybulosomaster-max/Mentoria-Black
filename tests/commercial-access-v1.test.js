@@ -26,6 +26,8 @@ await test('checkout adapter exposes four named sandbox mocks with zero network'
  const mock=provider.createMockCheckoutAdapter();for(const method of ['createAppMonthlyCheckout','createAppAnnualCheckout','createKnowledgeCheckout','createCompleteCheckout']){const result=await mock[method]({paymentMethod:'PIX'});ok(result.mock);equal(result.network,false)}
  equal(provider.checkoutIntent({environment:'sandbox',offerCode:'APP_MONTHLY',paymentMethod:'pix'}).offerCode,'APP_MONTHLY');
  assert.throws(()=>provider.checkoutIntent({environment:'production',offerCode:'APP_MONTHLY',paymentMethod:'PIX'}),/sandbox-only/);assertions++;
+ const calls=[],server=provider.createAsaasSandboxCheckoutAdapter({invoke:async(name,options)=>(calls.push({name,options}),{data:{checkoutUrl:'https://sandbox.asaas.com/checkoutSession/show/synthetic',status:'pending_confirmation'},error:null})});
+ const result=await server.createCompleteCheckout({paymentMethod:'CREDIT_CARD'});equal(result.status,'pending_confirmation');equal(calls[0].name,'asaas-checkout');equal(calls[0].options.body.offerId,'COMPLETE');
 });
 await test('admin browser contract validates and delegates only to server adapter',async()=>{
  const request=admin.validateGrantRequest({targetUserId:'a0000000-0000-4000-8000-000000000001',products:['app','knowledge'],accessType:'lifetime',reason:'Owner bootstrap'});
@@ -35,7 +37,7 @@ await test('admin browser contract validates and delegates only to server adapte
  await controller.findUser(request.targetUserId);await controller.listGrants(request.targetUserId);await controller.grantAccess(request);await controller.revokeAccess('grant-id','Support complete');equal(calls.join(','),'find,list,grant,revoke');
 });
 await test('Asaas event classifier separates partial refunds and lifecycle',()=>{
- equal(webhook.classifyAsaasEvent('PAYMENT_CONFIRMED'),'confirmed');equal(webhook.classifyAsaasEvent('PAYMENT_OVERDUE'),'past_due');equal(webhook.classifyAsaasEvent('PAYMENT_PARTIALLY_REFUNDED'),'administrative_review');equal(webhook.classifyAsaasEvent('PAYMENT_REFUNDED'),'refunded');equal(webhook.classifyAsaasEvent('PAYMENT_CHARGEBACK_REQUESTED'),'chargeback');equal(webhook.classifyAsaasEvent('SUBSCRIPTION_DELETED'),'cancelled');
+ equal(webhook.classifyAsaasEvent('PAYMENT_CONFIRMED'),'grant_activate');equal(webhook.classifyAsaasEvent('PAYMENT_OVERDUE'),'grant_grace');equal(webhook.classifyAsaasEvent('PAYMENT_PARTIALLY_REFUNDED'),'administrative_review');equal(webhook.classifyAsaasEvent('PAYMENT_REFUNDED'),'grant_revoke');equal(webhook.classifyAsaasEvent('PAYMENT_CHARGEBACK_REQUESTED'),'grant_revoke');equal(webhook.classifyAsaasEvent('SUBSCRIPTION_DELETED'),'informational');
 });
 await test('webhook authenticates, hashes and stores only safe metadata',async()=>{
  const token='sandbox-webhook-token-strong-000000000000';let recorded;

@@ -1,1 +1,4 @@
 dist-beta/
+.env
+.env.*
+supabase/functions/.env

@@ -32,7 +32,8 @@ insert into auth.users(id,email,email_confirmed_at) values
  ('c0000000-0000-4000-8000-000000000003','c@example.invalid',now()),
  ('d0000000-0000-4000-8000-000000000004','admin@example.invalid',now()),
  ('e0000000-0000-4000-8000-000000000005','complete@example.invalid',now()),
- ('f0000000-0000-4000-8000-000000000006','out-of-order@example.invalid',now());
+ ('f0000000-0000-4000-8000-000000000006','out-of-order@example.invalid',now()),
+ ('70000000-0000-4000-8000-000000000007','reference@example.invalid',now());
 
 set local role authenticated; set local request.jwt.claim.sub='a0000000-0000-4000-8000-000000000001';
 select is((select result from public.start_my_app_trial()),'not_eligible','unconfirmed email is not eligible and is not mutated');
@@ -96,13 +97,18 @@ values ('20000000-0000-4000-8000-000000000001','asaas','sandbox','evt-confirm','
 select is(public.process_payment_event_v1('20000000-0000-4000-8000-000000000001'),'processed','confirmed payment processes');
 select is(public.process_payment_event_v1('20000000-0000-4000-8000-000000000001'),'processed','processed event retry is no-op');
 select is((select count(*) from public.billing_order_grants where order_id='10000000-0000-4000-8000-000000000001'),1::bigint,'event creates one APP grant once');
+insert into public.payment_events(id,provider,environment,external_event_id,event_type,payload_hash,external_purchase_id)
+values ('20000000-0000-4000-8000-000000000016','asaas','sandbox','evt-checkout-reference-only','CHECKOUT_PAID',repeat('7',64),(select external_reference from public.billing_orders where id='10000000-0000-4000-8000-000000000001'));
+select is((select external_payment_id from public.payment_events where id='20000000-0000-4000-8000-000000000016'),null::text,'Asaas opaque order reference is never normalized into a payment ID');
+select is(public.process_payment_event_v1('20000000-0000-4000-8000-000000000016'),'ignored','checkout paid remains informational');
 select is((select state from public.product_trials where user_id='b0000000-0000-4000-8000-000000000002'),'converted','monthly payment converts the server-side trial');
 select is((select status from public.access_grants where user_id='b0000000-0000-4000-8000-000000000002' and access_type='trial'),'expired','conversion retires the trial grant without deleting it');
 set local role authenticated; set local request.jwt.claim.sub='b0000000-0000-4000-8000-000000000002'; select ok(public.has_active_access('APP'),'paid APP grants finance'); reset role;
 update public.billing_orders set paid_through=clock_timestamp()+interval '60 days' where id='10000000-0000-4000-8000-000000000001';
-insert into public.payment_events(id,provider,environment,external_event_id,event_type,payload_hash,external_subscription_id) values ('20000000-0000-4000-8000-000000000008','asaas','sandbox','evt-renewal','PAYMENT_RECEIVED',repeat('8',64),'sub-app');
+insert into public.payment_events(id,provider,environment,external_event_id,event_type,payload_hash,external_payment_id,external_subscription_id,billing_period_anchor) values ('20000000-0000-4000-8000-000000000008','asaas','sandbox','evt-renewal','PAYMENT_RECEIVED',repeat('8',64),'pay-app-renewal','sub-app',current_date+60);
 select is(public.process_payment_event_v1('20000000-0000-4000-8000-000000000008'),'processed','renewal processes idempotently');
-select ok((select g.expires_at>clock_timestamp()+interval '59 days' from public.access_grants g join public.billing_order_grants bog on bog.grant_id=g.id where bog.order_id='10000000-0000-4000-8000-000000000001'),'renewal advances APP paid period');
+select ok((select g.expires_at>clock_timestamp()+interval '89 days' from public.access_grants g join public.billing_order_grants bog on bog.grant_id=g.id where bog.order_id='10000000-0000-4000-8000-000000000001'),'renewal with a new payment ID advances APP paid period');
+select is((select external_payment_id from public.billing_orders where id='10000000-0000-4000-8000-000000000001'),'pay-app','order preserves the initial acquisition payment ID');
 
 insert into public.billing_orders(id,user_id,offer_id,provider,environment,status,external_payment_id,external_subscription_id,paid_through)
 select '10000000-0000-4000-8000-000000000005','a0000000-0000-4000-8000-000000000001',id,'asaas','sandbox','pending','pay-app-annual','sub-app-annual',clock_timestamp()+interval '365 days' from public.commercial_offers where code='APP_ANNUAL';
@@ -132,6 +138,12 @@ set local role authenticated; set local request.jwt.claim.sub='e0000000-0000-400
 insert into public.payment_events(id,provider,environment,external_event_id,event_type,payload_hash,external_payment_id) values ('20000000-0000-4000-8000-000000000005','asaas','sandbox','evt-partial','PAYMENT_PARTIALLY_REFUNDED',repeat('e',64),'pay-complete');
 select is(public.process_payment_event_v1('20000000-0000-4000-8000-000000000005'),'administrative_review','partial refund never auto-revokes');
 select is((select count(*) from public.access_grants g join public.billing_order_grants bog on bog.grant_id=g.id where bog.order_id='10000000-0000-4000-8000-000000000002' and g.status='active'),2::bigint,'partial refund preserves grants for review');
+insert into public.payment_events(id,provider,environment,external_event_id,event_type,payload_hash,external_payment_id,external_subscription_id,billing_period_anchor) values ('20000000-0000-4000-8000-000000000014','asaas','sandbox','evt-complete-renewal','PAYMENT_RECEIVED',repeat('5',64),'pay-complete-renewal','sub-complete',current_date+30);
+select is(public.process_payment_event_v1('20000000-0000-4000-8000-000000000014'),'processed','COMPLETE renewal with a new payment ID processes');
+insert into public.payment_events(id,provider,environment,external_event_id,event_type,payload_hash,external_payment_id,external_subscription_id) values ('20000000-0000-4000-8000-000000000015','asaas','sandbox','evt-complete-renewal-refund','PAYMENT_REFUNDED',repeat('6',64),'pay-complete-renewal','sub-complete');
+select is(public.process_payment_event_v1('20000000-0000-4000-8000-000000000015'),'processed','later COMPLETE renewal refund processes');
+select is((select status from public.access_grants g join public.billing_order_grants bog on bog.grant_id=g.id join public.products p on p.id=g.product_id where bog.order_id='10000000-0000-4000-8000-000000000002' and p.code='APP'),'refunded','later renewal refund revokes APP');
+select is((select status from public.access_grants g join public.billing_order_grants bog on bog.grant_id=g.id join public.products p on p.id=g.product_id where bog.order_id='10000000-0000-4000-8000-000000000002' and p.code='KNOWLEDGE'),'active','later renewal refund preserves lifetime KNOWLEDGE');
 insert into public.payment_events(id,provider,environment,external_event_id,event_type,payload_hash,external_payment_id) values ('20000000-0000-4000-8000-000000000006','asaas','sandbox','evt-refund','PAYMENT_REFUNDED',repeat('f',64),'pay-complete');
 select is(public.process_payment_event_v1('20000000-0000-4000-8000-000000000006'),'processed','full refund processes');
 select is((select count(*) from public.access_grants g join public.billing_order_grants bog on bog.grant_id=g.id where bog.order_id='10000000-0000-4000-8000-000000000002' and g.status='refunded'),2::bigint,'full refund revokes both related grants');
@@ -162,6 +174,22 @@ insert into public.payment_events(id,provider,environment,external_event_id,even
 select is(public.process_payment_event_v1('20000000-0000-4000-8000-000000000012'),'processed','late confirmation creates the canonical grant');
 select is(public.process_payment_event_v1('20000000-0000-4000-8000-000000000011'),'processed','retry reconciles earlier overdue event');
 select is((select count(*) from public.billing_order_grants where order_id='10000000-0000-4000-8000-000000000004'),1::bigint,'out-of-order reconciliation creates no duplicate grant');
+
+insert into public.billing_orders(id,user_id,offer_id,provider,environment,status,external_reference)
+select '10000000-0000-4000-8000-000000000007','70000000-0000-4000-8000-000000000007',id,'asaas','sandbox','pending','mbo_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'
+from public.commercial_offers where code='APP_MONTHLY';
+insert into public.payment_events(id,provider,environment,external_event_id,event_type,payload_hash,external_purchase_id,external_payment_id,external_subscription_id,external_customer_id,billing_period_anchor)
+values('20000000-0000-4000-8000-000000000017','asaas','sandbox','evt-reference-confirm','PAYMENT_CONFIRMED',repeat('7',64),'mbo_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA','pay-reference','sub-reference','cus-reference','2026-08-22');
+select is(public.process_payment_event_v1('20000000-0000-4000-8000-000000000017'),'processed','opaque checkout reference reconciles payment to its order');
+select ok((select external_payment_id='pay-reference' and external_subscription_id='sub-reference' from public.billing_orders where id='10000000-0000-4000-8000-000000000007'),'webhook attaches only technical Asaas identifiers');
+select is((select paid_through from public.billing_orders where id='10000000-0000-4000-8000-000000000007'),'2026-09-22 00:00:00+00'::timestamptz,'monthly paid period derives from server webhook due date');
+select is((select count(*) from public.billing_customers where user_id='70000000-0000-4000-8000-000000000007' and external_customer_id='cus-reference'),1::bigint,'customer mapping is stored by internal user id for reuse');
+select is((select count(*) from public.billing_order_grants where order_id='10000000-0000-4000-8000-000000000007'),1::bigint,'reference reconciliation creates one APP grant');
+select throws_ok($$insert into public.billing_orders(user_id,offer_id,provider,environment,external_reference) select '70000000-0000-4000-8000-000000000007',id,'asaas','sandbox','mbo_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' from public.commercial_offers where code='APP_MONTHLY'$$,'23505',null,'opaque order references cannot be replayed in one environment');
+insert into public.payment_events(id,provider,environment,external_event_id,event_type,payload_hash)
+values('20000000-0000-4000-8000-000000000018','asaas','sandbox','evt-checkout-paid','CHECKOUT_PAID',repeat('8',64));
+select is(public.process_payment_event_v1('20000000-0000-4000-8000-000000000018'),'ignored','checkout callback event never activates a grant');
+select is((select count(*) from public.billing_order_grants where order_id='10000000-0000-4000-8000-000000000007'),1::bigint,'informational checkout event produces zero additional grant');
 
 select is((select count(*) from pg_policies where schemaname='public' and tablename in ('accounts','cards','categories','goals','assets','liabilities','recurring','transactions','monthly_plans') and policyname='mb_commercial_app_access'),9::bigint,'nine financial tables are entitlement gated');
 set local role anon;

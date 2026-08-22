@@ -5,9 +5,9 @@ migration, Auth change, webhook registration, checkout, billing, merge or deploy
 
 Proposed migration: `20260822212119_commercial_access_v1.sql`
 
-SHA-256: `6117a48991d2652c17af94fa55be20315ca43bda015cf68d0d6cd2324eaa00cc` (the former
-`4b9934b7e9431fabe96c219b02221bc794611035afdc675deb4a922eecb1cfad`
-is superseded by the Kiwify reconciliation).
+SHA-256: `7ccfb4e48b13b13cf3b096be4effe26fa442b9c71f2dddc785f751773cafa89d`. The prior
+`6117a48991d2652c17af94fa55be20315ca43bda015cf68d0d6cd2324eaa00cc` is superseded
+by the opaque Asaas order-reference, billing-period and renewal reconciliation.
 
 ## Remote Kiwify legacy reconciliation
 
@@ -145,9 +145,11 @@ Policy implemented locally:
 - chargeback: immediate non-access state for linked grants;
 - capture refusal: no grant.
 
-Offer rows remain inactive and contain no real prices or provider IDs. Checkout
-creation stays mocked through the four named adapter methods requested for APP
-monthly, APP annual, KNOWLEDGE and COMPLETE.
+Offer rows remain inactive and contain no real prices or provider IDs. The frontend
+continues to use its offline mock by default, while a separate authenticated adapter
+and Edge endpoint now implement the four real Sandbox checkout intents. They cannot
+reach Asaas until the isolated environment receives approved secrets, prices, enable
+flags and a deployed endpoint.
 
 ## RLS and threats
 
@@ -170,10 +172,10 @@ accounts under different emails would require a separately approved stable ident
 
 Can be completed without an Asaas account: local migration/RLS tests, UI/paywall,
 admin server contract, event state machine, synthetic reconciliation and threat tests.
-Still required for Sandbox integration: approved Sandbox account, API key in Edge
-secret storage, separate strong webhook token, offer/product IDs and prices, server
-checkout endpoint, webhook URL registration, signature/token validation exercise,
-retry/reconciliation schedule and end-to-end Pix/card tests.
+Still required for Sandbox connection: approved Sandbox account, API key in Edge
+secret storage, separate strong webhook token, synthetic offer prices/enable flags,
+isolated Edge deployment, webhook URL registration, token-validation exercise,
+retry/reconciliation scheduling and end-to-end Pix/card tests.
 
 Remote promotion later requires `preflight_commercial_access_v2.sql`, a backup,
 explicit migration approval, proof/update of the deployed Kiwify writer conflict
@@ -181,3 +183,23 @@ contract, authorization for every legacy owner grant, Sandbox acceptance and a
 separate production rollout plan. The required sequence is: Phase A migration while
 V82 policies remain active; Phase B grants; Phase C verification; Phase D enforcement;
 then deploy the gated frontend. Never activate enforcement and then attempt bootstrap.
+
+## Real Asaas Sandbox preparation
+
+The server-side Sandbox adapter, checkout endpoint, callback page, authenticated event
+mapping and no-network homologation guard are now implemented locally. The adapter is
+fixed to `https://api-sandbox.asaas.com/v3`, uses `access_token` plus the identifying
+`Mentoria Black / Sandbox` User-Agent, and refuses production keys/environments before
+fetch. Four centrally configured intents cover APP monthly, APP annual, KNOWLEDGE
+lifetime and COMPLETE; prices and enable flags remain intentionally unset.
+
+Each checkout uses an opaque, random order reference persisted in `billing_orders`.
+Payment webhook metadata can reconcile that reference before Asaas payment/subscription
+IDs are known. The due date is the only billing-period datum retained from the new raw
+payload; the processor derives the paid-through timestamp from the database offer cycle.
+Customer mapping is keyed by internal Auth identity/provider/environment and retains
+only the external Asaas customer ID, never CPF. `CHECKOUT_PAID` and redirect callbacks
+remain informational and cannot grant access.
+
+Operational configuration and the future isolated deployment/webhook sequence are in
+`ASAAS_SANDBOX_INTEGRATION.md`. None of those remote actions has been executed.

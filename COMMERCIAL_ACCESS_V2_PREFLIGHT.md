@@ -5,8 +5,8 @@ credential, Asaas endpoint, `main`, Beta or visual branch is accessed by this te
 
 Candidate: `20260822212119_commercial_access_v1.sql`
 
-SHA-256: `6117a48991d2652c17af94fa55be20315ca43bda015cf68d0d6cd2324eaa00cc`; the prior
-`4b9934b7e9431fabe96c219b02221bc794611035afdc675deb4a922eecb1cfad` is superseded.
+SHA-256: `7ccfb4e48b13b13cf3b096be4effe26fa442b9c71f2dddc785f751773cafa89d`; the prior
+`6117a48991d2652c17af94fa55be20315ca43bda015cf68d0d6cd2324eaa00cc` is superseded.
 
 ## Clone construction
 
@@ -97,3 +97,12 @@ insert shape is tested, but production promotion must first prove that the write
 not depend on `ON CONFLICT (user_id,product_id)`, or deploy an approved writer update
 before retiring that unique constraint. This remains a production-only gate; it does
 not block an Asaas Sandbox integration.
+
+The Asaas Sandbox preparation adds an opaque order reference and a nullable billing
+period anchor to the still-unapplied candidate migration. Retry also verifies the
+reference/checkout unique indexes and exact `billing_orders`/`payment_events` shapes.
+The realistic Kiwify fixture must continue to preserve all 1/1/2 historical rows, while
+the V82 clone additionally proves an Asaas event can locate a pending order by opaque
+reference, attach technical IDs, derive its paid period, and create no duplicate grant.
+The checksum at the top of this document is updated after this local test cycle; the
+earlier checksum is superseded because the candidate migration changed.

@@ -243,14 +243,20 @@ begin
     end if;
     select array_agg(column_name order by column_name) into v_columns from information_schema.columns
       where table_schema='public' and table_name='payment_events';
-    if v_columns<>array['created_at','environment','error_code','event_id','event_type','external_customer_id','external_event_id','external_payment_id','external_purchase_id','external_subscription_id','id','last_error_at','next_retry_at','payload','payload_hash','processed','processed_at','processing_attempts','provider','received_at','status','user_id']::text[] then
+    if v_columns<>array['billing_period_anchor','created_at','environment','error_code','event_id','event_type','external_checkout_id','external_customer_id','external_event_id','external_payment_id','external_purchase_id','external_subscription_id','id','last_error_at','next_retry_at','payload','payload_hash','processed','processed_at','processing_attempts','provider','received_at','status','user_id']::text[] then
       raise exception 'commercial access v2 drift: payment_events V2 columns differ' using errcode='P0001';
+    end if;
+    select array_agg(column_name order by column_name) into v_columns from information_schema.columns
+      where table_schema='public' and table_name='billing_orders';
+    if v_columns<>array['created_at','environment','external_checkout_id','external_payment_id','external_reference','external_subscription_id','id','offer_id','paid_through','provider','status','updated_at','user_id']::text[] then
+      raise exception 'commercial access v2 drift: billing_orders V2 columns differ' using errcode='P0001';
     end if;
     foreach v_object in array array[
       'access_grants_provider_reference_uidx','access_grants_one_trial_uidx',
       'access_grants_one_active_subscription_uidx','access_grants_user_product_status_idx',
       'payment_events_provider_environment_event_uidx','payment_events_status_received_idx',
-      'payment_events_external_payment_idx'
+      'payment_events_external_payment_idx','billing_orders_external_reference_uidx',
+      'billing_orders_checkout_uidx'
     ] loop
       if to_regclass('public.'||v_object) is null or not exists(
         select 1 from pg_index where indexrelid=to_regclass('public.'||v_object) and indisvalid and indisready
@@ -266,7 +272,11 @@ begin
           and indisunique and pg_get_expr(indpred,indrelid) ilike '%access_type%paid%'
           and pg_get_expr(indpred,indrelid) ilike '%external_subscription_id%is not null%')
        or not exists(select 1 from pg_index where indexrelid='public.payment_events_provider_environment_event_uidx'::regclass
-          and indisunique and indpred is null) then
+          and indisunique and indpred is null)
+       or not exists(select 1 from pg_index where indexrelid='public.billing_orders_external_reference_uidx'::regclass
+          and indisunique and indpred is null)
+       or not exists(select 1 from pg_index where indexrelid='public.billing_orders_checkout_uidx'::regclass
+          and indisunique and pg_get_expr(indpred,indrelid) ilike '%external_checkout_id%is not null%') then
       raise exception 'commercial access v2 drift: V2 unique-index semantics differ' using errcode='P0001';
     end if;
     if to_regprocedure('public.has_active_access(text)') is null
@@ -525,6 +535,7 @@ create table if not exists public.billing_orders (
   provider text not null,
   environment text not null,
   status text not null default 'created',
+  external_reference text not null default ('mbo_'||replace(gen_random_uuid()::text,'-','')),
   external_checkout_id text,
   external_payment_id text,
   external_subscription_id text,
@@ -533,9 +544,15 @@ create table if not exists public.billing_orders (
   updated_at timestamptz not null default now(),
   constraint billing_orders_provider_format check (provider ~ '^[a-z][a-z0-9_-]{1,31}$'),
   constraint billing_orders_environment_check check (environment in ('legacy','sandbox','production')),
+  constraint billing_orders_reference_check check (external_reference ~ '^mbo_[A-Za-z0-9_-]{24,96}$'),
   constraint billing_orders_status_check check (status in ('created', 'pending', 'confirmed', 'received', 'past_due', 'cancelled', 'refunded', 'chargeback', 'failed'))
 );
 
+create unique index if not exists billing_orders_external_reference_uidx
+  on public.billing_orders(provider,environment,external_reference);
+create unique index if not exists billing_orders_checkout_uidx
+  on public.billing_orders(provider,environment,external_checkout_id)
+  where external_checkout_id is not null;
 create unique index if not exists billing_orders_payment_uidx
   on public.billing_orders(provider, environment, external_payment_id)
   where external_payment_id is not null;
@@ -588,6 +605,8 @@ create table if not exists public.payment_events (
   last_error_at timestamptz,
   payload_hash text not null,
   error_code text,
+  billing_period_anchor date,
+  external_checkout_id text,
   external_customer_id text,
   external_purchase_id text,
   external_payment_id text,
@@ -615,6 +634,8 @@ begin
     alter table public.payment_events add column last_error_at timestamptz;
     alter table public.payment_events add column payload_hash text;
     alter table public.payment_events add column error_code text;
+    alter table public.payment_events add column billing_period_anchor date;
+    alter table public.payment_events add column external_checkout_id text;
     alter table public.payment_events add column external_payment_id text;
     alter table public.payment_events add column external_subscription_id text;
     update public.payment_events set environment='legacy',external_event_id=event_id,
@@ -731,7 +752,9 @@ begin
   if new.payload_hash is null and new.payload is not null then
     new.payload_hash:=encode(sha256(convert_to(new.payload::text,'UTF8')),'hex');
   end if;
-  new.external_payment_id:=coalesce(new.external_payment_id,new.external_purchase_id);
+  if new.provider='kiwify' then
+    new.external_payment_id:=coalesce(new.external_payment_id,new.external_purchase_id);
+  end if;
   if new.environment is null or new.external_event_id is null or new.payload_hash is null then
     raise exception 'payment event requires canonical environment, event id and payload hash' using errcode='23502';
   end if;
@@ -1173,16 +1196,38 @@ declare
   v_product record;
   v_grant_id uuid;
   v_state text;
+  v_paid_through timestamptz;
+  v_order_count integer;
+  v_is_initial_payment boolean;
 begin
   select * into v_event from public.payment_events where id=p_event_id for update;
   if not found then raise exception 'payment event not found' using errcode='P0002'; end if;
   if v_event.status in ('processed','ignored','administrative_review') then return v_event.status; end if;
   update public.payment_events set status='processing',processed=false,processing_attempts=processing_attempts+1,error_code=null,next_retry_at=null where id=p_event_id;
 
+  if v_event.event_type in (
+    'CHECKOUT_CREATED','CHECKOUT_CANCELED','CHECKOUT_EXPIRED','CHECKOUT_PAID',
+    'SUBSCRIPTION_CREATED','SUBSCRIPTION_UPDATED','PAYMENT_CREATED',
+    'PAYMENT_REFUND_IN_PROGRESS','PAYMENT_REFUND_DENIED'
+  ) then
+    update public.payment_events set status='ignored',processed=true,processed_at=clock_timestamp(),error_code=null where id=p_event_id;
+    return 'ignored';
+  end if;
+
+  select count(*) into v_order_count from public.billing_orders o
+    where o.provider=v_event.provider and o.environment=v_event.environment
+      and ((v_event.external_payment_id is not null and o.external_payment_id=v_event.external_payment_id)
+        or (v_event.external_subscription_id is not null and o.external_subscription_id=v_event.external_subscription_id)
+        or (v_event.external_purchase_id is not null and o.external_reference=v_event.external_purchase_id));
+  if v_order_count>1 then
+    update public.payment_events set status='administrative_review',processed=true,error_code='ambiguous_order_reference',processed_at=clock_timestamp() where id=p_event_id;
+    return 'administrative_review';
+  end if;
   select * into v_order from public.billing_orders o
     where o.provider=v_event.provider and o.environment=v_event.environment
       and ((v_event.external_payment_id is not null and o.external_payment_id=v_event.external_payment_id)
-        or (v_event.external_subscription_id is not null and o.external_subscription_id=v_event.external_subscription_id))
+        or (v_event.external_subscription_id is not null and o.external_subscription_id=v_event.external_subscription_id)
+        or (v_event.external_purchase_id is not null and o.external_reference=v_event.external_purchase_id))
     order by o.created_at desc limit 1 for update;
   if not found then
     update public.payment_events set status='failed',processed=false,error_code='order_not_found',last_error_at=clock_timestamp(),next_retry_at=clock_timestamp()+interval '15 minutes' where id=p_event_id;
@@ -1190,10 +1235,46 @@ begin
   end if;
   select * into v_offer from public.commercial_offers where id=v_order.offer_id;
 
+  v_is_initial_payment:=v_order.external_payment_id is null
+    or (v_event.external_payment_id is not null and v_order.external_payment_id=v_event.external_payment_id);
+  if (v_order.external_subscription_id is not null and v_event.external_subscription_id is not null and v_order.external_subscription_id<>v_event.external_subscription_id)
+     or (v_order.external_payment_id is not null and v_event.external_payment_id is not null and v_order.external_payment_id<>v_event.external_payment_id
+       and (v_order.external_subscription_id is null or v_event.external_subscription_id is null or v_order.external_subscription_id<>v_event.external_subscription_id)) then
+    update public.payment_events set status='administrative_review',processed=true,error_code='order_external_id_conflict',processed_at=clock_timestamp() where id=p_event_id;
+    return 'administrative_review';
+  end if;
+  update public.billing_orders set
+    external_payment_id=coalesce(external_payment_id,v_event.external_payment_id),
+    external_subscription_id=coalesce(external_subscription_id,v_event.external_subscription_id)
+  where id=v_order.id;
+
+  if v_event.external_customer_id is not null then
+    if exists(select 1 from public.billing_customers c where c.provider=v_event.provider and c.environment=v_event.environment
+      and (c.external_customer_id=v_event.external_customer_id and c.user_id<>v_order.user_id
+        or c.user_id=v_order.user_id and c.external_customer_id<>v_event.external_customer_id)) then
+      update public.payment_events set status='administrative_review',processed=true,error_code='customer_mapping_conflict',processed_at=clock_timestamp() where id=p_event_id;
+      return 'administrative_review';
+    end if;
+    insert into public.billing_customers(user_id,provider,environment,external_customer_id)
+    values(v_order.user_id,v_event.provider,v_event.environment,v_event.external_customer_id)
+    on conflict(user_id,provider,environment) do nothing;
+    if not exists(select 1 from public.billing_customers c where c.user_id=v_order.user_id and c.provider=v_event.provider
+      and c.environment=v_event.environment and c.external_customer_id=v_event.external_customer_id) then
+      update public.payment_events set status='administrative_review',processed=true,error_code='customer_mapping_conflict',processed_at=clock_timestamp() where id=p_event_id;
+      return 'administrative_review';
+    end if;
+  end if;
+
   if v_event.event_type = 'PAYMENT_PARTIALLY_REFUNDED' then
     update public.payment_events set status='administrative_review',processed=true,error_code='partial_refund_requires_review',processed_at=clock_timestamp() where id=p_event_id;
     return 'administrative_review';
   elsif v_event.event_type in ('PAYMENT_CONFIRMED','PAYMENT_RECEIVED') then
+    if v_offer.billing_mode='subscription' and v_event.billing_period_anchor is not null then
+      v_paid_through:=((v_event.billing_period_anchor::timestamp at time zone 'UTC')+
+        case v_offer.billing_interval when 'month' then interval '1 month' when 'year' then interval '1 year' end);
+      update public.billing_orders set paid_through=greatest(coalesce(paid_through,v_paid_through),v_paid_through) where id=v_order.id;
+      v_order.paid_through:=greatest(coalesce(v_order.paid_through,v_paid_through),v_paid_through);
+    end if;
     if v_offer.billing_mode='subscription' and v_order.paid_through is null then
       update public.payment_events set status='failed',processed=false,error_code='paid_period_missing',last_error_at=clock_timestamp(),next_retry_at=clock_timestamp()+interval '15 minutes' where id=p_event_id;
       return 'retryable';
@@ -1251,22 +1332,34 @@ begin
     update public.billing_orders set status='cancelled' where id=v_order.id;
     v_state:='processed';
   elsif v_event.event_type in ('PAYMENT_REFUNDED','PAYMENT_RECEIVED_IN_CASH_UNDONE') then
+    if v_event.external_payment_id is null then
+      update public.payment_events set status='administrative_review',processed=true,error_code='refund_payment_identity_missing',processed_at=clock_timestamp() where id=p_event_id;
+      return 'administrative_review';
+    end if;
     if not exists(select 1 from public.billing_order_grants where order_id=v_order.id) then
       update public.payment_events set status='failed',processed=false,error_code='grant_link_not_found',last_error_at=clock_timestamp(),next_retry_at=clock_timestamp()+interval '15 minutes' where id=p_event_id;
       return 'retryable';
     end if;
     update public.billing_orders set status='refunded' where id=v_order.id;
     update public.access_grants g set status='refunded',revoked_at=clock_timestamp()
-    from public.billing_order_grants bog where bog.order_id=v_order.id and bog.grant_id=g.id;
+    from public.billing_order_grants bog, public.products p
+    where bog.order_id=v_order.id and bog.grant_id=g.id and p.id=bog.product_id
+      and (v_is_initial_payment or p.code='APP');
     v_state:='processed';
   elsif v_event.event_type in ('PAYMENT_CHARGEBACK_REQUESTED','PAYMENT_CHARGEBACK_DISPUTE','PAYMENT_AWAITING_CHARGEBACK_REVERSAL') then
+    if v_event.external_payment_id is null then
+      update public.payment_events set status='administrative_review',processed=true,error_code='chargeback_payment_identity_missing',processed_at=clock_timestamp() where id=p_event_id;
+      return 'administrative_review';
+    end if;
     if not exists(select 1 from public.billing_order_grants where order_id=v_order.id) then
       update public.payment_events set status='failed',processed=false,error_code='grant_link_not_found',last_error_at=clock_timestamp(),next_retry_at=clock_timestamp()+interval '15 minutes' where id=p_event_id;
       return 'retryable';
     end if;
     update public.billing_orders set status='chargeback' where id=v_order.id;
     update public.access_grants g set status='chargeback',revoked_at=clock_timestamp()
-    from public.billing_order_grants bog where bog.order_id=v_order.id and bog.grant_id=g.id;
+    from public.billing_order_grants bog, public.products p
+    where bog.order_id=v_order.id and bog.grant_id=g.id and p.id=bog.product_id
+      and (v_is_initial_payment or p.code='APP');
     v_state:='processed';
   elsif v_event.event_type='PAYMENT_CREDIT_CARD_CAPTURE_REFUSED' then
     update public.billing_orders set status='failed' where id=v_order.id;

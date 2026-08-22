@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="pt-BR">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Mentoria Black — Pagamento</title></head>
+<body style="margin:0;background:#050505;color:#f4f4f4;font:16px system-ui;display:grid;min-height:100vh;place-items:center">
+  <main style="max-width:36rem;padding:2rem;text-align:center;border:1px solid #8f741f;border-radius:1rem;background:#0d0d0d">
+    <h1 id="title" style="color:#c9a227">Status do pagamento</h1>
+    <p id="message">Consulte seu acesso na Mentoria Black. Nenhuma permissão é alterada por esta página.</p>
+    <a href="../" style="color:#e4c55b">Voltar à Mentoria Black</a>
+  </main>
+  <script>
+  (()=>{const state=new URLSearchParams(location.search).get('state');const title=document.getElementById('title'),message=document.getElementById('message');
+    if(state==='success'){title.textContent='Processando pagamento';message.textContent='Pagamento recebido para processamento. Seu acesso será liberado após confirmação.'}
+    if(state==='cancel'){title.textContent='Pagamento cancelado';message.textContent='Nenhum acesso foi alterado. Você pode tentar novamente quando quiser.'}
+    if(state==='expired'){title.textContent='Checkout expirado';message.textContent='Nenhum acesso foi alterado. Inicie uma nova tentativa de contratação.'}
+  })();
+  </script>
+</body>
+</html>
