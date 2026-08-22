@@ -9,51 +9,327 @@ select pg_advisory_xact_lock(hashtextextended('mentoria-black:commercial-access-
 do $preflight$
 declare
   v_object text;
+  v_state text;
+  v_columns text[];
+  v_policy record;
 begin
   if to_regprocedure('auth.uid()') is null or to_regclass('auth.users') is null then
-    raise exception 'commercial access v1 requires Supabase Auth' using errcode = 'P0001';
+    raise exception 'commercial access v2 requires Supabase Auth' using errcode='P0001';
   end if;
 
-  foreach v_object in array array[
-    'products', 'product_components', 'commercial_offers', 'product_trials',
-    'access_grants', 'commercial_admin_audit', 'commercial_enforcement_state', 'billing_customers', 'billing_orders',
-    'billing_order_grants', 'billing_subscriptions', 'payment_events'
-  ] loop
-    if to_regclass('public.' || v_object) is not null then
-      raise exception
-        'commercial access v1 found existing public.%: reconcile it explicitly before applying this proposal',
-        v_object using errcode = 'P0001';
+  if to_regclass('public.products') is null
+     and to_regclass('public.access_grants') is null
+     and to_regclass('public.payment_events') is null then
+    foreach v_object in array array[
+      'product_components','commercial_offers','product_trials','commercial_admin_audit',
+      'commercial_enforcement_state','billing_customers','billing_orders',
+      'billing_order_grants','billing_subscriptions'
+    ] loop
+      if to_regclass('public.'||v_object) is not null then
+        raise exception 'commercial access v2 partial schema: unexpected public.%',v_object using errcode='P0001';
+      end if;
+    end loop;
+    if to_regprocedure('public.has_active_access(text)') is not null
+       or to_regprocedure('public.get_my_entitlements()') is not null
+       or to_regprocedure('public.start_my_app_trial()') is not null
+       or to_regprocedure('public.set_kiwify_webhook_token(text)') is not null then
+      raise exception 'commercial access v2 partial schema: access RPC exists without commercial tables' using errcode='P0001';
     end if;
-  end loop;
+    v_state:='absent';
+  elsif to_regclass('public.products') is not null
+        and to_regclass('public.access_grants') is not null
+        and to_regclass('public.payment_events') is not null
+        and exists(select 1 from information_schema.columns where table_schema='public' and table_name='products' and column_name='slug')
+        and not exists(select 1 from information_schema.columns where table_schema='public' and table_name='products' and column_name='code')
+        and exists(select 1 from information_schema.columns where table_schema='public' and table_name='access_grants' and column_name='source')
+        and not exists(select 1 from information_schema.columns where table_schema='public' and table_name='access_grants' and column_name='access_type')
+        and exists(select 1 from information_schema.columns where table_schema='public' and table_name='payment_events' and column_name='event_id')
+        and not exists(select 1 from information_schema.columns where table_schema='public' and table_name='payment_events' and column_name='external_event_id') then
+    v_state:='kiwify_legacy';
 
-  if to_regprocedure('public.has_active_access(text)') is not null
-     or to_regprocedure('public.get_my_entitlements()') is not null
-     or to_regprocedure('public.start_my_app_trial()') is not null
-     or to_regprocedure('public.admin_grant_commercial_access_v1(uuid,text[],text,timestamptz,uuid,text)') is not null
-     or to_regprocedure('public.admin_get_commercial_access_v1(uuid)') is not null
-     or to_regprocedure('public.activate_commercial_enforcement_v1(uuid,text)') is not null
-     or to_regprocedure('public.rollback_commercial_enforcement_v1(uuid,text)') is not null
-     or to_regprocedure('public.process_payment_event_v1(uuid)') is not null then
-    raise exception 'commercial access v1 found an existing access RPC; semantic reconciliation is required'
-      using errcode = 'P0001';
+    foreach v_object in array array[
+      'product_components','commercial_offers','product_trials','commercial_admin_audit',
+      'commercial_enforcement_state','billing_customers','billing_orders',
+      'billing_order_grants','billing_subscriptions'
+    ] loop
+      if to_regclass('public.'||v_object) is not null then
+        raise exception 'commercial access v2 Kiwify drift: unexpected public.%',v_object using errcode='P0001';
+      end if;
+    end loop;
+
+    select array_agg(column_name order by column_name) into v_columns from information_schema.columns
+      where table_schema='public' and table_name='products';
+    if v_columns<>array['active','created_at','description','id','name','slug','updated_at']::text[] then
+      raise exception 'commercial access v2 Kiwify drift: public.products columns differ' using errcode='P0001';
+    end if;
+    select array_agg(column_name order by column_name) into v_columns from information_schema.columns
+      where table_schema='public' and table_name='access_grants';
+    if v_columns<>array['created_at','expires_at','external_customer_id','external_purchase_id','id','product_id','revoked_at','source','started_at','status','updated_at','user_id']::text[] then
+      raise exception 'commercial access v2 Kiwify drift: public.access_grants columns differ' using errcode='P0001';
+    end if;
+    select array_agg(column_name order by column_name) into v_columns from information_schema.columns
+      where table_schema='public' and table_name='payment_events';
+    if v_columns<>array['created_at','event_id','event_type','external_customer_id','external_purchase_id','id','payload','processed','processed_at','provider','user_id']::text[] then
+      raise exception 'commercial access v2 Kiwify drift: public.payment_events columns differ' using errcode='P0001';
+    end if;
+    if not exists(select 1 from information_schema.columns where table_schema='public' and table_name='products' and column_name='id' and data_type='uuid' and is_nullable='NO')
+       or not exists(select 1 from information_schema.columns where table_schema='public' and table_name='products' and column_name='slug' and data_type='text' and is_nullable='NO')
+       or not exists(select 1 from information_schema.columns where table_schema='public' and table_name='products' and column_name='active' and data_type='boolean' and is_nullable='NO' and regexp_replace(lower(column_default),'[[:space:]()]','','g')='true')
+       or not exists(select 1 from information_schema.columns where table_schema='public' and table_name='access_grants' and column_name='user_id' and data_type='uuid' and is_nullable='NO')
+       or not exists(select 1 from information_schema.columns where table_schema='public' and table_name='access_grants' and column_name='product_id' and data_type='uuid' and is_nullable='NO')
+       or not exists(select 1 from information_schema.columns where table_schema='public' and table_name='access_grants' and column_name='status' and data_type='text' and is_nullable='NO' and regexp_replace(lower(column_default),'[[:space:]()]','','g')='''active''::text')
+       or not exists(select 1 from information_schema.columns where table_schema='public' and table_name='access_grants' and column_name='source' and data_type='text' and is_nullable='NO' and regexp_replace(lower(column_default),'[[:space:]()]','','g')='''manual''::text')
+       or not exists(select 1 from information_schema.columns where table_schema='public' and table_name='access_grants' and column_name='started_at' and data_type='timestamp with time zone' and is_nullable='NO')
+       or not exists(select 1 from information_schema.columns where table_schema='public' and table_name='payment_events' and column_name='provider' and data_type='text' and is_nullable='NO' and regexp_replace(lower(column_default),'[[:space:]()]','','g')='''kiwify''::text')
+       or not exists(select 1 from information_schema.columns where table_schema='public' and table_name='payment_events' and column_name='payload' and data_type='jsonb' and is_nullable='NO')
+       or not exists(select 1 from information_schema.columns where table_schema='public' and table_name='payment_events' and column_name='processed' and data_type='boolean' and is_nullable='NO' and regexp_replace(lower(column_default),'[[:space:]()]','','g')='false') then
+      raise exception 'commercial access v2 Kiwify drift: legacy types/defaults/nullability differ' using errcode='P0001';
+    end if;
+
+    if exists(
+      select 1
+      from (values
+        ('products','name','text','NO'),('products','description','text','YES'),
+        ('products','created_at','timestamp with time zone','YES'),('products','updated_at','timestamp with time zone','YES'),
+        ('access_grants','id','uuid','NO'),('access_grants','expires_at','timestamp with time zone','YES'),
+        ('access_grants','external_customer_id','text','YES'),('access_grants','external_purchase_id','text','YES'),
+        ('access_grants','revoked_at','timestamp with time zone','YES'),('access_grants','created_at','timestamp with time zone','YES'),
+        ('access_grants','updated_at','timestamp with time zone','YES'),
+        ('payment_events','id','uuid','NO'),('payment_events','event_id','text','NO'),
+        ('payment_events','event_type','text','NO'),('payment_events','user_id','uuid','YES'),
+        ('payment_events','external_customer_id','text','YES'),('payment_events','external_purchase_id','text','YES'),
+        ('payment_events','processed_at','timestamp with time zone','YES'),('payment_events','created_at','timestamp with time zone','YES')
+      ) as expected(table_name,column_name,data_type,is_nullable)
+      left join information_schema.columns actual
+        on actual.table_schema='public' and actual.table_name=expected.table_name and actual.column_name=expected.column_name
+      where actual.column_name is null or actual.data_type<>expected.data_type or actual.is_nullable<>expected.is_nullable
+    ) then
+      raise exception 'commercial access v2 Kiwify drift: secondary legacy types/nullability differ' using errcode='P0001';
+    end if;
+
+    if (select count(*) from public.products)<>1
+       or (select count(*) from public.products where slug='mentoria-black')<>1
+       or (select count(*) from public.access_grants)<>1
+       or (select count(*) from public.payment_events)<>2
+       or exists(select 1 from public.access_grants where source not in ('manual','kiwify'))
+       or exists(select 1 from public.access_grants where status not in ('active','suspended','revoked','expired'))
+       or exists(select 1 from public.payment_events where provider<>'kiwify') then
+      raise exception 'commercial access v2 Kiwify drift: expected 1 mapped product, 1 grant and 2 Kiwify events' using errcode='P0001';
+    end if;
+    if not exists(
+      select 1 from pg_constraint c where c.conrelid='public.products'::regclass and c.contype='p'
+      and (select array_agg(a.attname order by key.ordinality) from unnest(c.conkey) with ordinality key(attnum,ordinality)
+           join pg_attribute a on a.attrelid=c.conrelid and a.attnum=key.attnum)=array['id']::name[]
+    ) or not exists(
+      select 1 from pg_constraint c where c.conrelid='public.products'::regclass and c.contype='u'
+      and (select array_agg(a.attname order by key.ordinality) from unnest(c.conkey) with ordinality key(attnum,ordinality)
+           join pg_attribute a on a.attrelid=c.conrelid and a.attnum=key.attnum)=array['slug']::name[]
+    ) or not exists(
+      select 1 from pg_constraint c where c.conrelid='public.access_grants'::regclass and c.contype='p'
+      and (select array_agg(a.attname order by key.ordinality) from unnest(c.conkey) with ordinality key(attnum,ordinality)
+           join pg_attribute a on a.attrelid=c.conrelid and a.attnum=key.attnum)=array['id']::name[]
+    ) or not exists(
+      select 1 from pg_constraint c where c.conrelid='public.access_grants'::regclass and c.contype='u'
+      and (select array_agg(a.attname order by key.ordinality) from unnest(c.conkey) with ordinality key(attnum,ordinality)
+           join pg_attribute a on a.attrelid=c.conrelid and a.attnum=key.attnum)=array['user_id','product_id']::name[]
+    ) or not exists(
+      select 1 from pg_constraint c where c.conrelid='public.payment_events'::regclass and c.contype='p'
+      and (select array_agg(a.attname order by key.ordinality) from unnest(c.conkey) with ordinality key(attnum,ordinality)
+           join pg_attribute a on a.attrelid=c.conrelid and a.attnum=key.attnum)=array['id']::name[]
+    ) or not exists(
+      select 1 from pg_constraint c where c.conrelid='public.payment_events'::regclass and c.contype='u'
+      and (select array_agg(a.attname order by key.ordinality) from unnest(c.conkey) with ordinality key(attnum,ordinality)
+           join pg_attribute a on a.attrelid=c.conrelid and a.attnum=key.attnum)=array['provider','event_id']::name[]
+    ) then
+      raise exception 'commercial access v2 Kiwify drift: legacy unique contracts differ' using errcode='P0001';
+    end if;
+    if not exists(select 1 from pg_constraint c where c.conrelid='public.access_grants'::regclass and c.contype='c' and c.convalidated
+          and regexp_replace(lower(pg_get_constraintdef(c.oid)),'[[:space:]()]','','g')='checksource=anyarray[''manual''::text,''kiwify''::text]')
+       or not exists(select 1 from pg_constraint c where c.conrelid='public.access_grants'::regclass and c.contype='c' and c.convalidated
+          and regexp_replace(lower(pg_get_constraintdef(c.oid)),'[[:space:]()]','','g')='checkstatus=anyarray[''active''::text,''suspended''::text,''revoked''::text,''expired''::text]')
+       or not exists(select 1 from pg_constraint c where c.conrelid='public.payment_events'::regclass and c.contype='c' and c.convalidated
+          and regexp_replace(lower(pg_get_constraintdef(c.oid)),'[[:space:]()]','','g')='checkprovider=''kiwify''::text') then
+      raise exception 'commercial access v2 Kiwify drift: legacy CHECK constraints differ' using errcode='P0001';
+    end if;
+    if (select count(*) from pg_constraint where conrelid='public.products'::regclass)<>2
+       or (select count(*) from pg_constraint where conrelid='public.access_grants'::regclass)<>6
+       or (select count(*) from pg_constraint where conrelid='public.payment_events'::regclass)<>3 then
+      raise exception 'commercial access v2 Kiwify drift: unexpected legacy constraint' using errcode='P0001';
+    end if;
+    if not exists(
+      select 1 from pg_constraint c where c.conrelid='public.access_grants'::regclass and c.contype='f' and c.confrelid='auth.users'::regclass
+      and (select array_agg(a.attname order by key.ordinality) from unnest(c.conkey) with ordinality key(attnum,ordinality)
+           join pg_attribute a on a.attrelid=c.conrelid and a.attnum=key.attnum)=array['user_id']::name[]
+      and (select array_agg(a.attname order by key.ordinality) from unnest(c.confkey) with ordinality key(attnum,ordinality)
+           join pg_attribute a on a.attrelid=c.confrelid and a.attnum=key.attnum)=array['id']::name[]
+    ) or not exists(
+      select 1 from pg_constraint c where c.conrelid='public.access_grants'::regclass and c.contype='f' and c.confrelid='public.products'::regclass
+      and (select array_agg(a.attname order by key.ordinality) from unnest(c.conkey) with ordinality key(attnum,ordinality)
+           join pg_attribute a on a.attrelid=c.conrelid and a.attnum=key.attnum)=array['product_id']::name[]
+      and (select array_agg(a.attname order by key.ordinality) from unnest(c.confkey) with ordinality key(attnum,ordinality)
+           join pg_attribute a on a.attrelid=c.confrelid and a.attnum=key.attnum)=array['id']::name[]
+    ) then
+      raise exception 'commercial access v2 Kiwify drift: access_grants ownership FKs differ' using errcode='P0001';
+    end if;
+    if exists(
+      select 1 from pg_constraint c
+      join pg_index i on i.indexrelid=c.conindid
+      where c.conrelid in('public.products'::regclass,'public.access_grants'::regclass,'public.payment_events'::regclass)
+        and c.contype in('p','u') and (not i.indisvalid or not i.indisready)
+    ) then
+      raise exception 'commercial access v2 Kiwify drift: legacy constraint index invalid' using errcode='P0001';
+    end if;
+    if not (select relrowsecurity from pg_class where oid='public.products'::regclass)
+       or not (select relrowsecurity from pg_class where oid='public.access_grants'::regclass)
+       or not (select relrowsecurity from pg_class where oid='public.payment_events'::regclass) then
+      raise exception 'commercial access v2 Kiwify drift: RLS must be enabled' using errcode='P0001';
+    end if;
+    if (select count(*) from pg_policies where schemaname='public' and tablename in('products','access_grants','payment_events'))<>3 then
+      raise exception 'commercial access v2 Kiwify drift: unexpected or duplicate legacy policy' using errcode='P0001';
+    end if;
+    select * into v_policy from pg_policies where schemaname='public' and tablename='products' and policyname='products_select_active';
+    if not found or v_policy.cmd<>'SELECT' or v_policy.roles<>array['authenticated']::name[]
+       or regexp_replace(lower(coalesce(v_policy.qual,'')),'[[:space:]()]','','g') not in ('active=true','active') then
+      raise exception 'commercial access v2 Kiwify drift: products policy differs' using errcode='P0001';
+    end if;
+    select * into v_policy from pg_policies where schemaname='public' and tablename='access_grants' and policyname='access_grants_select_own';
+    if not found or v_policy.cmd<>'SELECT' or v_policy.roles<>array['authenticated']::name[]
+       or regexp_replace(lower(coalesce(v_policy.qual,'')),'[[:space:]()]','','g') not in ('user_id=auth.uid','auth.uid=user_id','user_id=selectauth.uid','selectauth.uid=user_id') then
+      raise exception 'commercial access v2 Kiwify drift: access_grants policy differs' using errcode='P0001';
+    end if;
+    select * into v_policy from pg_policies where schemaname='public' and tablename='payment_events' and policyname='payment_events_no_client_access';
+    if not found or v_policy.cmd<>'ALL' or not (v_policy.roles @> array['anon','authenticated']::name[])
+       or regexp_replace(lower(coalesce(v_policy.qual,'')),'[[:space:]()]','','g')<>'false'
+       or regexp_replace(lower(coalesce(v_policy.with_check,'')),'[[:space:]()]','','g')<>'false' then
+      raise exception 'commercial access v2 Kiwify drift: payment_events policy differs' using errcode='P0001';
+    end if;
+    if not exists(select 1 from pg_proc where oid=to_regprocedure('public.has_active_access(text)')
+      and not prosecdef and provolatile='s' and pronargdefaults=1 and prorettype='boolean'::regtype
+      and prosrc ilike '%access_grants%' and prosrc ilike '%products%' and prosrc ilike '%auth.uid%')
+       or not exists(select 1 from pg_proc where oid=to_regprocedure('public.set_kiwify_webhook_token(text)')
+      and prosecdef and prorettype='void'::regtype
+      and exists(select 1 from unnest(coalesce(proconfig,array[]::text[])) as configs(setting)
+                 where lower(setting) like 'search_path=public,%vault%')) then
+      raise exception 'commercial access v2 Kiwify drift: legacy functions differ' using errcode='P0001';
+    end if;
+  elsif to_regclass('public.commercial_enforcement_state') is not null
+        and exists(select 1 from information_schema.columns where table_schema='public' and table_name='commercial_enforcement_state' and column_name='schema_version')
+        and exists(select 1 from information_schema.columns where table_schema='public' and table_name='products' and column_name='code')
+        and exists(select 1 from information_schema.columns where table_schema='public' and table_name='access_grants' and column_name='access_type')
+        and exists(select 1 from information_schema.columns where table_schema='public' and table_name='access_grants' and column_name='source')
+        and exists(select 1 from information_schema.columns where table_schema='public' and table_name='payment_events' and column_name='external_event_id') then
+    v_state:='commercial_v2';
+    if not exists(select 1 from public.commercial_enforcement_state where singleton and schema_version='commercial_access_v2_kiwify_reconciled') then
+      raise exception 'commercial access v2 drift: schema version marker differs' using errcode='P0001';
+    end if;
+    foreach v_object in array array[
+      'products','product_components','commercial_offers','product_trials','access_grants',
+      'commercial_admin_audit','commercial_enforcement_state','billing_customers',
+      'billing_orders','billing_order_grants','billing_subscriptions','payment_events'
+    ] loop
+      if to_regclass('public.'||v_object) is null then
+        raise exception 'commercial access v2 drift: missing public.%',v_object using errcode='P0001';
+      end if;
+    end loop;
+    select array_agg(column_name order by column_name) into v_columns from information_schema.columns
+      where table_schema='public' and table_name='products';
+    if v_columns<>array['active','code','created_at','description','id','name','product_kind','public_sample_available','slug','updated_at']::text[] then
+      raise exception 'commercial access v2 drift: products V2 columns differ' using errcode='P0001';
+    end if;
+    select array_agg(column_name order by column_name) into v_columns from information_schema.columns
+      where table_schema='public' and table_name='access_grants';
+    if v_columns<>array['access_type','administrative_reason','created_at','environment','expires_at','external_customer_id','external_purchase_id','external_reference','external_subscription_id','grace_until','granted_by','id','product_id','revoked_at','revoked_by','source','started_at','status','updated_at','user_id']::text[] then
+      raise exception 'commercial access v2 drift: access_grants V2 columns differ' using errcode='P0001';
+    end if;
+    select array_agg(column_name order by column_name) into v_columns from information_schema.columns
+      where table_schema='public' and table_name='payment_events';
+    if v_columns<>array['created_at','environment','error_code','event_id','event_type','external_customer_id','external_event_id','external_payment_id','external_purchase_id','external_subscription_id','id','last_error_at','next_retry_at','payload','payload_hash','processed','processed_at','processing_attempts','provider','received_at','status','user_id']::text[] then
+      raise exception 'commercial access v2 drift: payment_events V2 columns differ' using errcode='P0001';
+    end if;
+    foreach v_object in array array[
+      'access_grants_provider_reference_uidx','access_grants_one_trial_uidx',
+      'access_grants_one_active_subscription_uidx','access_grants_user_product_status_idx',
+      'payment_events_provider_environment_event_uidx','payment_events_status_received_idx',
+      'payment_events_external_payment_idx'
+    ] loop
+      if to_regclass('public.'||v_object) is null or not exists(
+        select 1 from pg_index where indexrelid=to_regclass('public.'||v_object) and indisvalid and indisready
+      ) then
+        raise exception 'commercial access v2 drift: missing or invalid index %',v_object using errcode='P0001';
+      end if;
+    end loop;
+    if not exists(select 1 from pg_index where indexrelid='public.access_grants_provider_reference_uidx'::regclass
+          and indisunique and pg_get_expr(indpred,indrelid) ilike '%external_reference%is not null%')
+       or not exists(select 1 from pg_index where indexrelid='public.access_grants_one_trial_uidx'::regclass
+          and indisunique and pg_get_expr(indpred,indrelid) ilike '%access_type%trial%')
+       or not exists(select 1 from pg_index where indexrelid='public.access_grants_one_active_subscription_uidx'::regclass
+          and indisunique and pg_get_expr(indpred,indrelid) ilike '%access_type%paid%'
+          and pg_get_expr(indpred,indrelid) ilike '%external_subscription_id%is not null%')
+       or not exists(select 1 from pg_index where indexrelid='public.payment_events_provider_environment_event_uidx'::regclass
+          and indisunique and indpred is null) then
+      raise exception 'commercial access v2 drift: V2 unique-index semantics differ' using errcode='P0001';
+    end if;
+    if to_regprocedure('public.has_active_access(text)') is null
+       or to_regprocedure('public.get_my_entitlements()') is null
+       or to_regprocedure('public.start_my_app_trial()') is null
+       or to_regprocedure('public.process_payment_event_v1(uuid)') is null
+       or to_regprocedure('public.activate_commercial_enforcement_v1(uuid,text)') is null
+       or not exists(select 1 from pg_proc where oid=to_regprocedure('public.has_active_access(text)') and not prosecdef and provolatile='s' and prosrc ilike '%p.slug%')
+       or not exists(select 1 from pg_proc where oid=to_regprocedure('public.process_payment_event_v1(uuid)') and prosecdef and prosrc ilike '%billing_order_grants%')
+       or (select enforced from public.commercial_enforcement_state where singleton)
+       or (select count(*) from pg_policies where schemaname='public' and policyname='mb_v82_own_rows')<>9
+       or (select count(*) from pg_policies where schemaname='public' and tablename in('accounts','cards','categories','goals','assets','liabilities','recurring','transactions','monthly_plans'))<>9
+       or (select count(*) from pg_policies where schemaname='public' and policyname in(
+            'mb_products_authenticated_read','mb_product_components_authenticated_read','mb_commercial_offers_authenticated_read',
+            'mb_product_trials_own_read','mb_access_grants_own_read','mb_payment_events_no_client_access'))<>6
+       or (select count(*) from pg_policies where schemaname='public' and tablename in(
+            'products','product_components','commercial_offers','product_trials','access_grants','commercial_admin_audit',
+            'commercial_enforcement_state','billing_customers','billing_orders','billing_order_grants','billing_subscriptions','payment_events'))<>6
+       or (to_regprocedure('public.set_kiwify_webhook_token(text)') is not null and not exists(
+            select 1 from pg_proc where oid=to_regprocedure('public.set_kiwify_webhook_token(text)') and prosecdef
+          )) then
+      raise exception 'commercial access v2 drift: existing V2 contract is not semantically retryable' using errcode='P0001';
+    end if;
+  else
+    raise exception 'commercial access v2 NO-GO: unknown or partial commercial schema' using errcode='P0001';
   end if;
+
+  perform set_config('mb.commercial_prestate',v_state,true);
 end
 $preflight$;
 
-create table public.products (
+create table if not exists public.products (
   id uuid primary key default gen_random_uuid(),
-  code text not null unique,
   name text not null,
-  product_kind text not null,
+  slug text not null unique,
+  description text,
   active boolean not null default true,
-  public_sample_available boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  constraint products_code_format check (code = upper(code) and code ~ '^[A-Z][A-Z0-9_]{1,63}$'),
-  constraint products_kind_check check (product_kind in ('entitlement', 'bundle'))
+  code text not null unique,
+  product_kind text not null,
+  public_sample_available boolean not null default false,
+  constraint products_code_format check (code=upper(code) and code~'^[A-Z][A-Z0-9_]{1,63}$'),
+  constraint products_kind_check check (product_kind in ('entitlement','bundle'))
 );
 
-create table public.product_components (
+do $reconcile_products$
+begin
+  if current_setting('mb.commercial_prestate')='kiwify_legacy' then
+    alter table public.products add column code text;
+    alter table public.products add column product_kind text;
+    alter table public.products add column public_sample_available boolean not null default false;
+    update public.products set code='APP',product_kind='entitlement' where slug='mentoria-black';
+    alter table public.products alter column code set not null;
+    alter table public.products alter column product_kind set not null;
+    alter table public.products add constraint products_code_key unique(code);
+    alter table public.products add constraint products_code_format check(code=upper(code) and code~'^[A-Z][A-Z0-9_]{1,63}$');
+    alter table public.products add constraint products_kind_check check(product_kind in('entitlement','bundle'));
+  end if;
+end
+$reconcile_products$;
+
+create table if not exists public.product_components (
   bundle_product_id uuid not null references public.products(id) on delete restrict,
   component_product_id uuid not null references public.products(id) on delete restrict,
   created_at timestamptz not null default now(),
@@ -61,7 +337,7 @@ create table public.product_components (
   constraint product_components_not_self check (bundle_product_id <> component_product_id)
 );
 
-create table public.commercial_offers (
+create table if not exists public.commercial_offers (
   id uuid primary key default gen_random_uuid(),
   code text not null unique,
   product_id uuid not null references public.products(id) on delete restrict,
@@ -89,7 +365,7 @@ create table public.commercial_offers (
   )
 );
 
-create table public.product_trials (
+create table if not exists public.product_trials (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   product_id uuid not null references public.products(id) on delete restrict,
@@ -111,17 +387,21 @@ create table public.product_trials (
   constraint product_trials_revocation_check check (revoked_at is null or revoked_at >= started_at)
 );
 
-create table public.access_grants (
+create table if not exists public.access_grants (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   product_id uuid not null references public.products(id) on delete restrict,
   access_type text not null,
-  source_provider text not null,
+  source text not null default 'manual',
+  environment text,
   status text not null default 'active',
-  starts_at timestamptz not null default now(),
+  started_at timestamptz not null default now(),
   expires_at timestamptz,
   grace_until timestamptz,
   external_reference text,
+  external_customer_id text,
+  external_purchase_id text,
+  external_subscription_id text,
   granted_by uuid references auth.users(id) on delete set null,
   administrative_reason text,
   revoked_at timestamptz,
@@ -129,29 +409,71 @@ create table public.access_grants (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint access_grants_type_check check (access_type in ('paid', 'trial', 'manual', 'lifetime')),
-  constraint access_grants_status_check check (status in ('active', 'grace_period', 'past_due', 'expired', 'revoked', 'refunded', 'chargeback', 'administrative_review')),
-  constraint access_grants_provider_format check (source_provider ~ '^[a-z][a-z0-9_-]{1,31}$'),
-  constraint access_grants_interval_check check (expires_at is null or expires_at > starts_at),
-  constraint access_grants_grace_check check (grace_until is null or grace_until >= starts_at),
+  constraint access_grants_status_check check (status in ('active','grace_period','past_due','suspended','expired','revoked','refunded','chargeback','administrative_review')),
+  constraint access_grants_source_format check (source~'^[a-z][a-z0-9_-]{1,31}$'),
+  constraint access_grants_environment_check check (environment is null or environment in ('legacy','sandbox','production')),
+  constraint access_grants_interval_check check (expires_at is null or expires_at > started_at),
+  constraint access_grants_grace_check check (grace_until is null or grace_until >= started_at),
   constraint access_grants_lifetime_check check (access_type <> 'lifetime' or expires_at is null),
-  constraint access_grants_trial_source_check check (access_type <> 'trial' or source_provider = 'trial'),
+  constraint access_grants_trial_source_check check (access_type<>'trial' or source='trial'),
   constraint access_grants_manual_audit_check check (
-    access_type <> 'manual' or (source_provider = 'manual' and granted_by is not null)
+    access_type<>'manual' or (source='manual' and (environment='legacy' or granted_by is not null))
   ),
-  constraint access_grants_revocation_check check (revoked_at is null or revoked_at >= starts_at)
+  constraint access_grants_revocation_check check (revoked_at is null or revoked_at >= started_at)
 );
 
-create unique index access_grants_provider_reference_uidx
-  on public.access_grants(source_provider, external_reference, product_id)
+do $reconcile_access_grants$
+declare v_constraint name;
+begin
+  if current_setting('mb.commercial_prestate')='kiwify_legacy' then
+    alter table public.access_grants add column access_type text;
+    alter table public.access_grants add column environment text;
+    alter table public.access_grants add column grace_until timestamptz;
+    alter table public.access_grants add column external_reference text;
+    alter table public.access_grants add column external_subscription_id text;
+    alter table public.access_grants add column granted_by uuid references auth.users(id) on delete set null;
+    alter table public.access_grants add column administrative_reason text;
+    alter table public.access_grants add column revoked_by uuid references auth.users(id) on delete set null;
+    update public.access_grants set
+      access_type=case when source='manual' then 'manual' else 'paid' end,
+      environment='legacy',
+      external_reference=external_purchase_id;
+    alter table public.access_grants alter column access_type set not null;
+
+    for v_constraint in select c.conname from pg_constraint c where c.conrelid='public.access_grants'::regclass
+      and (c.contype='c' and (pg_get_constraintdef(c.oid) ilike '%source%' or pg_get_constraintdef(c.oid) ilike '%status%')
+        or c.contype='u' and (select array_agg(a.attname order by key.ordinality) from unnest(c.conkey) with ordinality key(attnum,ordinality)
+          join pg_attribute a on a.attrelid=c.conrelid and a.attnum=key.attnum)=array['user_id','product_id']::name[])
+    loop execute format('alter table public.access_grants drop constraint %I',v_constraint); end loop;
+
+    alter table public.access_grants add constraint access_grants_type_check check(access_type in('paid','trial','manual','lifetime'));
+    alter table public.access_grants add constraint access_grants_status_check check(status in('active','grace_period','past_due','suspended','expired','revoked','refunded','chargeback','administrative_review'));
+    alter table public.access_grants add constraint access_grants_source_format check(source~'^[a-z][a-z0-9_-]{1,31}$');
+    alter table public.access_grants add constraint access_grants_environment_check check(environment is null or environment in('legacy','sandbox','production'));
+    alter table public.access_grants add constraint access_grants_interval_check check(expires_at is null or expires_at>started_at);
+    alter table public.access_grants add constraint access_grants_grace_check check(grace_until is null or grace_until>=started_at);
+    alter table public.access_grants add constraint access_grants_lifetime_check check(access_type<>'lifetime' or expires_at is null);
+    alter table public.access_grants add constraint access_grants_trial_source_check check(access_type<>'trial' or source='trial');
+    alter table public.access_grants add constraint access_grants_manual_audit_check check(access_type<>'manual' or (source='manual' and (environment='legacy' or granted_by is not null)));
+    alter table public.access_grants add constraint access_grants_revocation_check check(revoked_at is null or revoked_at>=started_at);
+  end if;
+end
+$reconcile_access_grants$;
+
+create unique index if not exists access_grants_provider_reference_uidx
+  on public.access_grants(source,coalesce(environment,'internal'),external_reference,product_id)
   where external_reference is not null;
-create unique index access_grants_one_trial_uidx
+create unique index if not exists access_grants_one_trial_uidx
   on public.access_grants(user_id, product_id)
   where access_type = 'trial';
-create index access_grants_user_product_status_idx
-  on public.access_grants(user_id, product_id, status, starts_at, expires_at);
-create index product_trials_user_idx on public.product_trials(user_id, product_id);
+create unique index if not exists access_grants_one_active_subscription_uidx
+  on public.access_grants(user_id,product_id,source,environment)
+  where access_type='paid' and external_subscription_id is not null and status in('active','grace_period');
+create index if not exists access_grants_user_product_status_idx
+  on public.access_grants(user_id, product_id, status, started_at, expires_at);
+create index if not exists product_trials_user_idx on public.product_trials(user_id, product_id);
 
-create table public.commercial_admin_audit (
+create table if not exists public.commercial_admin_audit (
   id uuid primary key default gen_random_uuid(),
   actor_user_id uuid not null references auth.users(id) on delete restrict,
   target_user_id uuid not null references auth.users(id) on delete restrict,
@@ -163,11 +485,12 @@ create table public.commercial_admin_audit (
   constraint commercial_admin_audit_action_check check (action in ('bootstrap','grant','revoke','activate_enforcement','rollback_enforcement')),
   constraint commercial_admin_audit_reason_check check (length(trim(reason)) between 3 and 500)
 );
-create index commercial_admin_audit_target_idx on public.commercial_admin_audit(target_user_id, created_at desc);
-create index commercial_admin_audit_actor_idx on public.commercial_admin_audit(actor_user_id, created_at desc);
+create index if not exists commercial_admin_audit_target_idx on public.commercial_admin_audit(target_user_id, created_at desc);
+create index if not exists commercial_admin_audit_actor_idx on public.commercial_admin_audit(actor_user_id, created_at desc);
 
-create table public.commercial_enforcement_state (
+create table if not exists public.commercial_enforcement_state (
   singleton boolean primary key default true check (singleton),
+  schema_version text not null default 'commercial_access_v2_kiwify_reconciled',
   enforced boolean not null default false,
   enforced_at timestamptz,
   enforced_by uuid references auth.users(id) on delete restrict,
@@ -175,11 +498,13 @@ create table public.commercial_enforcement_state (
   constraint commercial_enforcement_timeline_check check (
     (not enforced and enforced_at is null and enforced_by is null)
     or (enforced and enforced_at is not null and enforced_by is not null)
-  )
+  ),
+  constraint commercial_enforcement_version_check check(schema_version='commercial_access_v2_kiwify_reconciled')
 );
-insert into public.commercial_enforcement_state(singleton,enforced) values(true,false);
+insert into public.commercial_enforcement_state(singleton,schema_version,enforced)
+values(true,'commercial_access_v2_kiwify_reconciled',false) on conflict(singleton) do nothing;
 
-create table public.billing_customers (
+create table if not exists public.billing_customers (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   provider text not null,
@@ -190,10 +515,10 @@ create table public.billing_customers (
   unique (provider, environment, external_customer_id),
   unique (user_id, provider, environment),
   constraint billing_customers_provider_format check (provider ~ '^[a-z][a-z0-9_-]{1,31}$'),
-  constraint billing_customers_environment_check check (environment in ('sandbox', 'production'))
+  constraint billing_customers_environment_check check (environment in ('legacy','sandbox','production'))
 );
 
-create table public.billing_orders (
+create table if not exists public.billing_orders (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   offer_id uuid not null references public.commercial_offers(id) on delete restrict,
@@ -207,19 +532,19 @@ create table public.billing_orders (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint billing_orders_provider_format check (provider ~ '^[a-z][a-z0-9_-]{1,31}$'),
-  constraint billing_orders_environment_check check (environment in ('sandbox', 'production')),
+  constraint billing_orders_environment_check check (environment in ('legacy','sandbox','production')),
   constraint billing_orders_status_check check (status in ('created', 'pending', 'confirmed', 'received', 'past_due', 'cancelled', 'refunded', 'chargeback', 'failed'))
 );
 
-create unique index billing_orders_payment_uidx
+create unique index if not exists billing_orders_payment_uidx
   on public.billing_orders(provider, environment, external_payment_id)
   where external_payment_id is not null;
-create unique index billing_orders_subscription_uidx
+create unique index if not exists billing_orders_subscription_uidx
   on public.billing_orders(provider, environment, external_subscription_id)
   where external_subscription_id is not null;
-create index billing_orders_user_idx on public.billing_orders(user_id, created_at desc);
+create index if not exists billing_orders_user_idx on public.billing_orders(user_id, created_at desc);
 
-create table public.billing_order_grants (
+create table if not exists public.billing_order_grants (
   order_id uuid not null references public.billing_orders(id) on delete restrict,
   grant_id uuid not null references public.access_grants(id) on delete restrict,
   product_id uuid not null references public.products(id) on delete restrict,
@@ -228,7 +553,7 @@ create table public.billing_order_grants (
   unique (grant_id)
 );
 
-create table public.billing_subscriptions (
+create table if not exists public.billing_subscriptions (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   offer_id uuid not null references public.commercial_offers(id) on delete restrict,
@@ -243,16 +568,18 @@ create table public.billing_subscriptions (
   updated_at timestamptz not null default now(),
   unique (provider, environment, external_subscription_id),
   constraint billing_subscriptions_provider_format check (provider ~ '^[a-z][a-z0-9_-]{1,31}$'),
-  constraint billing_subscriptions_environment_check check (environment in ('sandbox', 'production')),
+  constraint billing_subscriptions_environment_check check (environment in ('legacy','sandbox','production')),
   constraint billing_subscriptions_status_check check (status in ('active', 'grace_period', 'past_due', 'expired', 'revoked', 'refunded', 'chargeback', 'cancelled'))
 );
 
-create table public.payment_events (
+create table if not exists public.payment_events (
   id uuid primary key default gen_random_uuid(),
   provider text not null,
+  event_id text not null,
   environment text not null,
   external_event_id text not null,
   event_type text not null,
+  user_id uuid,
   received_at timestamptz not null default now(),
   processed_at timestamptz,
   status text not null default 'received',
@@ -262,30 +589,78 @@ create table public.payment_events (
   payload_hash text not null,
   error_code text,
   external_customer_id text,
+  external_purchase_id text,
   external_payment_id text,
   external_subscription_id text,
+  payload jsonb,
+  processed boolean not null default false,
   created_at timestamptz not null default now(),
-  unique (provider, environment, external_event_id),
   constraint payment_events_provider_format check (provider ~ '^[a-z][a-z0-9_-]{1,31}$'),
-  constraint payment_events_environment_check check (environment in ('sandbox', 'production')),
+  constraint payment_events_environment_check check (environment in ('legacy','sandbox','production')),
   constraint payment_events_status_check check (status in ('received', 'processing', 'processed', 'ignored', 'failed', 'administrative_review')),
   constraint payment_events_attempts_check check (processing_attempts >= 0),
   constraint payment_events_hash_check check (payload_hash ~ '^[0-9a-f]{64}$')
 );
 
-create index payment_events_status_received_idx on public.payment_events(status, received_at);
-create index payment_events_external_payment_idx on public.payment_events(provider, environment, external_payment_id);
+do $reconcile_payment_events$
+declare v_constraint name;
+begin
+  if current_setting('mb.commercial_prestate')='kiwify_legacy' then
+    alter table public.payment_events add column environment text;
+    alter table public.payment_events add column external_event_id text;
+    alter table public.payment_events add column received_at timestamptz;
+    alter table public.payment_events add column status text;
+    alter table public.payment_events add column processing_attempts integer not null default 0;
+    alter table public.payment_events add column next_retry_at timestamptz;
+    alter table public.payment_events add column last_error_at timestamptz;
+    alter table public.payment_events add column payload_hash text;
+    alter table public.payment_events add column error_code text;
+    alter table public.payment_events add column external_payment_id text;
+    alter table public.payment_events add column external_subscription_id text;
+    update public.payment_events set environment='legacy',external_event_id=event_id,
+      received_at=coalesce(created_at,now()),status=case when processed then 'processed' else 'received' end,
+      payload_hash=encode(sha256(convert_to(payload::text,'UTF8')),'hex'),
+      external_payment_id=external_purchase_id;
+    alter table public.payment_events alter column environment set not null;
+    alter table public.payment_events alter column external_event_id set not null;
+    alter table public.payment_events alter column received_at set not null;
+    alter table public.payment_events alter column received_at set default now();
+    alter table public.payment_events alter column status set not null;
+    alter table public.payment_events alter column status set default 'received';
+    alter table public.payment_events alter column payload_hash set not null;
+    alter table public.payment_events alter column payload drop not null;
 
-insert into public.products(code, name, product_kind, public_sample_available) values
-  ('APP', 'Aplicativo financeiro Mentoria Black', 'entitlement', false),
-  ('KNOWLEDGE', 'Área de Conhecimento Mentoria Black', 'entitlement', true),
-  ('COMPLETE', 'Mentoria Black Completa', 'bundle', true);
+    for v_constraint in select c.conname from pg_constraint c where c.conrelid='public.payment_events'::regclass
+      and (c.contype='c' and pg_get_constraintdef(c.oid) ilike '%provider%'
+        or c.contype='u' and (select array_agg(a.attname order by key.ordinality) from unnest(c.conkey) with ordinality key(attnum,ordinality)
+          join pg_attribute a on a.attrelid=c.conrelid and a.attnum=key.attnum)=array['provider','event_id']::name[])
+    loop execute format('alter table public.payment_events drop constraint %I',v_constraint); end loop;
+
+    alter table public.payment_events add constraint payment_events_provider_format check(provider~'^[a-z][a-z0-9_-]{1,31}$');
+    alter table public.payment_events add constraint payment_events_environment_check check(environment in('legacy','sandbox','production'));
+    alter table public.payment_events add constraint payment_events_status_check check(status in('received','processing','processed','ignored','failed','administrative_review'));
+    alter table public.payment_events add constraint payment_events_attempts_check check(processing_attempts>=0);
+    alter table public.payment_events add constraint payment_events_hash_check check(payload_hash~'^[0-9a-f]{64}$');
+  end if;
+end
+$reconcile_payment_events$;
+
+create unique index if not exists payment_events_provider_environment_event_uidx on public.payment_events(provider,environment,external_event_id);
+create index if not exists payment_events_status_received_idx on public.payment_events(status, received_at);
+create index if not exists payment_events_external_payment_idx on public.payment_events(provider, environment, external_payment_id);
+
+insert into public.products(code,name,slug,description,product_kind,public_sample_available) values
+  ('APP','Aplicativo financeiro Mentoria Black','mentoria-black',null,'entitlement',false),
+  ('KNOWLEDGE','Área de Conhecimento Mentoria Black','knowledge',null,'entitlement',true),
+  ('COMPLETE','Mentoria Black Completa','complete',null,'bundle',true)
+on conflict(code) do nothing;
 
 insert into public.product_components(bundle_product_id, component_product_id)
 select bundle.id, component.id
 from public.products bundle
 join public.products component on component.code in ('APP', 'KNOWLEDGE')
-where bundle.code = 'COMPLETE';
+where bundle.code = 'COMPLETE'
+on conflict(bundle_product_id,component_product_id) do nothing;
 
 insert into public.commercial_offers(
   code, product_id, billing_mode, billing_interval, active,
@@ -300,7 +675,8 @@ from (values
   ('COMPLETE_MONTHLY', 'COMPLETE', 'subscription', 'month', 'KNOWLEDGE_LIFETIME_AFTER_VALID_ACQUISITION', 72),
   ('COMPLETE_ANNUAL', 'COMPLETE', 'subscription', 'year', 'KNOWLEDGE_LIFETIME_AFTER_VALID_ACQUISITION', 72)
 ) as offer(code, product_code, billing_mode, billing_interval, knowledge_cancellation_policy, grace_period_hours)
-join public.products product on product.code = offer.product_code;
+join public.products product on product.code = offer.product_code
+on conflict(code) do nothing;
 
 create or replace function public.mb_commercial_touch_updated_at()
 returns trigger
@@ -314,6 +690,55 @@ begin
 end
 $$;
 
+create or replace function public.mb_normalize_access_grant_v2()
+returns trigger
+language plpgsql
+security invoker
+set search_path=pg_catalog
+as $$
+begin
+  if new.access_type is null then
+    new.access_type:=case when new.source='manual' then 'manual' else 'paid' end;
+  end if;
+  if new.environment is null and new.source in ('kiwify','asaas','hotmart','eduzz') then
+    new.environment:='production';
+  end if;
+  if new.external_reference is null then
+    new.external_reference:=new.external_purchase_id;
+  end if;
+  return new;
+end
+$$;
+
+create or replace function public.mb_normalize_payment_event_v2()
+returns trigger
+language plpgsql
+security invoker
+set search_path=pg_catalog
+as $$
+begin
+  new.environment:=coalesce(new.environment,case when new.provider='kiwify' then 'production' else null end);
+  new.external_event_id:=coalesce(new.external_event_id,new.event_id);
+  new.event_id:=coalesce(new.event_id,new.external_event_id);
+  new.received_at:=coalesce(new.received_at,new.created_at,clock_timestamp());
+  new.status:=coalesce(new.status,case when coalesce(new.processed,false) then 'processed' else 'received' end);
+  if coalesce(new.processed,false) and new.status in ('received','processing') then
+    new.status:='processed';
+  end if;
+  if new.status='processed' then
+    new.processed:=true;
+  end if;
+  if new.payload_hash is null and new.payload is not null then
+    new.payload_hash:=encode(sha256(convert_to(new.payload::text,'UTF8')),'hex');
+  end if;
+  new.external_payment_id:=coalesce(new.external_payment_id,new.external_purchase_id);
+  if new.environment is null or new.external_event_id is null or new.payload_hash is null then
+    raise exception 'payment event requires canonical environment, event id and payload hash' using errcode='23502';
+  end if;
+  return new;
+end
+$$;
+
 do $touch_triggers$
 declare
   v_table text;
@@ -322,6 +747,7 @@ begin
     'products', 'commercial_offers', 'product_trials', 'access_grants',
     'billing_customers', 'billing_orders', 'billing_subscriptions'
   ] loop
+    execute format('drop trigger if exists mb_commercial_touch_updated_at on public.%I',v_table);
     execute format(
       'create trigger mb_commercial_touch_updated_at before update on public.%I '
       'for each row execute function public.mb_commercial_touch_updated_at()',
@@ -330,6 +756,16 @@ begin
   end loop;
 end
 $touch_triggers$;
+
+drop trigger if exists mb_normalize_access_grant_v2 on public.access_grants;
+create trigger mb_normalize_access_grant_v2
+before insert or update on public.access_grants
+for each row execute function public.mb_normalize_access_grant_v2();
+
+drop trigger if exists mb_normalize_payment_event_v2 on public.payment_events;
+create trigger mb_normalize_payment_event_v2
+before insert or update on public.payment_events
+for each row execute function public.mb_normalize_payment_event_v2();
 
 create or replace function public.mb_validate_commercial_grant_target()
 returns trigger
@@ -348,6 +784,7 @@ begin
 end
 $$;
 
+drop trigger if exists mb_validate_commercial_grant_target on public.access_grants;
 create trigger mb_validate_commercial_grant_target
 before insert or update of product_id on public.access_grants
 for each row execute function public.mb_validate_commercial_grant_target();
@@ -365,6 +802,15 @@ alter table public.billing_order_grants enable row level security;
 alter table public.billing_subscriptions enable row level security;
 alter table public.payment_events enable row level security;
 
+drop policy if exists products_select_active on public.products;
+drop policy if exists access_grants_select_own on public.access_grants;
+drop policy if exists payment_events_no_client_access on public.payment_events;
+drop policy if exists mb_products_authenticated_read on public.products;
+drop policy if exists mb_product_components_authenticated_read on public.product_components;
+drop policy if exists mb_commercial_offers_authenticated_read on public.commercial_offers;
+drop policy if exists mb_product_trials_own_read on public.product_trials;
+drop policy if exists mb_access_grants_own_read on public.access_grants;
+drop policy if exists mb_payment_events_no_client_access on public.payment_events;
 create policy mb_products_authenticated_read on public.products
 for select to authenticated using (active);
 create policy mb_product_components_authenticated_read on public.product_components
@@ -375,6 +821,8 @@ create policy mb_product_trials_own_read on public.product_trials
 for select to authenticated using ((select auth.uid()) = user_id);
 create policy mb_access_grants_own_read on public.access_grants
 for select to authenticated using ((select auth.uid()) = user_id);
+create policy mb_payment_events_no_client_access on public.payment_events
+for all to anon,authenticated using(false) with check(false);
 
 revoke all privileges on table public.products, public.product_components,
   public.commercial_offers, public.product_trials, public.access_grants,
@@ -384,7 +832,7 @@ revoke all privileges on table public.products, public.product_components,
 grant select on table public.products, public.product_components,
   public.commercial_offers, public.product_trials, public.access_grants to authenticated;
 
-create or replace function public.has_active_access(p_product_code text)
+create or replace function public.has_active_access(p_product_slug text default 'mentoria-black')
 returns boolean
 language sql
 stable
@@ -396,10 +844,10 @@ as $$
     from public.access_grants g
     join public.products p on p.id = g.product_id
     where g.user_id = (select auth.uid())
-      and p.code = upper(trim(p_product_code))
+      and (p.code=upper(trim(p_product_slug)) or p.slug=lower(trim(p_product_slug)))
       and p.product_kind = 'entitlement'
       and p.active
-      and g.starts_at <= statement_timestamp()
+      and g.started_at <= statement_timestamp()
       and (
         (g.status = 'active' and (g.expires_at is null or g.expires_at > statement_timestamp()))
         or (g.status = 'grace_period' and g.grace_until > statement_timestamp())
@@ -415,9 +863,9 @@ security invoker
 set search_path = pg_catalog
 as $$
   with product_state as (
-    select p.code, g.access_type, g.source_provider, g.status, g.expires_at, g.grace_until,
+    select p.code,g.access_type,g.source,g.status,g.expires_at,g.grace_until,
            coalesce(
-             g.starts_at <= statement_timestamp() and (
+             g.started_at <= statement_timestamp() and (
                (g.status = 'active' and (g.expires_at is null or g.expires_at > statement_timestamp()))
                or (g.status = 'grace_period' and g.grace_until > statement_timestamp())
              ), false
@@ -428,7 +876,7 @@ as $$
       from public.access_grants grant_row
       where grant_row.user_id = (select auth.uid())
         and grant_row.product_id = p.id
-        and grant_row.starts_at <= statement_timestamp()
+        and grant_row.started_at <= statement_timestamp()
       order by case
         when grant_row.status = 'active' and (grant_row.expires_at is null or grant_row.expires_at > statement_timestamp()) then 1
         when grant_row.status = 'grace_period' and grant_row.grace_until > statement_timestamp() then 2
@@ -459,7 +907,7 @@ as $$
         'access', has_access,
         'access_type', access_type,
         'type', access_type,
-        'source', source_provider,
+        'source', source,
         'state', case when status = 'active' and expires_at <= statement_timestamp() then 'expired' else status end,
         'status', case when status = 'active' and expires_at <= statement_timestamp() then 'expired' else status end,
         'expires_at', expires_at,
@@ -478,7 +926,7 @@ as $$
         'access', has_access,
         'access_type', access_type,
         'type', access_type,
-        'source', source_provider,
+        'source', source,
         'state', case when status = 'active' and expires_at <= statement_timestamp() then 'expired' else status end,
         'status', case when status = 'active' and expires_at <= statement_timestamp() then 'expired' else status end,
         'expires_at', expires_at,
@@ -560,8 +1008,8 @@ begin
   ) returning * into v_trial;
 
   insert into public.access_grants(
-    user_id, product_id, access_type, source_provider, status,
-    starts_at, expires_at, external_reference
+    user_id,product_id,access_type,source,status,
+    started_at,expires_at,external_reference
   ) values (
     v_user_id, v_product_id, 'trial', 'trial', 'active',
     v_trial.started_at, v_trial.expires_at, 'trial:' || v_trial.id::text
@@ -620,12 +1068,12 @@ begin
     select id into v_product_id from public.products where code = v_code and product_kind = 'entitlement' and active;
     v_reference := 'admin:' || p_target_user_id::text || ':' || v_code || ':' || p_access_type || ':' || coalesce(extract(epoch from p_expires_at)::bigint::text,'lifetime');
     select id,status into v_grant_id,v_existing_status from public.access_grants
-      where source_provider='manual' and product_id=v_product_id and external_reference=v_reference
+      where source='manual' and product_id=v_product_id and external_reference=v_reference
       for update;
     v_created := v_grant_id is null or v_existing_status <> 'active';
     if v_grant_id is null then
       insert into public.access_grants(
-        user_id, product_id, access_type, source_provider, status, expires_at,
+        user_id,product_id,access_type,source,status,expires_at,
         granted_by, administrative_reason, external_reference
       ) values (
         p_target_user_id, v_product_id, p_access_type, 'manual', 'active', p_expires_at,
@@ -633,7 +1081,7 @@ begin
         v_reference
       ) returning id into v_grant_id;
     elsif v_existing_status <> 'active' then
-      update public.access_grants set status='active',starts_at=current_timestamp,expires_at=p_expires_at,
+      update public.access_grants set status='active',started_at=current_timestamp,expires_at=p_expires_at,
         grace_until=null,revoked_at=null,revoked_by=null,granted_by=p_actor_user_id,
         administrative_reason=trim(p_reason) where id=v_grant_id;
     end if;
@@ -702,7 +1150,7 @@ as $$
     'grants', coalesce((
       select jsonb_agg(jsonb_build_object(
         'grant_id',g.id,'product_code',p.code,'access_type',g.access_type,
-        'source',g.source_provider,'status',g.status,'starts_at',g.starts_at,
+        'source',g.source,'status',g.status,'started_at',g.started_at,
         'expires_at',g.expires_at,'grace_until',g.grace_until
       ) order by g.created_at desc)
       from public.access_grants g join public.products p on p.id=g.product_id
@@ -729,7 +1177,7 @@ begin
   select * into v_event from public.payment_events where id=p_event_id for update;
   if not found then raise exception 'payment event not found' using errcode='P0002'; end if;
   if v_event.status in ('processed','ignored','administrative_review') then return v_event.status; end if;
-  update public.payment_events set status='processing',processing_attempts=processing_attempts+1,error_code=null,next_retry_at=null where id=p_event_id;
+  update public.payment_events set status='processing',processed=false,processing_attempts=processing_attempts+1,error_code=null,next_retry_at=null where id=p_event_id;
 
   select * into v_order from public.billing_orders o
     where o.provider=v_event.provider and o.environment=v_event.environment
@@ -737,17 +1185,17 @@ begin
         or (v_event.external_subscription_id is not null and o.external_subscription_id=v_event.external_subscription_id))
     order by o.created_at desc limit 1 for update;
   if not found then
-    update public.payment_events set status='failed',error_code='order_not_found',last_error_at=clock_timestamp(),next_retry_at=clock_timestamp()+interval '15 minutes' where id=p_event_id;
+    update public.payment_events set status='failed',processed=false,error_code='order_not_found',last_error_at=clock_timestamp(),next_retry_at=clock_timestamp()+interval '15 minutes' where id=p_event_id;
     return 'retryable';
   end if;
   select * into v_offer from public.commercial_offers where id=v_order.offer_id;
 
   if v_event.event_type = 'PAYMENT_PARTIALLY_REFUNDED' then
-    update public.payment_events set status='administrative_review',error_code='partial_refund_requires_review',processed_at=clock_timestamp() where id=p_event_id;
+    update public.payment_events set status='administrative_review',processed=true,error_code='partial_refund_requires_review',processed_at=clock_timestamp() where id=p_event_id;
     return 'administrative_review';
   elsif v_event.event_type in ('PAYMENT_CONFIRMED','PAYMENT_RECEIVED') then
     if v_offer.billing_mode='subscription' and v_order.paid_through is null then
-      update public.payment_events set status='failed',error_code='paid_period_missing',last_error_at=clock_timestamp(),next_retry_at=clock_timestamp()+interval '15 minutes' where id=p_event_id;
+      update public.payment_events set status='failed',processed=false,error_code='paid_period_missing',last_error_at=clock_timestamp(),next_retry_at=clock_timestamp()+interval '15 minutes' where id=p_event_id;
       return 'retryable';
     end if;
     update public.billing_orders set status=case when v_event.event_type='PAYMENT_RECEIVED' then 'received' else 'confirmed' end where id=v_order.id;
@@ -763,10 +1211,10 @@ begin
     loop
       select grant_id into v_grant_id from public.billing_order_grants where order_id=v_order.id and product_id=v_product.id;
       if v_grant_id is null then
-        insert into public.access_grants(user_id,product_id,access_type,source_provider,status,starts_at,expires_at,external_reference)
+        insert into public.access_grants(user_id,product_id,access_type,source,environment,status,started_at,expires_at,external_reference,external_subscription_id)
         values (v_order.user_id,v_product.id,case when v_product.code='KNOWLEDGE' then 'lifetime' else 'paid' end,
-          v_order.provider,'active',current_timestamp,case when v_product.code='APP' then v_order.paid_through else null end,
-          'order:'||v_order.id::text||':'||v_product.code)
+          v_order.provider,v_order.environment,'active',current_timestamp,case when v_product.code='APP' then v_order.paid_through else null end,
+          'order:'||v_order.id::text||':'||v_product.code,v_order.external_subscription_id)
         returning id into v_grant_id;
         insert into public.billing_order_grants(order_id,grant_id,product_id) values(v_order.id,v_grant_id,v_product.id);
       else
@@ -791,7 +1239,7 @@ begin
       join public.products p on p.id=bog.product_id
       where bog.order_id=v_order.id and p.code='APP'
     ) then
-      update public.payment_events set status='failed',error_code='grant_link_not_found',last_error_at=clock_timestamp(),next_retry_at=clock_timestamp()+interval '15 minutes' where id=p_event_id;
+      update public.payment_events set status='failed',processed=false,error_code='grant_link_not_found',last_error_at=clock_timestamp(),next_retry_at=clock_timestamp()+interval '15 minutes' where id=p_event_id;
       return 'retryable';
     end if;
     update public.billing_orders set status='past_due' where id=v_order.id;
@@ -804,7 +1252,7 @@ begin
     v_state:='processed';
   elsif v_event.event_type in ('PAYMENT_REFUNDED','PAYMENT_RECEIVED_IN_CASH_UNDONE') then
     if not exists(select 1 from public.billing_order_grants where order_id=v_order.id) then
-      update public.payment_events set status='failed',error_code='grant_link_not_found',last_error_at=clock_timestamp(),next_retry_at=clock_timestamp()+interval '15 minutes' where id=p_event_id;
+      update public.payment_events set status='failed',processed=false,error_code='grant_link_not_found',last_error_at=clock_timestamp(),next_retry_at=clock_timestamp()+interval '15 minutes' where id=p_event_id;
       return 'retryable';
     end if;
     update public.billing_orders set status='refunded' where id=v_order.id;
@@ -813,7 +1261,7 @@ begin
     v_state:='processed';
   elsif v_event.event_type in ('PAYMENT_CHARGEBACK_REQUESTED','PAYMENT_CHARGEBACK_DISPUTE','PAYMENT_AWAITING_CHARGEBACK_REVERSAL') then
     if not exists(select 1 from public.billing_order_grants where order_id=v_order.id) then
-      update public.payment_events set status='failed',error_code='grant_link_not_found',last_error_at=clock_timestamp(),next_retry_at=clock_timestamp()+interval '15 minutes' where id=p_event_id;
+      update public.payment_events set status='failed',processed=false,error_code='grant_link_not_found',last_error_at=clock_timestamp(),next_retry_at=clock_timestamp()+interval '15 minutes' where id=p_event_id;
       return 'retryable';
     end if;
     update public.billing_orders set status='chargeback' where id=v_order.id;
@@ -826,16 +1274,18 @@ begin
   else
     v_state:='ignored';
   end if;
-  update public.payment_events set status=v_state,processed_at=clock_timestamp(),error_code=null where id=p_event_id;
+  update public.payment_events set status=v_state,processed=true,processed_at=clock_timestamp(),error_code=null where id=p_event_id;
   return v_state;
 exception when others then
-  update public.payment_events set status='failed',error_code='processor_exception',last_error_at=clock_timestamp(),next_retry_at=clock_timestamp()+interval '15 minutes' where id=p_event_id;
+  update public.payment_events set status='failed',processed=false,error_code='processor_exception',last_error_at=clock_timestamp(),next_retry_at=clock_timestamp()+interval '15 minutes' where id=p_event_id;
   return 'retryable';
 end
 $$;
 
 revoke all on function public.mb_commercial_touch_updated_at() from public, anon, authenticated;
 revoke all on function public.mb_validate_commercial_grant_target() from public, anon, authenticated;
+revoke all on function public.mb_normalize_access_grant_v2() from public,anon,authenticated;
+revoke all on function public.mb_normalize_payment_event_v2() from public,anon,authenticated;
 revoke all on function public.has_active_access(text) from public, anon;
 revoke all on function public.get_my_entitlements() from public, anon;
 revoke all on function public.start_my_app_trial() from public, anon;
@@ -852,6 +1302,15 @@ grant execute on function public.bootstrap_commercial_admin_v1(uuid,uuid,text) t
 grant execute on function public.admin_revoke_commercial_access_v1(uuid,uuid,text) to service_role;
 grant execute on function public.admin_get_commercial_access_v1(uuid) to service_role;
 grant execute on function public.process_payment_event_v1(uuid) to service_role;
+
+do $preserve_kiwify_secret_rpc$
+begin
+  if to_regprocedure('public.set_kiwify_webhook_token(text)') is not null then
+    execute 'revoke all on function public.set_kiwify_webhook_token(text) from public,anon,authenticated';
+    execute 'grant execute on function public.set_kiwify_webhook_token(text) to service_role';
+  end if;
+end
+$preserve_kiwify_secret_rpc$;
 
 -- Phase 1 deliberately preserves the canonical V82 ownership policies. This lets
 -- an authorized server bootstrap every legacy owner before the entitlement gate is
@@ -952,7 +1411,7 @@ begin
     execute format(
       'select count(*) from (select distinct source.user_id from public.%I source '
       'where not exists (select 1 from public.access_grants g join public.products p on p.id=g.product_id '
-      'where g.user_id=source.user_id and p.code=''APP'' and p.active and g.starts_at<=statement_timestamp() '
+      'where g.user_id=source.user_id and p.code=''APP'' and p.active and g.started_at<=statement_timestamp() '
       'and ((g.status=''active'' and (g.expires_at is null or g.expires_at>statement_timestamp())) '
       'or (g.status=''grace_period'' and g.grace_until>statement_timestamp())))) missing',v_table
     ) into v_unentitled;
@@ -1060,6 +1519,29 @@ begin
       and policyname='mb_v82_own_rows')<>9
      or (select enforced from public.commercial_enforcement_state where singleton) then
     raise exception 'commercial access v1 must preserve V82 policies until explicit activation' using errcode='P0001';
+  end if;
+
+  if exists(
+    select 1 from pg_constraint c where c.conrelid='public.access_grants'::regclass and c.contype='u'
+      and (select array_agg(a.attname order by key.ordinality) from unnest(c.conkey) with ordinality key(attnum,ordinality)
+           join pg_attribute a on a.attrelid=c.conrelid and a.attnum=key.attnum)=array['user_id','product_id']::name[]
+  ) or exists(
+    select 1 from pg_constraint c where c.conrelid='public.payment_events'::regclass and c.contype='u'
+      and (select array_agg(a.attname order by key.ordinality) from unnest(c.conkey) with ordinality key(attnum,ordinality)
+           join pg_attribute a on a.attrelid=c.conrelid and a.attnum=key.attnum)=array['provider','event_id']::name[]
+  ) then
+    raise exception 'commercial access v2 legacy uniqueness was not reconciled' using errcode='P0001';
+  end if;
+
+  if current_setting('mb.commercial_prestate')='kiwify_legacy' and (
+    (select count(*) from public.products where code='APP' and slug='mentoria-black')<>1
+    or (select count(*) from public.access_grants)<>1
+    or (select count(*) from public.access_grants where source in('manual','kiwify') and environment='legacy')<>1
+    or (select count(*) from public.payment_events)<>2
+    or (select count(*) from public.payment_events where provider='kiwify' and environment='legacy' and payload is not null)<>2
+    or to_regprocedure('public.set_kiwify_webhook_token(text)') is null
+  ) then
+    raise exception 'commercial access v2 Kiwify preservation verification failed' using errcode='P0001';
   end if;
 end
 $verify$;

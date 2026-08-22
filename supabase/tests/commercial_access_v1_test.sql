@@ -31,7 +31,8 @@ insert into auth.users(id,email,email_confirmed_at) values
  ('b0000000-0000-4000-8000-000000000002','b@example.invalid',now()),
  ('c0000000-0000-4000-8000-000000000003','c@example.invalid',now()),
  ('d0000000-0000-4000-8000-000000000004','admin@example.invalid',now()),
- ('e0000000-0000-4000-8000-000000000005','complete@example.invalid',now());
+ ('e0000000-0000-4000-8000-000000000005','complete@example.invalid',now()),
+ ('f0000000-0000-4000-8000-000000000006','out-of-order@example.invalid',now());
 
 set local role authenticated; set local request.jwt.claim.sub='a0000000-0000-4000-8000-000000000001';
 select is((select result from public.start_my_app_trial()),'not_eligible','unconfirmed email is not eligible and is not mutated');
@@ -60,17 +61,17 @@ set local role authenticated; set local request.jwt.claim.sub='a0000000-0000-400
 select is((select count(*) from public.accounts),1::bigint,'APP active reads only own financial data'); reset role;
 set local role authenticated; set local request.jwt.claim.sub='b0000000-0000-4000-8000-000000000002';
 select is((select count(*) from public.accounts),0::bigint,'no APP cannot load finance');
-select throws_ok($$insert into public.access_grants(user_id,product_id,access_type,source_provider) select auth.uid(),id,'paid','asaas' from public.products where code='APP'$$,'42501',null,'client cannot self elevate'); reset role;
+select throws_ok($$insert into public.access_grants(user_id,product_id,access_type,source) select auth.uid(),id,'paid','asaas' from public.products where code='APP'$$,'42501',null,'client cannot self elevate'); reset role;
 set local role authenticated; set local request.jwt.claim.sub='a0000000-0000-4000-8000-000000000001';
 select throws_ok($$update public.access_grants set expires_at=clock_timestamp()+interval '1 year' where user_id=auth.uid()$$,'42501',null,'client cannot extend entitlement');
 select throws_ok($$insert into public.product_trials(user_id,product_id,state,started_at,expires_at) select auth.uid(),id,'active',clock_timestamp(),clock_timestamp()+interval '1 year' from public.products where code='APP'$$,'42501',null,'client cannot forge trial');
 select throws_ok($$update public.access_grants set product_id=(select id from public.products where code='KNOWLEDGE') where user_id=auth.uid()$$,'42501',null,'client cannot switch grant product'); reset role;
 
 update public.product_trials set started_at=statement_timestamp()-interval '167 hours 59 minutes',expires_at=statement_timestamp()+interval '1 minute' where user_id='a0000000-0000-4000-8000-000000000001';
-update public.access_grants set starts_at=statement_timestamp()-interval '167 hours 59 minutes',expires_at=statement_timestamp()+interval '1 minute' where user_id='a0000000-0000-4000-8000-000000000001' and access_type='trial';
+update public.access_grants set started_at=statement_timestamp()-interval '167 hours 59 minutes',expires_at=statement_timestamp()+interval '1 minute' where user_id='a0000000-0000-4000-8000-000000000001' and access_type='trial';
 set local role authenticated; set local request.jwt.claim.sub='a0000000-0000-4000-8000-000000000001'; select ok(public.has_active_access('APP'),'trial active at 167h59'); reset role;
 update public.product_trials set started_at=statement_timestamp()-interval '168 hours',expires_at=statement_timestamp() where user_id='a0000000-0000-4000-8000-000000000001';
-update public.access_grants set starts_at=statement_timestamp()-interval '168 hours',expires_at=statement_timestamp() where user_id='a0000000-0000-4000-8000-000000000001' and access_type='trial';
+update public.access_grants set started_at=statement_timestamp()-interval '168 hours',expires_at=statement_timestamp() where user_id='a0000000-0000-4000-8000-000000000001' and access_type='trial';
 set local role authenticated; set local request.jwt.claim.sub='a0000000-0000-4000-8000-000000000001';
 select ok(not public.has_active_access('APP'),'trial blocks at 168h');
 select is((public.get_my_entitlements()->'app'->>'state'),'expired','expired state reaches paywall');
@@ -145,15 +146,15 @@ select is(public.process_payment_event_v1('20000000-0000-4000-8000-000000000010'
 set local role authenticated; set local request.jwt.claim.sub='c0000000-0000-4000-8000-000000000003'; select ok(not public.has_active_access('KNOWLEDGE'),'chargeback revokes linked knowledge'); reset role;
 select is((select count(*) from public.admin_grant_commercial_access_v1('c0000000-0000-4000-8000-000000000003',array['APP'],'manual',clock_timestamp()+interval '1 day','d0000000-0000-4000-8000-000000000004','Temporary support access') where created),1::bigint,'admin can grant temporary APP');
 set local role authenticated; set local request.jwt.claim.sub='c0000000-0000-4000-8000-000000000003'; select ok(public.has_active_access('APP'),'manual APP unlocks own finance'); reset role;
-select ok(public.admin_revoke_commercial_access_v1((select g.id from public.access_grants g join public.products p on p.id=g.product_id where g.user_id='c0000000-0000-4000-8000-000000000003' and p.code='APP' and g.source_provider='manual'),'d0000000-0000-4000-8000-000000000004','Temporary support complete'),'admin can revoke with audit');
-select is((select count(*) from public.admin_grant_commercial_access_v1('c0000000-0000-4000-8000-000000000003',array['APP'],'manual',(select expires_at from public.access_grants g join public.products p on p.id=g.product_id where g.user_id='c0000000-0000-4000-8000-000000000003' and p.code='APP' and g.source_provider='manual'),'d0000000-0000-4000-8000-000000000004','Temporary support restored') where created),1::bigint,'revoked admin grant can be restored idempotently');
+select ok(public.admin_revoke_commercial_access_v1((select g.id from public.access_grants g join public.products p on p.id=g.product_id where g.user_id='c0000000-0000-4000-8000-000000000003' and p.code='APP' and g.source='manual'),'d0000000-0000-4000-8000-000000000004','Temporary support complete'),'admin can revoke with audit');
+select is((select count(*) from public.admin_grant_commercial_access_v1('c0000000-0000-4000-8000-000000000003',array['APP'],'manual',(select expires_at from public.access_grants g join public.products p on p.id=g.product_id where g.user_id='c0000000-0000-4000-8000-000000000003' and p.code='APP' and g.source='manual'),'d0000000-0000-4000-8000-000000000004','Temporary support restored') where created),1::bigint,'revoked admin grant can be restored idempotently');
 
 insert into public.payment_events(id,provider,environment,external_event_id,event_type,payload_hash,external_payment_id) values ('20000000-0000-4000-8000-000000000007','asaas','sandbox','evt-orphan','PAYMENT_RECEIVED',repeat('1',64),'missing');
 select is(public.process_payment_event_v1('20000000-0000-4000-8000-000000000007'),'retryable','unmatched event remains retryable');
 select ok((select status='failed' and next_retry_at is not null and processing_attempts=1 from public.payment_events where id='20000000-0000-4000-8000-000000000007'),'failed processing remains reconciliable');
 
 insert into public.billing_orders(id,user_id,offer_id,provider,environment,status,external_payment_id,external_subscription_id,paid_through)
-select '10000000-0000-4000-8000-000000000004','b0000000-0000-4000-8000-000000000002',id,'asaas','sandbox','pending','pay-out-of-order','sub-out-of-order',clock_timestamp()+interval '30 days' from public.commercial_offers where code='APP_MONTHLY';
+select '10000000-0000-4000-8000-000000000004','f0000000-0000-4000-8000-000000000006',id,'asaas','sandbox','pending','pay-out-of-order','sub-out-of-order',clock_timestamp()+interval '30 days' from public.commercial_offers where code='APP_MONTHLY';
 insert into public.payment_events(id,provider,environment,external_event_id,event_type,payload_hash,external_payment_id) values ('20000000-0000-4000-8000-000000000011','asaas','sandbox','evt-overdue-early','PAYMENT_OVERDUE',repeat('2',64),'pay-out-of-order');
 select is(public.process_payment_event_v1('20000000-0000-4000-8000-000000000011'),'retryable','out-of-order overdue remains retryable until grant exists');
 select is((select error_code from public.payment_events where id='20000000-0000-4000-8000-000000000011'),'grant_link_not_found','out-of-order event records a non-sensitive reconciliation code');

@@ -109,9 +109,9 @@ assert_sql "$normal_db" "set client_min_messages=warning; select count(*) from u
   'public.rollback_commercial_enforcement_v1(uuid,text)'::regprocedure
 ]) function_oid cross join lateral plpgsql_check_function_tb(function_oid) check_result where check_result.level in ('error','fatal')" "0" "plpgsql_check finds no SQL errors"
 run_pgtap "$normal_db" "$commercial_tests"
-if apply_file "$normal_db" "$commercial" 2>"$tmp_dir/retry.err";then echo "successful migration direct rerun unexpectedly succeeded" >&2;exit 1;fi
-rg -q 'reconcile it explicitly' "$tmp_dir/retry.err"
-assert_sql "$normal_db" "select count(*) from public.products" "3" "safe direct rerun changes nothing"
+commercial_counts="$(psql_db "$normal_db" -Atqc "select concat_ws(',',(select count(*) from products),(select count(*) from access_grants),(select count(*) from payment_events))")"
+apply_file "$normal_db" "$commercial"
+assert_sql "$normal_db" "select concat_ws(',',(select count(*) from products),(select count(*) from access_grants),(select count(*) from payment_events))" "$commercial_counts" "semantic V2 retry changes no rows"
 
 create_v82_clone "$legacy_db"
 psql_db "$legacy_db" >/dev/null <<'SQL'
@@ -151,7 +151,7 @@ assert_sql "$legacy_db" "set role authenticated;set request.jwt.claim.sub='d1000
 assert_sql "$legacy_db" "set role authenticated;set request.jwt.claim.sub='c1000000-0000-4000-8000-000000000003';select result from start_my_app_trial();reset role" "started" "confirmed user starts trial"
 psql_db "$legacy_db" -qc "insert into accounts(id,user_id,name) values('c1100000-0000-4000-8000-000000000003','c1000000-0000-4000-8000-000000000003','Trial data')" >/dev/null
 assert_sql "$legacy_db" "set role authenticated;set request.jwt.claim.sub='c1000000-0000-4000-8000-000000000003';select count(*) from accounts;reset role" "1" "active trial reads own finance"
-psql_db "$legacy_db" -qc "update product_trials set started_at=statement_timestamp()-interval '168 hours',expires_at=statement_timestamp() where user_id='c1000000-0000-4000-8000-000000000003';update access_grants set starts_at=statement_timestamp()-interval '168 hours',expires_at=statement_timestamp() where user_id='c1000000-0000-4000-8000-000000000003' and access_type='trial'" >/dev/null
+psql_db "$legacy_db" -qc "update product_trials set started_at=statement_timestamp()-interval '168 hours',expires_at=statement_timestamp() where user_id='c1000000-0000-4000-8000-000000000003';update access_grants set started_at=statement_timestamp()-interval '168 hours',expires_at=statement_timestamp() where user_id='c1000000-0000-4000-8000-000000000003' and access_type='trial'" >/dev/null
 assert_sql "$legacy_db" "set role authenticated;set request.jwt.claim.sub='c1000000-0000-4000-8000-000000000003';select count(*) from accounts;reset role" "0" "trial blocks at 168 hours"
 assert_sql "$legacy_db" "set role authenticated;set request.jwt.claim.sub='c1000000-0000-4000-8000-000000000003';select result from start_my_app_trial();reset role" "already_used" "expired trial never restarts"
 assert_sql "$legacy_db" "select count(*) from accounts where user_id='c1000000-0000-4000-8000-000000000003'" "1" "trial expiry preserves rows"
@@ -159,7 +159,7 @@ assert_sql "$legacy_db" "select public.rollback_commercial_enforcement_v1('a1000
 assert_sql "$legacy_db" "select count(*) from pg_policies where schemaname='public' and policyname='mb_v82_own_rows'" "9" "rollback restores V82 ownership"
 
 create_v82_clone "$partial_db"
-awk '{print;if(index($0,"create table public.access_grants")){armed=1}else if(armed&&/^\);$/){print "select 1/0;";armed=0}}' "$commercial" >"$tmp_dir/partial.sql"
+awk '{print;if(index($0,"create table if not exists public.access_grants")){armed=1}else if(armed&&/^\);$/){print "select 1/0;";armed=0}}' "$commercial" >"$tmp_dir/partial.sql"
 if apply_file "$partial_db" "$tmp_dir/partial.sql" 2>/dev/null;then echo "partial migration unexpectedly succeeded" >&2;exit 1;fi
 assert_sql "$partial_db" "select count(*) from information_schema.tables where table_schema='public' and table_name in ('products','access_grants','payment_events')" "0" "partial failure is atomic"
 apply_file "$partial_db" "$commercial"
@@ -167,13 +167,13 @@ apply_file "$partial_db" "$commercial"
 create_v82_clone "$collision_db"
 psql_db "$collision_db" -qc "create table public.products(id uuid primary key,code text unique)" >/dev/null
 if apply_file "$collision_db" "$commercial" 2>"$tmp_dir/collision.err";then echo "table collision unexpectedly accepted" >&2;exit 1;fi
-rg -q 'existing public.products' "$tmp_dir/collision.err"
+rg -q 'unknown or partial commercial schema' "$tmp_dir/collision.err"
 assert_sql "$collision_db" "select count(*) from information_schema.tables where table_schema='public' and table_name='access_grants'" "0" "table collision is NO-GO without overwrite"
 
 create_v82_clone "$function_drift_db"
 psql_db "$function_drift_db" -qc "create function public.has_active_access(text) returns boolean language sql as 'select true'" >/dev/null
 if apply_file "$function_drift_db" "$commercial" 2>"$tmp_dir/function-drift.err";then echo "function collision unexpectedly accepted" >&2;exit 1;fi
-rg -q 'existing access RPC' "$tmp_dir/function-drift.err"
+rg -q 'access RPC exists without commercial tables' "$tmp_dir/function-drift.err"
 assert_sql "$function_drift_db" "select count(*) from information_schema.tables where table_schema='public' and table_name='products'" "0" "function drift is NO-GO without partial objects"
 
 echo "commercial V2 faithful V82 clone: ${pgtap_assertions} pgTAP + ${shell_assertions} shell assertions passed"

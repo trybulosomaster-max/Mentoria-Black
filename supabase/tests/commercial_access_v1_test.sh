@@ -68,7 +68,7 @@ fi
 test_assertions="$(rg -c 'ok [0-9]+ -' <<<"$test_output")"
 
 create_base "$partial_db"
-awk '{print; if(index($0,"create table public.access_grants")){armed=1} else if(armed&&/^\);$/){print "select 1/0;";armed=0}}' "$migration" > "$tmp_dir/partial.sql"
+awk '{print; if(index($0,"create table if not exists public.access_grants")){armed=1} else if(armed&&/^\);$/){print "select 1/0;";armed=0}}' "$migration" > "$tmp_dir/partial.sql"
 if apply_file "$partial_db" "$tmp_dir/partial.sql" 2>/dev/null; then
   echo "partial migration injection unexpectedly succeeded" >&2; exit 1
 fi
@@ -80,7 +80,7 @@ psql_db "$drift_db" -qc "create table public.products(id uuid primary key)" >/de
 if apply_file "$drift_db" "$migration" 2>"$tmp_dir/drift.err"; then
   echo "existing incompatible object unexpectedly accepted" >&2; exit 1
 fi
-rg -q 'reconcile it explicitly' "$tmp_dir/drift.err"
+rg -q 'unknown or partial commercial schema' "$tmp_dir/drift.err"
 assert_sql "$drift_db" "select count(*) from information_schema.tables where table_schema='public' and table_name='access_grants'" "0" "drift failure leaves no partial schema"
 
 create_base "$concurrent_db"
