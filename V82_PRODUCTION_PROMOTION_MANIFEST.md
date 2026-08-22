@@ -1,7 +1,7 @@
 # V82 Production Promotion Manifest
 
-Status: migration inputs reconciled locally; production promotion remains blocked until
-the controlled four-row legacy cleanup and its post-cleanup read-only gate are complete.
+Status: migration inputs reconciled and controlled legacy cleanup complete; promotion
+still requires a new explicit authorization using the current commit and checksums.
 
 This document freezes the reviewed production inputs and the operational sequence. It
 does not authorize or perform a database migration, Git merge, or production deploy.
@@ -77,8 +77,8 @@ inferred relationship is permitted. Migration 3 changes only the future default 
 `categories.kind` and `recurring.type` to `despesa`.
 
 Before any migration, exactly four objectively audited incompatible test transactions
-must be exported to a restricted file outside Git and deleted in one transaction by
-their exact locked IDs. Required aggregate counts are:
+were required to be exported to a restricted file outside Git and deleted in one
+transaction by their exact locked IDs. Required and observed aggregate counts are:
 
 | Object | Before | After |
 | --- | ---: | ---: |
@@ -95,6 +95,23 @@ The execution record may contain only cleanup time, count `4`, aggregate before/
 counts, restricted-export SHA-256, backup availability, post-cleanup preflight result,
 and Advisor result. It must never contain row IDs, descriptions, notes, values, or user
 identifiers. Any deviation rolls back and blocks promotion.
+
+### Controlled cleanup execution record
+
+- Committed at: `2026-08-22 15:23:22 UTC`
+- Transactions deleted: `4`
+- Technical reason: incompatible, non-reconstructible V82 test transactions; no
+  account/asset/endpoint relationship was inferred
+- Counts: `transactions 183 -> 179`; `recurring 15 -> 15`; `goals 4 -> 4`;
+  `accounts 1 -> 1`; `cards 1 -> 1`; `assets 0 -> 0`; `liabilities 0 -> 0`;
+  Auth users `3 -> 3`
+- Restricted export SHA-256:
+  `6e7e8c275e3ca21b20b94f4c05b09c2701706f3d3a924fd72addbdf051e79683`
+- Physical backup gate: `PROD-PHYSICAL-20260822T061354Z` remained available
+- Post-cleanup read-only preflight: `GO`
+- Post-cleanup Security Advisor: `0` findings
+- No migration, schema, Auth, RLS, grant, frontend, `main`, or Beta change was included
+  in the cleanup transaction
 
 ## Preconditions for the separately authorized window
 
