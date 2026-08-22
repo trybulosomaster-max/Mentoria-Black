@@ -7,10 +7,22 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Mentoria Black">
-<title>Mentoria Black — Gestão Financeira V81 ESCUDO FINAL</title>
+<title>Mentoria Black — Gestão Financeira V82</title>
 <link rel="manifest" href="manifest.webmanifest">
+<script src="js/production-environment.js"></script>
+<script src="js/production-runtime.js"></script>
+<script src="js/observability.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.9/dist/chart.umd.min.js"></script>
+<script src="js/financial-core.js"></script>
+<script src="js/recurrence-projection.js"></script>
+<script src="js/structured-recurring-v82.js"></script>
+<script src="js/planning-integration.js"></script>
+<script src="js/goal-projection.js"></script>
+<script src="js/goals-integration.js"></script>
+<script src="js/reports-integration.js"></script>
+<script src="js/dashboard-financial-integration.js"></script>
+<script src="js/health-integration.js"></script>
 <style>
 :root{--bg:#050505;--panel:#0d0d0d;--panel2:#111;--line:#2b2b2b;--text:#f5f5f5;--muted:#999;--gold:#c9a227;--gold2:#e4c55b;--danger:#d88b8b;--ok:#86bb91;--shadow:0 14px 45px #0008}
 *{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--text);font:14px Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}body{min-height:100vh}button,input,select,textarea{font:inherit}button{cursor:pointer}.hidden{display:none!important}
@@ -22,7 +34,7 @@
 .grid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:12px}.s12{grid-column:span 12}.s8{grid-column:span 8}.s6{grid-column:span 6}.s4{grid-column:span 4}.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:15px}.card h2{font-size:16px;margin:0 0 5px}.card .desc{color:var(--muted);font-size:11px;margin-bottom:10px}
 .tablewrap{overflow:auto}table{width:100%;border-collapse:collapse;min-width:720px}th,td{padding:9px 7px;border-bottom:1px solid #232323;text-align:left;vertical-align:middle}th{color:#999;font-size:10px;text-transform:uppercase;letter-spacing:.06em}td{font-size:12px}.positive{color:#9aca9d}.negative{color:#e2a0a0}.tag{display:inline-block;padding:3px 7px;border:1px solid #3b3b3b;border-radius:99px;font-size:10px;color:#aaa}.tag.ok{color:#9fc7a5;border-color:#3c5b42}.tag.warn{color:#dfb76e;border-color:#5a4927}
 .statline{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid #222}.bar{height:8px;background:#202020;border-radius:99px;overflow:hidden;margin:5px 0 8px}.bar i{display:block;height:100%;border-radius:99px}.empty{min-height:170px;display:grid;place-items:center;text-align:center;color:var(--muted);border:1px dashed #303030;border-radius:10px;padding:20px}.chartbox{height:330px;position:relative}.chartbox.small{height:260px}.legend{display:grid;gap:7px;margin-top:10px}.legend-row{display:flex;justify-content:space-between;align-items:center;gap:10px}.dot{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:7px}
-.goals-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:14px}.goal-list{display:grid;gap:12px}.goal-card{padding:16px}.goal-card.completed{border-color:#3c5b42;background:linear-gradient(145deg,#0d1410,#0d0d0d)}.goal-card-top{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.goal-card h2{font-size:18px}.goal-target{font-size:24px;font-weight:850;margin:5px 0 0}.goal-progress-copy{display:flex;justify-content:space-between;gap:10px;font-size:12px;margin-top:14px}.goal-projected{margin-top:12px;padding-top:10px;border-top:1px solid #222}.goal-projected .bar{height:5px}.goal-projected .bar i{background:#77849a}.goal-values{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:14px 0}.goal-value{background:#101010;border:1px solid #242424;border-radius:10px;padding:10px;min-width:0}.goal-value span{display:block;color:#999;font-size:10px;text-transform:uppercase;letter-spacing:.06em}.goal-value strong{display:block;font-size:15px;margin-top:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.goal-details{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.goal-detail{font-size:12px;color:#aaa}.goal-detail b{display:block;color:#eee;font-size:13px;margin-top:3px}.goal-card .actions{margin-top:14px;justify-content:flex-end}.goal-status-ahead{color:#9fc7a5;border-color:#3c5b42}.goal-status-track{color:#dfc878;border-color:#5a4927}.goal-status-behind{color:#e4a0a0;border-color:#6a3333}.goal-status-forecast{color:#aaa}.goal-status-completed{color:#9fc7a5;border-color:#3c5b42;background:#102015}
+.goals-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:14px}.goal-list{display:grid;gap:12px}.goal-card{padding:16px}.goal-card.completed{border-color:#3c5b42;background:linear-gradient(145deg,#0d1410,#0d0d0d)}.goal-card-top{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.goal-card h2{font-size:18px}.goal-target{font-size:24px;font-weight:850;margin:5px 0 0}.goal-progress-copy{display:flex;justify-content:space-between;gap:10px;font-size:12px;margin-top:14px}.goal-projected{margin-top:12px;padding-top:10px;border-top:1px solid #222}.goal-projected .bar{height:5px}.goal-projected .bar i{background:#77849a}.goal-values{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;margin:14px 0}.goal-value{background:#101010;border:1px solid #242424;border-radius:10px;padding:10px;min-width:0}.goal-value span{display:block;color:#999;font-size:10px;text-transform:uppercase;letter-spacing:.06em}.goal-value strong{display:block;font-size:15px;margin-top:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.goal-details{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.goal-detail{font-size:12px;color:#aaa}.goal-detail b{display:block;color:#eee;font-size:13px;margin-top:3px}.goal-card .actions{margin-top:14px;justify-content:flex-end}.goal-status-ahead{color:#9fc7a5;border-color:#3c5b42}.goal-status-track{color:#dfc878;border-color:#5a4927}.goal-status-behind{color:#e4a0a0;border-color:#6a3333}.goal-status-forecast{color:#aaa}.goal-status-completed{color:#9fc7a5;border-color:#3c5b42;background:#102015}
 .dashboard-goals{display:grid;gap:9px}.dashboard-goal-row{padding:10px 0;border-bottom:1px solid #222}.dashboard-goal-row:last-of-type{border-bottom:0}.dashboard-goal-row .name{font-weight:800}.dashboard-goal-row .copy{color:#aaa;font-size:12px;margin-top:3px}.dashboard-goal-row .meta{display:flex;justify-content:space-between;gap:8px;align-items:center;margin-top:7px;font-size:11px;color:#aaa}.dashboard-goals-budget{margin-top:5px;padding-top:10px;border-top:1px solid #292929}.dashboard-goals-completed{margin-top:6px;padding:9px 10px;border:1px solid #3c5b42;border-radius:9px;background:#102015;color:#9fc7a5;font-size:12px}
 .modal{position:fixed;inset:0;background:#000b;display:grid;place-items:center;padding:16px;z-index:100}.modalbox{width:min(760px,100%);max-height:92vh;overflow:auto;background:#0c0c0c;border:1px solid #383838;border-radius:16px;padding:18px;box-shadow:var(--shadow)}.delete-choice{display:flex;flex-direction:column;gap:10px;margin-top:14px}.delete-option{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:15px;border:1px solid #2b2b2b;border-radius:12px;background:#111;cursor:pointer}.delete-option:hover{border-color:#555}.delete-option.active{border-color:#b18b2e;background:#17140d}.delete-option .copy{display:flex;flex-direction:column;gap:4px}.delete-option .title{font-size:14px;color:#eee}.delete-option .desc{font-size:11px;color:#888}.delete-radio{width:20px;height:20px;accent-color:#b18b2e}.danger-action{background:#191111!important;border-color:#6a3333!important;color:#e8a0a0!important}.modalbox h2{margin:0}.formgrid{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}.full{grid-column:1/-1}.modal-foot{display:flex;justify-content:flex-end;gap:8px;margin-top:15px;padding-top:12px;border-top:1px solid #252525}.preview{background:#111;border:1px solid #292929;border-radius:10px;padding:10px;margin-top:10px}.notice{padding:10px;border:1px solid #594a25;background:#18150c;border-radius:9px;color:#e1c978;font-size:12px}.errorbox{padding:10px;border:1px solid #5d3030;background:#1a0f0f;border-radius:9px;color:#e4a0a0;font-size:12px}
 .footer{border-top:1px solid var(--line);margin-top:18px;padding:14px 0;color:#666;font-size:10px;text-align:center}
@@ -85,7 +97,7 @@
   </header>
   <nav id="nav" class="nav"></nav>
   <main id="view"></main>
-  <div class="footer">Mentoria Black — Gestão Financeira V81 ESCUDO FINAL • dados protegidos por usuário no Supabase</div>
+  <div class="footer">Mentoria Black — Gestão Financeira V82 • dados protegidos por usuário no Supabase</div>
  </div>
 </section>
 
@@ -93,9 +105,12 @@
 <div id="toast" class="modal hidden" style="inset:auto 16px 16px auto;place-items:end;pointer-events:none"><div id="toastBox" class="notice"></div></div>
 
 <script>
-const SUPABASE_URL="https://mwjqfzbpjmwiscvtxvfc.supabase.co";
-const SUPABASE_ANON_KEY="sb_publishable_Bz8zOgsayn5KRDKBa0_u_A_TbvV_RuK";
-const sb=supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
+// Legacy names retained only for characterization harnesses; production never reads them.
+const SUPABASE_URL="";
+const SUPABASE_ANON_KEY="";
+const MB_PRODUCTION_RUNTIME=window.MBProductionRuntime.requireConfigured(document,window.MBProductionRuntime);
+const MB_PRODUCTION_FETCH=window.MBObservability.monitoredFetch(window.fetch.bind(window));
+const sb=supabase.createClient(MB_PRODUCTION_RUNTIME.supabaseUrl,MB_PRODUCTION_RUNTIME.supabasePublishableKey,{global:{fetch:MB_PRODUCTION_FETCH}});
 const $=id=>document.getElementById(id);
 const money=v=>new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL"}).format(Number(v)||0);
 const num=v=>new Intl.NumberFormat("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2}).format(Number(v)||0);
@@ -406,6 +421,7 @@ function categoryOptions(value="",allowBlank=true){
 }
 function accountOptions(value=""){return `<option value="">Nenhuma</option>`+DATA.accounts.map(a=>`<option value="${a.id}" ${a.id===value?"selected":""}>${esc(a.name)}${a.institution?" — "+esc(a.institution):""}</option>`).join("")}
 function cardOptions(value=""){return `<option value="">Nenhum</option>`+DATA.cards.map(c=>`<option value="${c.id}" ${c.id===value?"selected":""}>${esc(c.name)}</option>`).join("")}
+function assetOptions(value=""){return `<option value="">Nenhum</option>`+(DATA.assets||[]).map(a=>`<option value="${a.id}" ${a.id===value?"selected":""}>${esc(a.name)}${a.institution?" — "+esc(a.institution):""}</option>`).join("")}
 function nav(){
  const tabs=[["dashboard","Dashboard"],["transactions","Lançamentos"],["planning","Planejamento"],["accounts","Contas"],["cards","Cartões"],["categories","Categorias"],["goals","Metas"],["recurring","Recorrências"],["wealth","Patrimônio"],["reports","Relatórios"]];
  $("nav").innerHTML=tabs.map(([id,l])=>`<button class="btn ${TAB===id?"active":""}" data-tab="${id}">${l}</button>`).join("");
@@ -557,11 +573,14 @@ const valueLabelPlugin={id:"valueLabel",afterDatasetsDraw(chart){
  });
 }};
 Chart.register(valueLabelPlugin);
+function isPendingTransaction(t){
+ return ["pendente","pending","programado","scheduled"].includes(String(t?.status||"").toLowerCase());
+}
 function transactionTable(rows){
  if(!rows.length)return `<div class="empty">Nenhum lançamento encontrado para os filtros atuais.</div>`;
  return `<div class="tablewrap"><table><thead><tr><th>Data</th><th>Descrição</th><th>Categoria</th><th>Tipo</th><th>Conta/Cartão</th><th>Valor</th><th>Status</th><th></th></tr></thead><tbody>${rows.map(t=>{
    const rel=t.account_id?DATA.accounts.find(a=>a.id===t.account_id)?.name:t.card_id?DATA.cards.find(c=>c.id===t.card_id)?.name:"";
-   const pending=t.status==="pendente";
+   const pending=isPendingTransaction(t);
    return `<tr><td>${t.transaction_date?new Date(t.transaction_date+"T12:00:00").toLocaleDateString("pt-BR"):""}</td><td>${esc(t.description)}</td><td>${esc(canonicalCategoryName(t.category,t.transaction_type)||"—")}${t.subcategory?" / "+esc(t.subcategory):""}</td><td>${esc(t.transaction_type)}</td><td>${esc(rel||"—")}</td><td class="${t.transaction_type==="receita"||t.transaction_type==="resgate"?"positive":"negative"}">${money(t.amount)}</td><td>${pending?'<span class="tag warn">Pendente</span>':'<span class="tag ok">Realizado</span>'}</td><td><div class="actions">${pending?`<button class="btn gold" onclick="markPaid('${t.id}')">Pagar</button>`:""}<button class="btn" onclick="openTransaction('${t.id}')">Editar</button><button class="btn danger" onclick="deleteTransactionSmart('${t.id}')">Excluir</button></div></td></tr>`
  }).join("")}</tbody></table></div>`
 }
@@ -608,7 +627,7 @@ async function deleteTransactionSmart(id){
  toast(choice==="one"?"Somente esta parcela foi excluída.":`${ids.length} parcela(s) excluída(s).`);
 }
 function dashboard(){
- const ts=periodTx(),t=totals(ts),p=monthlyPlan(),pv=planValues(p),planned=planTotal(p),res=reserveInfo(),cats=expensesByCat(ts),cards=cardSummary(),realizedOut=t.expense+t.invest;
+ const ts=periodTx(),t=totals(ts),res=reserveInfo(),cats=expensesByCat(ts),cards=cardSummary();
  const reserveK=res.current?money(res.current):"R$ 0,00";
  return pageHead("Dashboard",`${MONTHS[FILTERS.month-1]} de ${FILTERS.year}` ,`<button class="btn gold" onclick="openTransaction()">＋ Lançamento</button>`) +
  `<div class="filters">
@@ -622,17 +641,22 @@ function dashboard(){
   <section class="card s8"><h2>Despesas por categoria</h2><div class="desc">Valor + percentual diretamente acima de cada barra.</div>${cats.length?`<div class="chartbox"><canvas id="dashCat"></canvas></div>`:`<div class="empty">Ainda não há despesas neste período.</div>`}</section>
   <section class="card s4"><h2>Reserva de emergência</h2><div class="desc">Metas, contas ou ativos identificados como Reserva, Emergência ou Caixinha.</div><div style="font-size:28px;font-weight:850;margin:16px 0">${reserveK}</div>${res.target?`<div class="bar"><i style="width:${res.pct}%;background:var(--gold)"></i></div><div class="statline"><span>Progresso</span><strong>${pct(res.pct)}</strong></div>`:`<div class="notice">Cadastre uma meta/conta/ativo com nome contendo “Reserva”, “Emergência” ou “Caixinha”.</div>`}</section>
   <section class="card s6"><h2>Cartões de crédito</h2><div class="desc">Gastos do período por cartão.</div>${cards.rows.length?cards.rows.map(([c,v])=>`<div class="statline"><span>${esc(c.name)}</span><strong>${money(v)}</strong></div>`).join("")+`<div class="statline"><strong>Total</strong><strong>${money(cards.total)}</strong></div>`:`<div class="empty">Nenhum cartão cadastrado.</div>`}</section>
-  <section class="card s6"><h2>Planejado × realizado</h2><div class="desc">Comparação geral do período selecionado.</div>${planned?`<div class="statline"><span>Planejado</span><strong>${money(planned)}</strong></div><div class="statline"><span>Realizado</span><strong>${money(realizedOut)}</strong></div><div class="statline"><span>Execução</span><strong>${pct(realizedOut/planned*100)}</strong></div><div class="bar"><i style="width:${Math.min(100,realizedOut/planned*100)}%;background:var(--gold)"></i></div>`:`<div class="empty">Cadastre o planejamento de ${MONTHS[FILTERS.month-1]} de ${FILTERS.year} para comparar.</div>`}</section>
-  <section class="card s12"><h2>Planejado × realizado por categoria</h2>${planned?`<div class="tablewrap"><table><thead><tr><th>Categoria</th><th>Planejado</th><th>Realizado</th><th>Execução</th><th>Diferença</th></tr></thead><tbody>${CAT_ORDER.map(c=>{const real=cats.find(x=>x[0]===c)?.[1]||0,pl=pv[c]||0;return `<tr><td><span class="dot" style="background:${categoryColor(c)}"></span>${c}</td><td>${money(pl)}</td><td>${money(real)}</td><td>${pl?pct(real/pl*100):"—"}</td><td>${money(pl-real)}</td></tr>`}).join("")}</tbody></table></div>`:`<div class="empty">Sem planejamento no período.</div>`}</section>
   <section class="card s12"><h2>Últimos lançamentos do período</h2>${transactionTable([...periodTx()].sort((a,b)=>String(b.transaction_date).localeCompare(String(a.transaction_date))).slice(0,10))}</section>
  </div>`;
 }
 function planning(){
  const p=monthlyPlan()||{},pv=planValues(p),total=Number(p.revenue||0),sum=planTotal(p);
+ const current=new Date(),now=`${current.getFullYear()}-${String(current.getMonth()+1).padStart(2,'0')}-${String(current.getDate()).padStart(2,'0')}`;
+ const projection=window.MBPlanningV82.projectPlanningPeriod(monthlyPlan(),DATA.transactions||[],DATA.recurring||[],{year:FILTERS.year,month:FILTERS.month,now});
+ const movementValue=(bucket,category)=>category==='Investimentos'?Number(bucket.investment||0):Number(bucket.consumptionByCategory?.[category]||0);
+ const plannedValue=category=>category==='Investimentos'?Number(projection.planned.investment||0):Number(projection.planned.consumptionByCategory?.[category]||0);
+ const trackingRows=CAT_ORDER.map(category=>`<tr><td><span class="dot" style="background:${categoryColor(category)}"></span>${esc(category)}</td><td>${money(plannedValue(category))}</td><td>${money(movementValue(projection.realized,category))}</td><td>${money(movementValue(projection.scheduledMaterialized,category))}</td><td>${money(movementValue(projection.projectedVirtual,category))}</td><td>${money(movementValue(projection.forecast,category))}</td></tr>`).join('');
+ const incomeRow=`<tr><td><span class="dot" style="background:var(--ok)"></span>Receitas</td><td>${money(projection.planned.revenue)}</td><td>${money(projection.realized.income)}</td><td>${money(projection.scheduledMaterialized.income)}</td><td>${money(projection.projectedVirtual.income)}</td><td>${money(projection.forecast.income)}</td></tr>`;
+ const trackingNotice=!projection.period.planFound?'<div class="notice" style="margin-bottom:10px">Ainda não há planejamento cadastrado para este mês. Os movimentos canônicos continuam disponíveis para acompanhamento.</div>':projection.unclassified.length?`<div class="notice" style="margin-bottom:10px">${projection.unclassified.length} lançamento(s) sem classificação canônica foram excluídos dos valores e permanecem disponíveis para auditoria.</div>`:'';
  return pageHead("Planejamento",`Cada combinação de ano + mês possui seu próprio planejamento.`,`<button class="btn gold" onclick="openPlan()">＋ Planejamento</button>`)+
  `<div class="filters"><div class="filter"><label>Ano</label><select id="planYear">${yearOptions()}</select></div><div class="filter"><label>Mês</label><select id="planMonth">${monthOptions()}</select></div><div class="filter"><label>Receita planejada</label><strong style="font-size:18px">${money(total)}</strong></div></div>
  <div class="kpis">${CAT_ORDER.map(c=>kpi(c,money(pv[c]),total?pct(pv[c]/total*100):"0,0%")).join("")}</div>
- <div class="grid"><section class="card s8"><h2>Distribuição planejada</h2><div class="desc">As cores são as mesmas cadastradas nas categorias.</div><div class="chartbox"><canvas id="planChart"></canvas></div></section><section class="card s4"><h2>Estratégia percentual</h2><div class="statline"><span>Base</span><strong>${money(total)}</strong></div>${CAT_ORDER.map(c=>`<div class="statline"><span><span class="dot" style="background:${categoryColor(c)}"></span>${c}</span><strong>${total?pct(pv[c]/total*100):"0,0%"}</strong></div>`).join("")}<div class="statline"><strong>Total distribuído</strong><strong>${money(sum)} (${total?pct(sum/total*100):"0,0%"})</strong></div></section></div>`;
+ <div class="grid"><section class="card s8"><h2>Distribuição planejada</h2><div class="desc">As cores são as mesmas cadastradas nas categorias.</div><div class="chartbox"><canvas id="planChart"></canvas></div></section><section class="card s4"><h2>Estratégia percentual</h2><div class="statline"><span>Base</span><strong>${money(total)}</strong></div>${CAT_ORDER.map(c=>`<div class="statline"><span><span class="dot" style="background:${categoryColor(c)}"></span>${c}</span><strong>${total?pct(pv[c]/total*100):"0,0%"}</strong></div>`).join("")}<div class="statline"><strong>Total distribuído</strong><strong>${money(sum)} (${total?pct(sum/total*100):"0,0%"})</strong></div></section><section class="card s12 planning-canonical"><h2>Acompanhamento canônico do mês</h2><div class="desc"><b>Realizado</b> já ocorreu • <b>Programado</b> está persistido • <b>Projetado</b> é virtual • <b>Previsão</b> = Programado + Projetado.</div>${trackingNotice}<div class="tablewrap"><table><thead><tr><th>Envelope</th><th>Planejado</th><th>Realizado</th><th>Programado</th><th>Projetado</th><th>Previsão</th></tr></thead><tbody>${incomeRow}${trackingRows}<tr><td><strong>Total de saídas</strong></td><td><strong>${money(projection.planned.totalOut)}</strong></td><td><strong>${money(projection.realized.totalOut)}</strong></td><td><strong>${money(projection.scheduledMaterialized.totalOut)}</strong></td><td><strong>${money(projection.projectedVirtual.totalOut)}</strong></td><td><strong>${money(projection.forecast.totalOut)}</strong></td></tr></tbody></table></div></section></div>`;
 }
 function openPlan(){
  const p=monthlyPlan()||{};modal("Planejamento mensal",`<form id="planForm"><div class="formgrid"><div><label>Ano</label><select name="year">${yearOptions(p.year||FILTERS.year)}</select></div><div><label>Mês</label><select name="month">${monthOptions(p.month||FILTERS.month)}</select></div>${[["revenue","Receita"],["fixed_expenses","Gastos Fixos"],["investments","Investimentos"],["comfort","Conforto"],["goals","Metas"],["leisure","Lazer"],["knowledge","Conhecimento"]].map(([k,l])=>`<div class="field"><label>${l}</label><input name="${k}" class="money-field" value="${p[k]??""}" inputmode="decimal"></div>`).join("")}</div><div id="planMsg" class="msg"></div><div class="modal-foot"><button type="button" class="btn" onclick="closeModal()">Cancelar</button><button class="btn primary">Salvar planejamento</button></div></form>`);
@@ -649,19 +673,19 @@ function cards(){const s=cardSummary();return pageHead("Cartões de crédito","R
 function simpleTable(rows,cols,table){if(!rows.length)return `<div class="empty">Nenhum registro cadastrado.</div>`;const edit={accounts:"Account",cards:"Card",categories:"Category",goals:"Goal",recurring:"Recurring"}[table];return `<div class="tablewrap"><table><thead><tr>${cols.map(c=>`<th>${c[0]}</th>`).join("")}<th></th></tr></thead><tbody>${rows.map(x=>`<tr>${cols.map(c=>`<td>${c[1](x)}</td>`).join("")}<td><div class="actions">${edit?`<button class="btn" onclick="open${edit}('${x.id}')">Editar</button>`:""}<button class="btn danger" onclick="deleteRow('${table}','${x.id}')">Excluir</button></div></td></tr>`).join("")}</tbody></table></div>`}
 function categories(){return pageHead("Categorias","Categorias, subcategorias e cores do dashboard.",`<button class="btn gold" onclick="openCategory()">＋ Categoria</button>`)+`<div class="card">${simpleTable(DATA.categories,[["Categoria",x=>`<span class="dot" style="background:${x.color||categoryColor(x.name)}"></span>${esc(x.name)}`],["Subcategoria",x=>esc(x.parent||"—")]],"categories")}</div>`}
 function goals(){
- const engine=window.MBGoals, statusMap={completed:['Meta alcançada','goal-status-completed'],ahead:['Adiantada','goal-status-ahead'],on_track:['No ritmo','goal-status-track'],behind:['Atrasada','goal-status-behind'],no_forecast:['Sem previsão','goal-status-forecast']};
+ const legacyEngine=window.MBGoals, engine=window.MBGoalsV82, statusMap={completed:['Meta alcançada','goal-status-completed'],ahead:['Adiantada','goal-status-ahead'],on_track:['No ritmo','goal-status-track'],behind:['Atrasada','goal-status-behind'],no_forecast:['Sem previsão','goal-status-forecast']};
  const dateLabel=value=>value?new Date(value+"T12:00:00").toLocaleDateString("pt-BR"):"—";
- const metrics=(DATA.goals||[]).map(goal=>engine.metrics(goal)), active=metrics.filter(item=>!item.isCompleted), completed=metrics.filter(item=>item.isCompleted);
+ const current=new Date(), now=`${current.getFullYear()}-${String(current.getMonth()+1).padStart(2,'0')}-${String(current.getDate()).padStart(2,'0')}`;
+ const metrics=engine.projectGoalsForView(DATA.goals||[],DATA.transactions||[],DATA.recurring||[],{now}), active=metrics.filter(item=>!item.isCompleted), completed=metrics.filter(item=>item.isCompleted);
  const sortActive=(a,b)=>{const rank=item=>item.status==='behind'?0:item.deadline?1:item.status==='on_track'?2:3;const diff=rank(a)-rank(b);if(diff)return diff;return String(a.deadline||'9999-12-31').localeCompare(String(b.deadline||'9999-12-31'));};
  active.sort(sortActive);completed.sort((a,b)=>String(b.deadline||'').localeCompare(String(a.deadline||'')));
- const budget=engine.budget();
+ const budget=legacyEngine.budget();
  const budgetCopy=budget.goalBudgetStatus==='sufficient'?'Seu orçamento atual comporta suas metas.':budget.goalBudgetStatus==='insufficient'?`Suas metas exigem ${money(Math.abs(budget.goalBudgetGap))}/mês a mais que o orçamento definido.`:'Defina um orçamento mensal para Metas no Planejamento.';
  const card=item=>{
    const [status,statusClass]=statusMap[item.status]||statusMap.no_forecast;
    const deadline=item.deadline?`<div class="goal-detail">Prazo<b>${dateLabel(item.deadline)}${item.monthsRemaining!==null?` • ${item.monthsRemaining===1?'1 mês':`${item.monthsRemaining} meses`}`:''}</b></div>`:`<div class="goal-detail">Prazo<b>Sem prazo definido</b></div>`;
-   const pace=item.monthlyPace===null?'<div class="goal-detail">Ritmo atual<b>Ainda sem histórico suficiente</b></div>':`<div class="goal-detail">Ritmo atual<b>${money(item.monthlyPace)}/mês</b></div>`;
-   const forecast=item.isCompleted?'<div class="goal-detail">Situação<b>Objetivo financeiro alcançado</b></div>':item.estimatedCompletionDate?`<div class="goal-detail">Previsão de conclusão<b>${new Date(item.estimatedCompletionDate+"T12:00:00").toLocaleDateString('pt-BR',{month:'long',year:'numeric'})}</b></div>`:'<div class="goal-detail">Previsão<b>Ainda sem dados suficientes</b></div>';
-   return `<section class="card goal-card ${item.isCompleted?'completed':''}"><div class="goal-card-top"><div><h2>${esc(item.goal.name||'Meta sem nome')}</h2><div class="goal-target">${money(item.target)}</div></div><span class="tag ${statusClass}">${item.isCompleted?'✓ ':''}${status}</span></div><div class="goal-progress-copy"><span>Realizado: <b>${money(item.realized)} de ${money(item.target)}</b></span><b>${pct(item.progressRealPct)}</b></div><div class="bar"><i style="width:${Math.min(100,Math.max(0,item.progressRealPct))}%;background:var(--gold)"></i></div><div class="goal-projected"><div class="goal-progress-copy"><span>Com aportes já programados: <b>${money(item.projectedCovered)}</b></span><b>${pct(item.progressProjectedPct)}</b></div><div class="bar"><i style="width:${Math.min(100,Math.max(0,item.progressProjectedPct))}%"></i></div></div><div class="goal-values"><div class="goal-value"><span>Realizado</span><strong>${money(item.realized)}</strong></div><div class="goal-value"><span>Programado</span><strong>${money(item.programmed)}</strong></div><div class="goal-value"><span>Falta realizar</span><strong>${money(item.remainingReal)}</strong></div><div class="goal-value"><span>Falta planejar</span><strong>${money(item.remainingUnplanned)}</strong></div></div><div class="goal-details">${deadline}<div class="goal-detail">Necessário<b>${item.deadline?`${money(item.monthlyNeeded)}/mês`:'—'}</b></div>${pace}${forecast}</div><div class="actions"><button class="btn" onclick="openGoal('${item.goal.id}')">Editar</button><button class="btn danger" onclick="deleteRow('goals','${item.goal.id}')">Excluir</button></div></section>`;
+   const forecast=item.isCompleted?'<div class="goal-detail">Situação<b>Objetivo financeiro alcançado</b></div>':item.estimatedCompletionDate?`<div class="goal-detail">Previsão de conclusão<b>${new Date(item.estimatedCompletionDate+"T12:00:00").toLocaleDateString('pt-BR',{month:'long',year:'numeric'})}</b></div>`:'<div class="goal-detail">Previsão<b>Ainda sem cobertura suficiente</b></div>';
+   return `<section class="card goal-card ${item.isCompleted?'completed':''}"><div class="goal-card-top"><div><h2>${esc(item.goal.name||'Meta sem nome')}</h2><div class="goal-target">${money(item.target)}</div></div><span class="tag ${statusClass}">${item.isCompleted?'✓ ':''}${status}</span></div><div class="goal-progress-copy"><span>Realizado: <b>${money(item.realizedTotal)} de ${money(item.target)}</b></span><b>${pct(item.progressRealPct)}</b></div><div class="bar"><i style="width:${Math.min(100,Math.max(0,item.progressRealPct))}%;background:var(--gold)"></i></div><div class="goal-projected"><div class="goal-progress-copy"><span>Cobertura total prevista: <b>${money(item.projectedCovered)}</b></span><b>${pct(item.progressProjectedPct)}</b></div><div class="bar"><i style="width:${Math.min(100,Math.max(0,item.progressProjectedPct))}%"></i></div></div><div class="goal-values"><div class="goal-value"><span>Realizado</span><strong>${money(item.realizedTotal)}</strong></div><div class="goal-value"><span>Programado</span><strong>${money(item.programmed)}</strong></div><div class="goal-value"><span>Projetado</span><strong>${money(item.projected)}</strong></div><div class="goal-value"><span>Cobertura prevista</span><strong>${money(item.projectedCovered)}</strong></div><div class="goal-value"><span>Falta para a meta</span><strong>${money(item.remainingReal)}</strong></div><div class="goal-value"><span>Falta planejar</span><strong>${money(item.remainingUnplanned)}</strong></div></div><div class="goal-details">${deadline}<div class="goal-detail">Necessário<b>${item.deadline?`${money(item.monthlyNeeded)}/mês`:'—'}</b></div>${forecast}</div><div class="actions"><button class="btn" onclick="openGoal('${item.goal.id}')">Editar</button><button class="btn danger" onclick="deleteRow('goals','${item.goal.id}')">Excluir</button></div></section>`;
  };
  const summary=`<section class="card"><div class="row" style="justify-content:space-between"><div><h2>Orçamento de Metas</h2><div class="desc">Acompanhe o espaço mensal necessário para suas metas em andamento.</div></div><span class="tag ${budget.goalBudgetStatus==='sufficient'?'ok':budget.goalBudgetStatus==='insufficient'?'warn':''}">${budget.goalBudgetStatus==='sufficient'?'Compatível':budget.goalBudgetStatus==='insufficient'?'Insuficiente':'Sem orçamento'}</span></div><div class="goals-summary"><div class="goal-value"><span>Orçamento mensal</span><strong>${money(budget.budgetForGoals)}</strong></div><div class="goal-value"><span>Necessidade mensal</span><strong>${money(budget.requiredForActiveGoals)}</strong></div><div class="goal-value"><span>Diferença</span><strong>${money(budget.goalBudgetGap)}</strong></div></div><div class="notice">${budgetCopy}</div></section>`;
  const activeHtml=active.length?`<div class="goal-list">${active.map(card).join('')}</div>`:'<div class="empty">Nenhuma meta em andamento. Cadastre uma nova meta para começar.</div>';
@@ -678,9 +702,10 @@ function nextRecurringDateLabel(x){
 }
 function wealth(){const res=reserveInfo();let reserve="";if(res.target)reserve="<div class=\"bar\"><i style=\"width:"+res.pct+"%;background:var(--gold)\"></i></div><div>"+pct(res.pct)+" do objetivo</div>";const body="<div class=\"grid\"><section class=\"card s6\"><h2>Patrimônio líquido</h2><div style=\"font-size:30px;font-weight:850;margin-top:12px\">"+money(netWorth())+"</div></section><section class=\"card s6\"><h2>Reserva de emergência</h2><div style=\"font-size:30px;font-weight:850;margin-top:12px\">"+money(res.current)+"</div>"+reserve+"</section><section class=\"card s12\"><h2>Ativos</h2>"+simpleTable(DATA.assets,[["Nome",x=>esc(x.name)],["Instituição",x=>esc(x.institution||"—")],["Valor",x=>money(x.current_value)]],"assets")+"</section></div>";return pageHead("Patrimônio","Ativos, dívidas e reserva de emergência.",body)}
 function reportStatus(t){
- if(MBFinance.isCancelled(t))return "cancelado";
- const s=String(t.status||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();
- return ["pendente","pending","programado","scheduled"].includes(s)?"pendente":"realizado";
+ if(t?.state)return t.state==='efetivado'?'realizado':t.state==='previsto_materializado'?'programado':t.state;
+ if(typeof window==='undefined'||!window.MBCanonicalFinance){if(MBFinance.isCancelled(t))return 'cancelado';const legacy=String(t.status||'').toLowerCase();return ['pendente','pending','programado','scheduled'].includes(legacy)?'pendente':'realizado'}
+ const state=window.MBCanonicalFinance.temporalState(t,new Date().toISOString().slice(0,10)).state;
+ return state==='efetivado'?'realizado':state==='previsto_materializado'?'programado':state;
 }
 function matchesReportPeriod(transaction,filters=REPORT_FILTERS){
  const date=MBFinance.financialDate(transaction);if(!date)return false;
@@ -706,6 +731,11 @@ function matchesReportAccount(transaction,filters=REPORT_FILTERS){
    (!filters.goalId||String(transaction.goal_id||"")===String(filters.goalId));
 }
 function buildReportDataset(filters=REPORT_FILTERS){
+ if(typeof window!=='undefined'&&window.MBReportsV82){
+  const now=new Date().toISOString().slice(0,10),states=(filters.statuses||[]).map(s=>s==='pendente'?'programado':s);
+  const result=window.MBReportsV82.projectReport(DATA.transactions||[],DATA.recurring||[],{...filters,states,now});
+  return result.rows.map(row=>({...row,transaction_date:row.date,status:row.state==='efetivado'?'realizado':row.state==='previsto_materializado'?'programado':row.state}));
+ }
  const normalized=(DATA.transactions||[]).map(MBFinance.normalizeTransaction);
  const source=typeof cleanTransactions==="function"?cleanTransactions(normalized).rows:normalized;
  return source.filter(t=>
@@ -721,6 +751,11 @@ function reportTotalsByMonth(rows){return aggregateReportBy(rows,t=>MBFinance.fi
 function reportTotalsByYear(rows){return aggregateReportBy(rows,t=>MBFinance.financialDate(t).slice(0,4))}
 function reportTotalsByStatus(rows){return aggregateReportBy(rows,reportStatus)}
 function reportAggregations(rows){
+ if(rows.some(row=>row?.state)){
+  const byType=reportTotalsByType(rows),realized=rows.filter(row=>row.state==='efetivado'),sum=(type)=>realized.filter(row=>MBFinance.kind(row.transaction_type||row.type)===type).reduce((total,row)=>total+Number(row.amount||0),0);
+  const income=sum('receita'),expense=sum('despesa'),investment=sum('investimento'),rescue=sum('resgate');
+  return {count:rows.length,movementTotal:rows.reduce((sum,row)=>sum+Number(row.amount||0),0),periodBalance:income-expense-investment+rescue,byType,byCategory:reportTotalsByCategory(rows),byMonth:reportTotalsByMonth(rows),byYear:reportTotalsByYear(rows),byStatus:reportTotalsByStatus(rows)};
+ }
  const byType=reportTotalsByType(rows),canonical=MBFinance.totals(rows);
  return {count:rows.length,movementTotal:rows.reduce((sum,t)=>sum+Number(t.amount||0),0),periodBalance:canonical.balance,byType,byCategory:reportTotalsByCategory(rows),byMonth:reportTotalsByMonth(rows),byYear:reportTotalsByYear(rows),byStatus:reportTotalsByStatus(rows)};
 }
@@ -750,7 +785,7 @@ function reports(){
   <div class="filter"><label>Conta</label><select id="reportAccount">${option("","Todas",!REPORT_FILTERS.accountId)}${DATA.accounts.map(a=>option(a.id,a.name,REPORT_FILTERS.accountId===a.id)).join("")}</select></div>
   <div class="filter"><label>Cartão</label><select id="reportCard">${option("","Todos",!REPORT_FILTERS.cardId)}${DATA.cards.map(c=>option(c.id,c.name,REPORT_FILTERS.cardId===c.id)).join("")}</select></div>
   <div class="filter"><label>Meta vinculada</label><select id="reportGoal">${option("","Todas",!REPORT_FILTERS.goalId)}${DATA.goals.map(g=>option(g.id,g.name,REPORT_FILTERS.goalId===g.id)).join("")}</select></div>
- </div><div class="report-choice-row"><div><label>Tipos</label>${[["receita","Receita"],["despesa","Despesa"],["investimento","Investimento"],["transferencia","Transferência"],["resgate","Resgate"]].map(([v,l])=>reportCheck("types",v,l)).join("")}</div><div><label>Status</label>${[["realizado","Realizado"],["pendente","Pendente/programado"],["cancelado","Cancelado"]].map(([v,l])=>reportCheck("statuses",v,l)).join("")}<label class="report-check"><input id="reportFuture" type="checkbox" ${REPORT_FILTERS.includeFuture?"checked":""}> Incluir futuros</label></div></div><div class="actions report-actions"><button class="btn gold" id="applyReportFilters">Aplicar filtros</button><button class="btn" id="clearReportFilters">Limpar filtros</button></div></section>
+ </div><div class="report-choice-row"><div><label>Tipos</label>${[["receita","Receita"],["despesa","Despesa"],["investimento","Investimento"],["transferencia","Transferência"],["resgate","Resgate"]].map(([v,l])=>reportCheck("types",v,l)).join("")}</div><div><label>Estado temporal</label>${[["realizado","Realizado"],["pendente","Programado materializado"],["projetado","Projetado virtual"],["cancelado","Cancelado"],["nao_classificado","Não classificado (auditoria)"]].map(([v,l])=>reportCheck("statuses",v,l)).join("")}</div></div><div class="actions report-actions"><button class="btn gold" id="applyReportFilters">Aplicar filtros</button><button class="btn" id="clearReportFilters">Limpar filtros</button></div></section>
  <div class="kpis report-kpis">${kpi("Lançamentos",agg.count,"registros filtrados")}${kpi("Movimentação total",money(agg.movementTotal),"soma dos valores filtrados")}${kpi("Saldo do período",money(agg.periodBalance),"receitas − despesas − investimentos")}${Object.entries(agg.byType).slice(0,3).map(([k,v])=>kpi(k,money(v),"por tipo")).join("")}</div>
  <div class="grid"><section class="card s8 report-chart-card"><h2>Totais por categoria</h2><div class="chartbox"><canvas id="reportCat"></canvas></div></section><section class="card s4"><h2>Resumo por tipo</h2>${Object.entries(agg.byType).map(([k,v])=>`<div class="statline"><span>${esc(k)}</span><strong>${money(v)}</strong></div>`).join("")||'<div class="empty">Sem dados.</div>'}</section><section class="card s12 report-table-card"><h2>Lançamentos filtrados</h2>${table}</section></div></div>`;
 }
@@ -796,7 +831,7 @@ async function deleteRow(table,id){
    if(!choice)return;
    if(choice==="future"&&linked.length){
      const today=new Date(); today.setHours(0,0,0,0);
-     const ids=linked.filter(t=>t.status==="pendente"&&new Date(t.transaction_date+"T12:00:00")>=today).map(t=>t.id);
+     const ids=linked.filter(t=>isPendingTransaction(t)&&new Date(t.transaction_date+"T12:00:00")>=today).map(t=>t.id);
      if(ids.length){
        const dr=await sb.from("transactions").delete().in("id",ids).eq("user_id",USER.id);
        if(dr.error){toast("Regra não excluída: "+dr.error.message,true);return}
@@ -1025,6 +1060,8 @@ if("serviceWorker" in navigator){
   window.addMonthsV17=addMonthsV17;
 
   function recurrenceSignature(t){
+    const canonical=window.MBStructuredRecurringV82.occurrenceKey(t);
+    if(canonical)return canonical;
     const note=String(t.note||"");
     const source=(note.match(/Recorrência automática • ([0-9a-f-]{8,})/i)||[])[1]||"";
     return [source,t.transaction_date,t.transaction_type,String(t.description||"").trim().toLowerCase(),String(t.category||"").trim().toLowerCase(),Number(t.amount||0).toFixed(2),t.account_id||"",t.card_id||""].join("|");
@@ -1033,50 +1070,12 @@ if("serviceWorker" in navigator){
   async function materializeRecurringV17(){
     if(!USER || !Array.isArray(DATA.recurring)) return {transactions:[],updated:[]};
     const today=new Date();today.setHours(12,0,0,0);
-    const horizon=new Date(today);horizon.setMonth(horizon.getMonth()+12);
+    const horizonEnd=addMonthsV17(today.toISOString().slice(0,10),12);
+    const result=await sb.rpc("materialize_recurring_occurrences_v82",{p_horizon_end:horizonEnd});
+    if(result.error)throw new Error("Falha ao gerar recorrências: "+result.error.message);
     const existing=new Set((DATA.transactions||[]).map(recurrenceSignature));
-    const pending=[], updated=[];
-    for(const r of DATA.recurring.filter(x=>x.active!==false)){
-      let cursor=r.next_date;
-      if(!cursor) continue;
-      let guard=0;
-      while(cursor && new Date(cursor+"T12:00:00")<=horizon && guard<240){
-        if(r.end_date && cursor>r.end_date) break;
-        const row={
-          user_id:USER.id, transaction_date:cursor, description:r.name,
-          category:r.category||null, subcategory:r.subcategory||null, amount:Number(r.amount||0),
-          transaction_type:r.type||"despesa",
-          status:new Date(cursor+"T12:00:00")<=today?"realizado":"pendente",
-          payment_method:r.card_id?"Cartão de crédito":"Conta",
-          account_id:r.account_id||null, card_id:r.card_id||null,
-          goal_id:r.goal_id||null, goal_effect:r.goal_id?(r.goal_effect||'contribution'):null,
-          note:(String(r.note||"").trim()?String(r.note).trim()+" • ":"")+`Recorrência automática • ${r.id}`
-        };
-        const sig=recurrenceSignature(row);
-        if(!existing.has(sig)){ pending.push(row); existing.add(sig); }
-        cursor=addMonthsV17(cursor,Number(r.interval||1)); guard++;
-      }
-      if(cursor && cursor!==r.next_date) updated.push({id:r.id,next_date:cursor});
-    }
-    if(pending.length){
-      const inserted=[];
-      for(let i=0;i<pending.length;i+=100){
-        const batch=pending.slice(i,i+100);
-        const ins=await sb.from("transactions").insert(batch).select();
-        if(ins.error) throw new Error("Falha ao gerar recorrências: "+ins.error.message);
-        if(ins.data?.length) inserted.push(...ins.data);
-      }
-      pending.length=0;
-      pending.push(...inserted);
-    }
-    if(updated.length){
-      await Promise.all(updated.map(async u=>{
-        const r=await sb.from("recurring").update({next_date:u.next_date}).eq("id",u.id).eq("user_id",USER.id);
-        if(r.error)console.error("V18 next_date",r.error);
-        const local=DATA.recurring.find(x=>x.id===u.id);if(local)local.next_date=u.next_date;
-      }));
-    }
-    return {transactions:pending,updated};
+    const inserted=(result.data||[]).filter(row=>{const key=recurrenceSignature(row);if(existing.has(key))return false;existing.add(key);return true});
+    return {transactions:inserted,updated:[]};
   }
   // V18 lifecycle: one parallel load + one batched materialization, avoiding the old double reload.
   window.reload=async function(){
@@ -1260,7 +1259,8 @@ if("serviceWorker" in navigator){
           <div><label id="v19DateLabel">Data do lançamento</label><input name="transaction_date" id="v19TransactionDate" type="date" value="${initialBilling}" required></div>
           <div><label>Descrição</label><input name="description" value="${esc(t?.description||'')}" placeholder="Ex.: Salário" required></div>
           <div><label>Categoria</label><select name="category" id="v19Category" required>${v19Opts(V19_CATS_FOR(initial),t?.category||'')}</select></div>
-          <div><label>Conta</label><select name="account_id" id="v19Account">${accountOptions(t?.account_id||'')}</select></div>
+          <div><label id="v19AccountLabel">Conta</label><select name="account_id" id="v19Account">${accountOptions(t?.source_account_id||t?.account_id||'')}</select></div>
+          <div id="v19AssetBox"><label>Ativo de destino</label><select name="asset_id" id="v19Asset">${assetOptions(t?.asset_id||'')}</select></div>
         </div>
         <div id="v19CardBox" class="full" style="display:${t?.card_id?'block':'none'}">
           <div class="notice"><b>Cartão de crédito:</b> a compra e a competência da fatura são datas diferentes. A competência é a data usada nos gráficos, planejamento e saldo do mês.</div>
@@ -1273,7 +1273,7 @@ if("serviceWorker" in navigator){
           <div><label>Cartão</label><select name="card_id" id="v19Card">${cardOptions(t?.card_id||'')}</select></div>
           <div><label>Subcategoria</label><input name="subcategory" value="${esc(t?.subcategory||'')}"></div>
         </div>
-        <div class="v38-status-row"><label>Status</label><select name="status"><option value="realizado">Realizado</option><option value="pendente" ${t?.status==='pendente'?'selected':''}>Pendente</option><option value="cancelado" ${t?.status==='cancelado'?'selected':''}>Cancelado</option></select></div>
+        <div class="v38-status-row"><label>Status</label><select name="status" id="v19Status"><option value="realizado">Realizado</option><option value="pendente" ${t?.status==='pendente'?'selected':''}>Pendente</option><option value="cancelado" ${t?.status==='cancelado'?'selected':''}>Cancelado</option></select></div>
         <details class="v15-details"><summary>Mais detalhes <span>Opcional</span></summary>
           <div class="v15-detail-grid">
             <div><label>Forma de pagamento</label><input name="payment_method" value="${esc(t?.payment_method||'')}"></div>
@@ -1291,8 +1291,9 @@ if("serviceWorker" in navigator){
 
     const form=$('v19TxForm'), amount=$('v19Amount'), typeButtons=document.querySelectorAll('#v19TxForm .v15-type'), typeInitial=initial;
     const typeState={value:typeInitial};
+    const operationId=!id&&globalThis.crypto?.randomUUID?globalThis.crypto.randomUUID():null;
     const typeEl=()=>typeState.value;
-    const category=$('v19Category'), account=$('v19Account'), card=$('v19Card'), cardBox=$('v19CardBox'), purchase=$('v19PurchaseDate'), billing=$('v19BillingDate'), billingMain=$('v19TransactionDate'), dateLabel=$('v19DateLabel'), install=$('v19Install'), installFields=$('v19InstallFields'), start=$('v19Start'), count=$('v19Count'), installPreview=$('v19InstallPreview'), recurring=$('v19Recurring'), goal=$('v19Goal'), goalEffect=$('v19GoalEffect');
+    const category=$('v19Category'), account=$('v19Account'), accountLabel=$('v19AccountLabel'), asset=$('v19Asset'), assetBox=$('v19AssetBox'), card=$('v19Card'), cardBox=$('v19CardBox'), purchase=$('v19PurchaseDate'), billing=$('v19BillingDate'), billingMain=$('v19TransactionDate'), dateLabel=$('v19DateLabel'), status=$('v19Status'), install=$('v19Install'), installFields=$('v19InstallFields'), start=$('v19Start'), count=$('v19Count'), installPreview=$('v19InstallPreview'), recurring=$('v19Recurring'), goal=$('v19Goal'), goalEffect=$('v19GoalEffect');
     function syncCategories(){
       const list=V19_CATS_FOR(typeEl());
       category.innerHTML=v19Opts(list,v19CategoryFor(typeEl(),category.value)?category.value:'');
@@ -1300,9 +1301,18 @@ if("serviceWorker" in navigator){
     }
     function syncAccountCard(){
       const revenue=typeEl()==='receita';
-      if(revenue) card.value='';
-      card.disabled=revenue;
+      const investment=typeEl()==='investimento';
+      if(revenue||investment) card.value='';
+      card.disabled=revenue||investment;
       account.disabled=!!card.value;
+      accountLabel.textContent=investment?'Conta de origem':'Conta';
+      assetBox.classList.toggle('hidden',!investment);
+      asset.disabled=!investment;
+      if(!investment)asset.value='';
+      install.disabled=investment;
+      if(investment)install.checked=false;
+      status.disabled=investment&&!id;
+      if(investment&&!id)status.value='realizado';
     }
     function syncDatesFromCard(){
       const hasCard=!!card.value && typeEl()!=='receita';
@@ -1374,7 +1384,9 @@ if("serviceWorker" in navigator){
       if(amountValue<=0)errors.push('valor');
       if(!String(fd.get('description')||'').trim())errors.push('descrição');
       if(!v19CategoryFor(type,cat))errors.push('selecione uma categoria compatível com o tipo');
-      if(['despesa','investimento'].includes(type)&&!accountId&&!cardId)errors.push('conta ou cartão');
+      if(type==='despesa'&&!accountId&&!cardId)errors.push('conta ou cartão');
+      if(type==='investimento'&&!accountId)errors.push('conta de origem');
+      if(type==='investimento'&&!asset.value)errors.push('ativo de destino');
       if(type==='receita'&&!accountId)errors.push('conta');
       if(accountId&&cardId)errors.push('escolha conta OU cartão');
       if(cardId&&type==='receita')errors.push('receita não pode usar cartão de crédito');
@@ -1387,6 +1399,8 @@ if("serviceWorker" in navigator){
         transaction_type:type, description:String(fd.get('description')).trim(), category:cat,
         subcategory:fd.get('subcategory')||null, amount:amountValue, status:fd.get('status')||'realizado',
         account_id:accountId, card_id:cardId,
+        source_account_id:type==='investimento'?accountId:null,
+        destination_account_id:null, asset_id:type==='investimento'?(asset.value||null):null,
         payment_method:fd.get('payment_method')||null, note:fd.get('note')||null,
         goal_id:goalId, goal_effect:goalEffectValue
       };
@@ -1409,6 +1423,15 @@ if("serviceWorker" in navigator){
         const r=await sb.from('transactions').insert(rows);
         if(r.error){$('v19TxMsg').textContent='Não foi possível criar as parcelas: '+r.error.message;return}
         createdInstallments=true;
+      }else if(type==='investimento'){
+        if(!operationId){$('v19TxMsg').textContent='Este navegador não oferece geração segura do identificador da operação.';return}
+        const r=await sb.rpc('create_investment_entry_v82',{
+          p_operation_id:operationId,p_source_account_id:accountId,p_asset_id:asset.value,
+          p_amount:amountValue,p_transaction_date:billingDate,p_category:cat,p_description:base.description,
+          p_subcategory:base.subcategory,p_payment_method:base.payment_method,p_note:base.note,
+          p_goal_id:base.goal_id,p_goal_effect:base.goal_effect
+        });
+        if(r.error){$('v19TxMsg').textContent='Não foi possível salvar: '+r.error.message;return}
       }else{
         const r=await sb.from('transactions').insert({...base,user_id:USER.id});
         if(r.error){$('v19TxMsg').textContent='Não foi possível salvar: '+r.error.message;return}
@@ -1420,7 +1443,9 @@ if("serviceWorker" in navigator){
           user_id:USER.id,name:base.description,frequency:'monthly',interval:1,next_date:recurringStart,
           start_date:base.transaction_date,day_of_month:Number(billingDate.slice(8,10))||1,
           amount:base.amount,type:base.transaction_type,category:base.category,subcategory:base.subcategory,
-          account_id:base.account_id,card_id:base.card_id,goal_id:base.goal_id,goal_effect:base.goal_effect,
+          account_id:base.account_id,card_id:base.card_id,
+          source_account_id:base.source_account_id,destination_account_id:base.destination_account_id,asset_id:base.asset_id,
+          goal_id:base.goal_id,goal_effect:base.goal_effect,
           active:true,auto_post:true,note:base.note||null
         });
         if(rr.error){$('v19TxMsg').textContent='Lançamento salvo, mas a recorrência não foi criada: '+rr.error.message;return}
@@ -1464,7 +1489,7 @@ if("serviceWorker" in navigator){
     const x=id?DATA.recurring.find(a=>a.id===id):{};
     if(!id) await v19EnsureIncomeCategories();
     const today=new Date().toISOString().slice(0,10);
-    const initialType=['despesa','receita','investimento'].includes(x?.type)?x.type:'despesa';
+    const initialType=['despesa','receita','investimento','transferencia','resgate'].includes(window.MBStructuredRecurringV82.normalizeType(x?.type))?window.MBStructuredRecurringV82.normalizeType(x?.type):'despesa';
     const startDate=x?.start_date||x?.next_date||today;
     const nextDate=x?.next_date||startDate;
     const frequency=String(x?.frequency||'monthly');
@@ -1475,7 +1500,7 @@ if("serviceWorker" in navigator){
         <div class="v15-essential">
           <div><label>Nome</label><input name="name" required value="${esc(x?.name||'')}"></div>
           <div><label>Valor</label><input name="amount" id="v19RecurringAmount" class="money-field" inputmode="decimal" value="${x?.amount?num(x.amount):''}" required></div>
-          <div><label>Tipo</label><select name="type" id="v19RecurringType">${['despesa','receita','investimento'].map(type=>`<option value="${type}" ${initialType===type?'selected':''}>${type[0].toUpperCase()+type.slice(1)}</option>`).join('')}</select></div>
+          <div><label>Tipo</label><select name="type" id="v19RecurringType">${[['despesa','Despesa'],['receita','Receita'],['investimento','Investimento'],['transferencia','Transferência'],['resgate','Resgate']].map(([type,label])=>`<option value="${type}" ${initialType===type?'selected':''}>${label}</option>`).join('')}</select></div>
           <div><label>Categoria</label><select name="category" id="v19RecurringCategory" required>${v19Opts(V19_CATS_FOR(initialType),x?.category||'')}</select></div>
           <div><label>Frequência</label><select name="frequency">${frequencies.map(([value,label])=>`<option value="${esc(value)}" ${frequency===value?'selected':''}>${esc(label)}</option>`).join('')}</select></div>
           <div><label>Intervalo</label><input name="interval" type="number" min="1" max="120" value="${Math.max(1,Number(x?.interval)||1)}" required></div>
@@ -1483,8 +1508,11 @@ if("serviceWorker" in navigator){
           <div><label>Próxima data</label><input name="next_date" id="v19RecurringNext" type="date" value="${nextDate}" required></div>
           <div><label>Dia do mês</label><input name="day_of_month" id="v19RecurringDay" type="number" min="1" max="31" value="${Math.min(31,Math.max(1,Number(x?.day_of_month)||Number(startDate.slice(8,10))||1))}" required></div>
           <div><label>Subcategoria</label><input name="subcategory" value="${esc(x?.subcategory||'')}"></div>
-          <div><label>Conta</label><select name="account_id" id="v19RecurringAccount">${accountOptions(x?.account_id||'')}</select></div>
-          <div><label>Cartão</label><select name="card_id" id="v19RecurringCard">${cardOptions(x?.card_id||'')}</select></div>
+          <div id="v19RecurringLegacyAccountBox"><label>Conta</label><select name="account_id" id="v19RecurringAccount">${accountOptions(x?.account_id||'')}</select></div>
+          <div id="v19RecurringCardBox"><label>Cartão</label><select name="card_id" id="v19RecurringCard">${cardOptions(x?.card_id||'')}</select></div>
+          <div id="v19RecurringSourceBox"><label>Conta de origem</label><select name="source_account_id" id="v19RecurringSource">${accountOptions(x?.source_account_id||'')}</select></div>
+          <div id="v19RecurringDestinationBox"><label>Conta de destino</label><select name="destination_account_id" id="v19RecurringDestination">${accountOptions(x?.destination_account_id||'')}</select></div>
+          <div id="v19RecurringAssetBox"><label id="v19RecurringAssetLabel">Ativo de destino</label><select name="asset_id" id="v19RecurringAsset">${assetOptions(x?.asset_id||'')}</select></div>
         </div>
         <details class="v15-details"><summary>Mais opções <span>Opcional</span></summary><div class="v15-detail-grid">
           <div><label>Vincular a uma meta</label><select name="goal_id" id="v19RecurringGoal">${v19GoalOptions(x?.goal_id)}</select></div>
@@ -1496,14 +1524,16 @@ if("serviceWorker" in navigator){
         <div id="v19RecurringMsg" class="msg"></div>
         <div class="modal-foot"><button type="button" class="btn" onclick="closeModal()">Cancelar</button><button class="btn primary">Salvar</button></div>
       </form>`);
-    const form=$('v19RecurringForm'), type=$('v19RecurringType'), category=$('v19RecurringCategory'), account=$('v19RecurringAccount'), card=$('v19RecurringCard'), start=$('v19RecurringStart'), next=$('v19RecurringNext'), day=$('v19RecurringDay'), amount=$('v19RecurringAmount'), goal=$('v19RecurringGoal'), goalEffect=$('v19RecurringGoalEffect');
+    const form=$('v19RecurringForm'), type=$('v19RecurringType'), category=$('v19RecurringCategory'), account=$('v19RecurringAccount'), accountBox=$('v19RecurringLegacyAccountBox'), card=$('v19RecurringCard'), cardBox=$('v19RecurringCardBox'), source=$('v19RecurringSource'), sourceBox=$('v19RecurringSourceBox'), destination=$('v19RecurringDestination'), destinationBox=$('v19RecurringDestinationBox'), asset=$('v19RecurringAsset'), assetBox=$('v19RecurringAssetBox'), assetLabel=$('v19RecurringAssetLabel'), start=$('v19RecurringStart'), next=$('v19RecurringNext'), day=$('v19RecurringDay'), amount=$('v19RecurringAmount'), goal=$('v19RecurringGoal'), goalEffect=$('v19RecurringGoalEffect');
     const syncType=()=>{
       const keep=category.value;
       category.innerHTML=v19Opts(V19_CATS_FOR(type.value),v19CategoryFor(type.value,keep)?keep:'');
-      const revenue=type.value==='receita';
-      if(revenue) card.value='';
-      card.disabled=revenue;
-      account.disabled=!!card.value;
+      const simple=['receita','despesa'].includes(type.value),investment=type.value==='investimento',transfer=type.value==='transferencia',rescue=type.value==='resgate';
+      accountBox.classList.toggle('hidden',!simple);cardBox.classList.toggle('hidden',!simple);
+      sourceBox.classList.toggle('hidden',!(investment||transfer));destinationBox.classList.toggle('hidden',!(transfer||rescue));assetBox.classList.toggle('hidden',!(investment||rescue));
+      account.disabled=!simple||!!card.value;card.disabled=!simple||type.value==='receita';source.disabled=!(investment||transfer);destination.disabled=!(transfer||rescue);asset.disabled=!(investment||rescue);
+      assetLabel.textContent=rescue?'Ativo de origem':'Ativo de destino';
+      if(type.value==='receita')card.value='';
     };
     type.onchange=async()=>{if(type.value==='receita')await v19EnsureIncomeCategories();syncType();};
     account.onchange=()=>{if(account.value)card.value='';syncType();};
@@ -1521,23 +1551,30 @@ if("serviceWorker" in navigator){
     form.onsubmit=async e=>{
       e.preventDefault();
       const fd=new FormData(form), amountValue=parseMoney(fd.get('amount')), selectedType=type.value, selectedCategory=String(fd.get('category')||'').trim(), accountId=account.value||null, cardId=card.value||null;
+      const draft={type:selectedType,source_account_id:source.value||null,destination_account_id:destination.value||null,asset_id:asset.value||null};
+      const structural=window.MBStructuredRecurringV82.validateRecurring(draft);
       const goalId=goal.value||null, goalEffectValue=goalId?(goalEffect.value==='withdrawal'?'withdrawal':'contribution'):null;
       const errors=[];
       if(!String(fd.get('name')||'').trim()) errors.push('nome');
       if(!Number.isFinite(amountValue)||amountValue<=0) errors.push('valor');
       if(!v19CategoryFor(selectedType,selectedCategory)) errors.push('categoria compatível com o tipo');
-      if(['despesa','investimento'].includes(selectedType)&&!accountId&&!cardId) errors.push('conta ou cartão');
+      if(selectedType==='despesa'&&!accountId&&!cardId) errors.push('conta ou cartão');
       if(selectedType==='receita'&&!accountId) errors.push('conta');
       if(accountId&&cardId) errors.push('escolha conta OU cartão');
       if(cardId&&selectedType==='receita') errors.push('receita não pode usar cartão de crédito');
+      if(!structural.valid) errors.push(...structural.errors);
       if(!fd.get('start_date')) errors.push('data inicial');
       if(!fd.get('next_date')) errors.push('próxima data');
       if(errors.length){$('v19RecurringMsg').textContent='Preencha/corrija: '+errors.join(', ')+'.';return}
+      const links=window.MBStructuredRecurringV82.canonicalLinks(draft);
       const o={
         name:String(fd.get('name')).trim(), frequency:String(fd.get('frequency')||'monthly'), interval:Math.max(1,Math.min(120,Number(fd.get('interval'))||1)),
         next_date:fd.get('next_date'), start_date:fd.get('start_date'), day_of_month:Math.min(31,Math.max(1,Number(fd.get('day_of_month'))||Number(String(fd.get('start_date')).slice(8,10))||1)),
         amount:amountValue, type:selectedType, category:selectedCategory, subcategory:fd.get('subcategory')||null,
-        account_id:accountId, card_id:cardId, goal_id:goalId, goal_effect:goalEffectValue,
+        account_id:window.MBStructuredRecurringV82.legacyAccountAlias(selectedType,links,accountId),
+        card_id:['receita','despesa'].includes(selectedType)?cardId:null,
+        source_account_id:links.source_account_id,destination_account_id:links.destination_account_id,asset_id:links.asset_id,
+        goal_id:goalId, goal_effect:goalEffectValue,
         active:fd.get('active')==='on', auto_post:fd.get('auto_post')==='on', note:fd.get('note')||null
       };
       const r=id?await sb.from('recurring').update(o).eq('id',id).eq('user_id',USER.id):await sb.from('recurring').insert({...o,user_id:USER.id});
@@ -1995,7 +2032,7 @@ setTimeout(()=>{
       const parcelInfo=parcelMatch?`<div class="small v23-parcel-tag"><b>Parcela ${parcelMatch[1]}/${parcelMatch[2]}</b> · ${rem?`${rem} parcela${rem>1?'s':''} restante${rem>1?'s':''}`:'última parcela'}</div>`:'';
       const recurringMatch=String(t.note||'').match(/Recorrência automática\s+•\s+([^\s•]+)/i);
       const recurringInfo=recurringMatch||/recorr[eê]ncia/i.test(String(t.note||''))?'<div class="small v38-recurring-tag"><b>↻ Recorrente</b> · mensal</div>':'';
-      const pending=t.status==='pendente';
+      const pending=isPendingTransaction(t);
       return `<tr><td>${t.transaction_date?new Date(t.transaction_date+'T12:00:00').toLocaleDateString('pt-BR'):''}${purchase}${invoice}${parcelInfo}${recurringInfo}</td><td>${esc(t.description)}</td><td>${esc(canonicalCategoryName(t.category,t.transaction_type)||'—')}${t.subcategory?' / '+esc(t.subcategory):''}</td><td>${esc(t.transaction_type)}</td><td>${esc(rel||'—')}</td><td class="${t.transaction_type==='receita'||t.transaction_type==='resgate'?'positive':'negative'}">${money(t.amount)}</td><td>${pending?'<span class="tag warn">Pendente</span>':'<span class="tag ok">Realizado</span>'}</td><td><div class="actions">${pending?`<button class="btn gold" onclick="markPaid('${t.id}')">Pagar</button>`:''}<button class="btn" onclick="openTransaction('${t.id}')">Editar</button><button class="btn danger" onclick="deleteTransactionSmart('${t.id}')">Excluir</button></div></td></tr>`;
     }).join('')}</tbody></table></div>`;
   };
@@ -2188,8 +2225,8 @@ setTimeout(()=>{
 
 
   window.openV50Analysis=function(){
-    const h=health();
-    modal('Análise financeira',`<section class="card" style="background:#0d0d0d"><div class="row" style="justify-content:space-between"><div><div class="small muted">SAÚDE FINANCEIRA</div><div style="font-size:42px;font-weight:900;margin:4px 0">${h.score}/100</div></div><span class="tag ${h.score>=75?'ok':'warn'}">${h.label}</span></div><div class="notice" style="margin-top:12px;line-height:1.7">${esc(analysisText(h))}</div><h3 style="margin:18px 0 8px">O que está indo bem</h3><ul style="line-height:1.8;color:#ddd"><li>Controle do orçamento: ${Math.round(h.budgetScore)}/100</li><li>Investimentos: ${Math.round(h.investScore)}/100</li><li>Metas: ${Math.round(h.goalScore)}/100</li></ul><h3 style="margin:18px 0 8px">Reserva</h3><div class="statline"><span>Cobertura</span><strong>${h.cov.toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1})} meses</strong></div><div class="statline"><span>Meta</span><strong>${h.mt} meses</strong></div><div class="statline"><span>Gastos Fixos</span><strong>${money(h.fixed)}/mês</strong></div><div class="statline"><span>Valor necessário</span><strong>${money(reserveTargetValue())}</strong></div><div class="statline"><span>Falta</span><strong>${money(remaining())}</strong></div><div class="modal-foot"><button class="btn" onclick="closeModal()">Fechar</button></div></section>`);
+    const h=typeof window.MB_V50_HEALTH==='function'?window.MB_V50_HEALTH():health(),metric=value=>value===null||value===undefined?'Sem dados suficientes':`${Math.round(value)}/100`,score=h.score===null?'Sem avaliação':`${h.score}/100`,target=window.MB_V56_RESERVE_TARGET?.()||reserveTargetValue(),current=window.MB_V56_RESERVE_CURRENT?.()||0;
+    modal('Análise financeira',`<section class="card" style="background:#0d0d0d"><div class="row" style="justify-content:space-between"><div><div class="small muted">SAÚDE FINANCEIRA</div><div style="font-size:42px;font-weight:900;margin:4px 0">${score}</div></div><span class="tag ${h.score!==null&&h.score>=75?'ok':'warn'}">${h.label}</span></div><div class="notice" style="margin-top:12px;line-height:1.7">${esc(h.message||analysisText(h))}</div><h3 style="margin:18px 0 8px">Indicadores</h3><ul style="line-height:1.8;color:#ddd"><li>Controle do orçamento: ${metric(h.budgetScore)}</li><li>Investimentos: ${metric(h.investScore)}</li><li>Metas: ${metric(h.goalScore)}</li></ul><h3 style="margin:18px 0 8px">Reserva</h3><div class="statline"><span>Cobertura</span><strong>${Number(h.cov||0).toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1})} meses</strong></div><div class="statline"><span>Meta</span><strong>${h.mt} meses</strong></div><div class="statline"><span>Gastos Fixos</span><strong>${money(h.fixed)}/mês</strong></div><div class="statline"><span>Valor necessário</span><strong>${money(target)}</strong></div><div class="statline"><span>Falta</span><strong>${money(Math.max(0,target-current))}</strong></div><div class="modal-foot"><button class="btn" onclick="closeModal()">Fechar</button></div></section>`);
   };
 
   const style=document.createElement('style');
@@ -2482,6 +2519,7 @@ setTimeout(()=>{
   const pctV53=n=>typeof pct==='function'?pct(n):`${safeV53(n).toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1})}%`;
 
   function healthAnalysisV53(h){
+    if(h.evaluable===false)return h.message||'Ainda sem dados suficientes para calcular sua Saúde Financeira.';
     const parts=[];
     if(h.budgetScore>=75) parts.push('Você mantém bom controle do orçamento.');
     if(h.investScore>=75) parts.push('Sua construção patrimonial está avançando bem.');
@@ -2504,9 +2542,12 @@ setTimeout(()=>{
 
   function healthPageV53(){
     const h=healthV53();
-    const score=safeV53(h.score);
-    const label=h.label||'Crítica';
-    const cls=score>=75?'ok':'warn';
+    const score=h.evaluable===false?null:safeV53(h.score);
+    const label=h.label||(score===null?'Dados insuficientes':'Crítica');
+    const cls=score!==null&&score>=75?'ok':'warn';
+    const metric=value=>value===null||value===undefined?'Sem dados suficientes':`${Math.round(value)}/100`;
+    const scoreText=score===null?'Sem avaliação':`${score}/100`;
+    const availability=h.message||'';
     const periodText=(typeof selectedKey==='function'&&typeof monthLabelKey==='function')?monthLabelKey(selectedKey()):'';
     const yearHtml=typeof yearOptions==='function'?yearOptions():`<option value="${FILTERS.year}">${FILTERS.year}</option>`;
     const monthHtml=typeof monthOptions==='function'?monthOptions():`<option value="${FILTERS.month}">${MONTHS[FILTERS.month-1]}</option>`;
@@ -2523,12 +2564,12 @@ setTimeout(()=>{
       </div>
 
       <div class="kpis">
-        ${k('Saúde financeira',`${score}/100`,label)}
-        ${k('Orçamento',`${Math.round(h.budgetScore)}/100`,'controle do orçamento')}
-        ${k('Investimentos',`${Math.round(h.investScore)}/100`,'constância dos investimentos')}
-        ${k('Reserva',`${Math.round(h.reserveScore)}/100`,'proteção financeira')}
-        ${k('Comprometimento',`${Math.round(h.commitmentScore)}/100`,'peso da estrutura financeira')}
-        ${k('Metas',`${Math.round(h.goalScore)}/100`,'evolução das metas')}
+        ${k('Saúde financeira',scoreText,availability||label)}
+        ${k('Orçamento',metric(h.budgetScore),'controle do orçamento')}
+        ${k('Investimentos',metric(h.investScore),'constância dos investimentos')}
+        ${k('Reserva',metric(h.reserveScore),'proteção financeira')}
+        ${k('Comprometimento',metric(h.commitmentScore),'peso da estrutura financeira')}
+        ${k('Metas',metric(h.goalScore),'evolução das metas')}
       </div>
 
       <div class="grid">
@@ -2541,14 +2582,15 @@ setTimeout(()=>{
             <span class="tag ${cls}">${label}</span>
           </div>
 
-          <div style="font-size:52px;font-weight:900;margin:16px 0">${score}<span style="font-size:20px;color:#888">/100</span></div>
-          <div class="bar"><i style="width:${Math.min(100,score)}%;background:var(--gold)"></i></div>
+          <div style="font-size:${score===null?'24px':'52px'};font-weight:900;margin:16px 0">${score===null?'Ainda sem dados suficientes':`${score}<span style="font-size:20px;color:#888">/100</span>`}</div>
+          ${availability?`<div class="notice" style="margin-bottom:12px">${esc(availability)}</div>`:''}
+          ${score===null?'':`<div class="bar"><i style="width:${Math.min(100,score)}%;background:var(--gold)"></i></div>`}
 
-          <div class="statline"><span>Controle do orçamento</span><strong>${Math.round(h.budgetScore)}/100</strong></div>
-          <div class="statline"><span>Investimentos</span><strong>${Math.round(h.investScore)}/100</strong></div>
-          <div class="statline"><span>Reserva</span><strong>${Math.round(h.reserveScore)}/100</strong></div>
-          <div class="statline"><span>Comprometimento</span><strong>${Math.round(h.commitmentScore)}/100</strong></div>
-          <div class="statline"><span>Metas</span><strong>${Math.round(h.goalScore)}/100</strong></div>
+          <div class="statline"><span>Controle do orçamento</span><strong>${metric(h.budgetScore)}</strong></div>
+          <div class="statline"><span>Investimentos</span><strong>${metric(h.investScore)}</strong></div>
+          <div class="statline"><span>Reserva</span><strong>${metric(h.reserveScore)}</strong></div>
+          <div class="statline"><span>Comprometimento</span><strong>${metric(h.commitmentScore)}</strong></div>
+          <div class="statline"><span>Metas</span><strong>${metric(h.goalScore)}</strong></div>
         </section>
 
         <section class="card s4">
@@ -2757,13 +2799,8 @@ migrateReserveGoals();
   }
 
   function fixedForMonth58(y,m){
-    const key=monthKey58(y,m);
-    const rows=(Array.isArray(DATA?.transactions)?DATA.transactions:[]).map(normalizeTransaction);
-    return rows
-      .filter(t=>MBFinance.period(t).key===key&&!isCancelled(t))
-      .filter(t=>typeof topCategory==='function' && topCategory(t.category,t.transaction_type)==='Gastos Fixos')
-      .filter(t=>isExpense(t)||isInvestment(t))
-      .reduce((sum,t)=>sum+t.amount,0);
+    const today=new Date().toISOString().slice(0,10);
+    return window.MBReserveHealthV82.fixedForMonth(Array.isArray(DATA?.transactions)?DATA.transactions:[],y,m,today);
   }
 
   function fixedAverage58(){
@@ -2882,6 +2919,16 @@ migrateReserveGoals();
   if(footer)footer.textContent=footer.textContent.replace(/V56|V55|V54|V53|V52|V51|V50|V39/g,'V58');
 })();
 
+/* V82: nota de Saúde baseada somente no realizado canônico; ledger e configuração permanecem V56/V58. */
+(function(){
+  const current=new Date(),now=`${current.getFullYear()}-${String(current.getMonth()+1).padStart(2,'0')}-${String(current.getDate()).padStart(2,'0')}`;
+  window.MB_V50_HEALTH=function(){
+    const target=window.MB_V56_TARGET_INFO?.()||{target:0,months:6,fx:0},balance=window.MB_V56_RESERVE_CURRENT?.()||0;
+    const reserve={balance,target:Number(target.target||0),months:Number(target.months||6),coverage:window.MB_V56_RESERVE_COVERAGE?.()||0};
+    return window.MBReserveHealthV82.healthScore({plan:monthlyPlan(),transactions:DATA.transactions||[],rules:DATA.recurring||[],goalsData:DATA.goals||[],reserve,year:FILTERS.year,month:FILTERS.month,now});
+  };
+})();
+
 
 
 /* ================================================================
@@ -2962,9 +3009,10 @@ migrateReserveGoals();
   };
 
   function dashboardGoalsSummary(){
-    if(!window.MBGoals)return '';
+    if(!window.MBGoals||!window.MBGoalsV82)return '';
     const statusMap={completed:['Meta alcançada','goal-status-completed'],ahead:['Adiantada','goal-status-ahead'],on_track:['No ritmo','goal-status-track'],behind:['Atrasada','goal-status-behind'],no_forecast:['Sem previsão','goal-status-forecast']};
-    const all=window.MBGoals.all();
+    const current=new Date(), now=`${current.getFullYear()}-${String(current.getMonth()+1).padStart(2,'0')}-${String(current.getDate()).padStart(2,'0')}`;
+    const all=window.MBGoalsV82.projectGoalsForView(DATA.goals||[],DATA.transactions||[],DATA.recurring||[],{now});
     const active=all.filter(goal=>!goal.isCompleted);
     const completed=all.filter(goal=>goal.isCompleted);
     const rank=goal=>goal.status==='behind'?0:goal.deadline?1:goal.status==='on_track'?2:3;
@@ -2973,13 +3021,32 @@ migrateReserveGoals();
     const row=goal=>{
       const [status,statusClass]=statusMap[goal.status]||statusMap.no_forecast;
       const when=goal.estimatedCompletionDate?`previsão: ${dateLabel(goal.estimatedCompletionDate)}`:goal.deadline?`prazo: ${dateLabel(goal.deadline)}`:'sem prazo';
-      return `<div class="dashboard-goal-row"><div class="name">${esc(goal.goal.name||'Meta sem nome')}</div><div class="copy">${money(goal.realized)} / ${money(goal.target)} • ${pct(goal.progressRealPct)}</div><div class="meta"><span class="tag ${statusClass}">${status}</span><span>${when}</span></div></div>`;
+      return `<div class="dashboard-goal-row"><div class="name">${esc(goal.goal.name||'Meta sem nome')}</div><div class="copy">Realizado: ${money(goal.realizedTotal)} / ${money(goal.target)} • ${pct(goal.progressRealPct)}</div><div class="copy">Cobertura prevista: ${money(goal.projectedCovered)} • ${pct(goal.progressProjectedPct)}</div><div class="small muted">Programado: ${money(goal.programmed)} • Projetado: ${money(goal.projected)} • Falta: ${money(goal.remainingReal)}</div><div class="meta"><span class="tag ${statusClass}">${status}</span><span>${when}</span></div></div>`;
     };
     const budget=window.MBGoals.budget();
     const budgetText=budget.goalBudgetStatus==='sufficient'?'Seu orçamento comporta as metas atuais.':budget.goalBudgetStatus==='insufficient'?`Faltam ${money(Math.abs(budget.goalBudgetGap))}/mês para financiar as metas nos prazos definidos.`:'Defina o orçamento de Metas no Planejamento.';
     const rows=active.slice(0,3).map(row).join('')||'<div class="empty" style="min-height:90px">Nenhuma meta em andamento.</div>';
     const completedLine=completed.length?`<div class="dashboard-goals-completed">✓ Meta${completed.length>1?'s':''} alcançada${completed.length>1?'s':''}: ${completed.slice(0,2).map(goal=>esc(goal.goal.name||'Meta')).join(' • ')}</div>`:'';
     return `<section class="card s6"><div class="row" style="justify-content:space-between"><div><h2>Metas</h2><div class="desc">Progresso automático dos objetivos mais relevantes.</div></div><button class="btn" onclick="TAB='goals';render()">Ver todas as metas</button></div><div class="dashboard-goals">${rows}</div>${completedLine}<div class="dashboard-goals-budget"><div class="statline"><span>Orçamento mensal</span><strong>${money(budget.budgetForGoals)}</strong></div><div class="statline"><span>Necessidade mensal</span><strong>${money(budget.requiredForActiveGoals)}</strong></div><div class="statline"><span>Diferença</span><strong>${money(budget.goalBudgetGap)}</strong></div><div class="small muted" style="margin-top:9px">${budgetText}</div></div></section>`;
+  }
+
+  function dashboardPlanningSummary(){
+    if(!window.MBPlanningV82||typeof window.MBPlanningV82.projectPlanningPeriod!=='function')return '';
+    const current=new Date(),now=`${current.getFullYear()}-${String(current.getMonth()+1).padStart(2,'0')}-${String(current.getDate()).padStart(2,'0')}`;
+    const projection=window.MBPlanningV82.projectPlanningPeriod(
+      typeof monthlyPlan==='function'?monthlyPlan():null,
+      DATA.transactions||[],DATA.recurring||[],
+      {year:FILTERS.year,month:FILTERS.month,now}
+    );
+    const movement=(bucket,category)=>category==='Investimentos'?Number(bucket.investment||0):Number(bucket.consumptionByCategory?.[category]||0);
+    const planned=category=>category==='Investimentos'?Number(projection.planned.investment||0):Number(projection.planned.consumptionByCategory?.[category]||0);
+    const line=(label,value)=>`<div class="statline"><span>${label}</span><strong>${money(value)}</strong></div>`;
+    const rows=(Array.isArray(CAT_ORDER)?CAT_ORDER:[]).map(category=>`<tr><td><span class="dot" style="background:${typeof categoryColor==='function'?categoryColor(category):'var(--gold)'}"></span>${esc(category)}</td><td>${money(planned(category))}</td><td>${money(movement(projection.realized,category))}</td><td>${money(movement(projection.scheduledMaterialized,category))}</td><td>${money(movement(projection.projectedVirtual,category))}</td><td>${money(movement(projection.forecast,category))}</td></tr>`).join('');
+    const notice=!projection.period.planFound?'<div class="notice">Sem planejamento cadastrado neste mês; os movimentos canônicos continuam disponíveis.</div>':projection.unclassified.length?`<div class="notice">${projection.unclassified.length} lançamento(s) sem classificação canônica foram excluídos dos valores.</div>`:'';
+    const totalSection=`<section class="card s6 dashboard-planning-v82"><h2>Planejamento do mês</h2><div class="desc"><b>Realizado</b> já ocorreu • <b>Programado</b> está persistido • <b>Projetado</b> é virtual • <b>Previsão</b> = Programado + Projetado.</div>${notice}${line('Planejado',projection.planned.totalOut)}${line('Realizado',projection.realized.totalOut)}${line('Programado',projection.scheduledMaterialized.totalOut)}${line('Projetado',projection.projectedVirtual.totalOut)}${line('Previsão',projection.forecast.totalOut)}</section>`;
+    const investmentSection=`<section class="card s6 v60-invest-card"><h2>Investimentos</h2><div class="desc">Acompanhamento separado das despesas de consumo.</div>${line('Planejado',projection.planned.investment)}${line('Realizado',projection.realized.investment)}${line('Programado',projection.scheduledMaterialized.investment)}${line('Projetado',projection.projectedVirtual.investment)}${line('Previsão',projection.forecast.investment)}</section>`;
+    const categorySection=`<section class="card s12 dashboard-planning-categories-v82"><h2>Planejamento por envelope</h2><div class="tablewrap"><table><thead><tr><th>Envelope</th><th>Planejado</th><th>Realizado</th><th>Programado</th><th>Projetado</th><th>Previsão</th></tr></thead><tbody><tr><td><span class="dot" style="background:var(--ok)"></span>Receitas</td><td>${money(projection.planned.revenue)}</td><td>${money(projection.realized.income)}</td><td>${money(projection.scheduledMaterialized.income)}</td><td>${money(projection.projectedVirtual.income)}</td><td>${money(projection.forecast.income)}</td></tr>${rows}<tr><td><strong>Total de saídas</strong></td><td><strong>${money(projection.planned.totalOut)}</strong></td><td><strong>${money(projection.realized.totalOut)}</strong></td><td><strong>${money(projection.scheduledMaterialized.totalOut)}</strong></td><td><strong>${money(projection.projectedVirtual.totalOut)}</strong></td><td><strong>${money(projection.forecast.totalOut)}</strong></td></tr></tbody></table></div></section>`;
+    return totalSection+investmentSection+categorySection;
   }
 
   window.dashboard = function(){
@@ -2995,11 +3062,14 @@ migrateReserveGoals();
     // KPIs únicos e coerentes com a regra financeira consolidada.
     const ts = typeof periodTx==='function' ? periodTx() : [];
     const total = typeof totals==='function' ? totals(ts) : {income:0,expense:0,invest:0,balance:0};
+    const now=new Date().toISOString().slice(0,10);
+    const financial=window.MBDashboardFinancialV82?.projectDashboardPeriod(DATA.transactions||[],DATA.recurring||[],{year:FILTERS.year,month:FILTERS.month,now});
     const reserve = typeof window.MB_V56_RESERVE_CURRENT==='function' ? window.MB_V56_RESERVE_CURRENT() : 0;
     const patrimonio = typeof netWorth==='function' ? netWorth() : 0;
     const kpiBlock = html.match(/<div class="kpis">[\s\S]*?(?=<div class="grid">)/);
     if(kpiBlock){
-      const replacement=`<div class="kpis">${kpi('Receitas',money(total.income),'período selecionado')}${kpi('Despesas',money(total.expense),'saídas do período')}${kpi('Saldo',money(total.balance),total.balance>=0?'positivo':'atenção')}${kpi('Investimentos',money(total.invest),'período selecionado')}${kpi('Reserva de Emergência',money(reserve),'valor acumulado / disponível')}${kpi('Patrimônio Líquido',money(patrimonio),'estimativa atual')}</div>`;
+      const realized=financial?.realized||{income:total.income,consumptionExpense:total.expense,investment:total.invest,availableBalance:total.balance};const forecast=financial?.forecast||{};
+      const replacement=`<div class="kpis">${kpi('Receitas',money(realized.income),'realizado')}${kpi('Despesas',money(realized.consumptionExpense),'consumo realizado')}${kpi('Saldo',money(realized.availableBalance),realized.availableBalance>=0?'realizado':'atenção')}${kpi('Investimentos',money(realized.investment),'realizado')}${kpi('Reserva de Emergência',money(reserve),'valor acumulado / disponível')}${kpi('Patrimônio Líquido',money(patrimonio),'estimativa atual')}</div>${financial?`<section class="card s12 dashboard-financial-v82"><div class="desc">Previsão separada: Programado + Projetado; não compõe o saldo realizado.</div><div class="statline"><span>Programado</span><strong>${money(financial.scheduled.availableBalanceEffect)}</strong></div><div class="statline"><span>Projetado</span><strong>${money(financial.projected.availableBalanceEffect)}</strong></div><div class="statline"><span>Previsão</span><strong>${money(forecast.availableBalanceEffect)}</strong></div></section>`:''}`;
       html=html.replace(kpiBlock[0],replacement);
     }
 
@@ -3018,33 +3088,18 @@ migrateReserveGoals();
       else if(goalsSection) html=html.replace('<div class="grid">','<div class="grid">'+goalsSection);
     }
 
-    // Planejado × realizado por categoria — única implementação final.
-    const plan=typeof monthlyPlan==='function'?monthlyPlan():null;
-    if(plan){
-      const pv=typeof planValues==='function'?planValues(plan):{};
-      const real=realizedByCategory(ts);
-      const rows=(Array.isArray(CAT_ORDER)?CAT_ORDER:[]).map(c=>{
-        const pl=Number(pv[c]||0),re=Number(real[c]||0);
-        return `<tr><td><span class="dot" style="background:${typeof categoryColor==='function'?categoryColor(c):'var(--gold)'}"></span>${esc(c)}</td><td>${money(pl)}</td><td>${money(re)}</td><td>${pl?pct(re/pl*100):'—'}</td><td>${money(pl-re)}</td></tr>`;
-      }).join('');
-      const section=`<section class="card s12"><h2>Planejado × realizado por categoria</h2><div class="tablewrap"><table><thead><tr><th>Categoria</th><th>Planejado</th><th>Realizado</th><th>Execução</th><th>Diferença</th></tr></thead><tbody>${rows}</tbody></table></div></section>`;
-      const anchor='<section class="card s12"><h2>Últimos lançamentos do período</h2>';
-      if(html.includes(anchor)) html=html.replace(anchor,section+anchor);
-      else html=html.replace('<div class="grid">','<div class="grid">'+section);
-
-      const plannedInvest=Number(pv['Investimentos']||0);
-      const realizedInvest=Number(real['Investimentos']||0);
-      const investSection=`<section class="card s6 v60-invest-card"><h2>Investimentos</h2><div class="desc">Acompanhamento separado das despesas do período.</div><div class="statline"><span>Planejado</span><strong>${money(plannedInvest)}</strong></div><div class="statline"><span>Realizado</span><strong>${money(realizedInvest)}</strong></div><div class="statline"><span>Diferença</span><strong>${money(plannedInvest-realizedInvest)}</strong></div><div class="bar"><i style="width:${plannedInvest?Math.min(100,realizedInvest/plannedInvest*100):0}%;background:${typeof categoryColor==='function'?categoryColor('Investimentos'):'var(--gold)'}"></i></div></section>`;
-      const planAnchor='<section class="card s6"><h2>Planejado × realizado</h2>';
-      if(html.includes(planAnchor)) html=html.replace(planAnchor,investSection+planAnchor);
-      else html=html.replace('<div class="grid">','<div class="grid">'+investSection);
-    }
+    // Planejamento V82: um único motor compartilhado com a página Planejamento.
+    const planningSection=dashboardPlanningSummary();
+    const planningAnchor='<section class="card s12"><h2>Últimos lançamentos do período</h2>';
+    if(planningSection&&html.includes(planningAnchor)) html=html.replace(planningAnchor,planningSection+planningAnchor);
+    else if(planningSection) html=html.replace('<div class="grid">','<div class="grid">'+planningSection);
     return html;
   };
 
-  document.title='Mentoria Black — Gestão Financeira V81 ESCUDO FINAL';
+  document.title='Mentoria Black — Gestão Financeira V82';
+  if(window.MBProductionRuntime?.label) document.title=window.MBProductionRuntime.label;
   const footer=document.querySelector('.footer');
-  if(footer) footer.textContent='Mentoria Black — Gestão Financeira V81 ESCUDO FINAL';
+  if(footer) footer.textContent=`${window.MBProductionRuntime?.label||'Mentoria Black — Gestão Financeira V82'} • dados protegidos por usuário no Supabase`;
 })();
 
 </script>

@@ -1,0 +1,2 @@
+-- Intentionally empty. Database tests create synthetic fixtures inside transactions.
+-- Never place production or personal data in this local seed.
