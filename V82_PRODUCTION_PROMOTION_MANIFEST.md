@@ -1,7 +1,7 @@
 # V82 Production Promotion Manifest
 
-Status: migration inputs reconciled and controlled legacy cleanup complete; promotion
-still requires a new explicit authorization using the current commit and checksums.
+Status: controlled promotion executed on 22 August 2026; production post-flight and
+non-destructive delivery smoke gates passed.
 
 This document freezes the reviewed production inputs and the operational sequence. It
 does not authorize or perform a database migration, Git merge, or production deploy.
@@ -301,3 +301,39 @@ state with the approved preflight and unchanged checksum.
 
 This manifest contains no password, token, authenticated connection string,
 `service_role` credential, publishable key, personal data, or financial data.
+
+## Execution record — 22 August 2026
+
+- Authorized candidate: `beta/v82` at
+  `c4a757dda90d3f32271b0d3bd2fb565d3c7368d7`
+- V81 return point: `0c82a679503ff14fb7ab634253c97c75b2f5f66b`
+- Production release configuration commit:
+  `b00736aa26b18f5311cd51279de1af12f828317c`
+- Production merge commit: `de55cc1c77dec85ca354c327fe533b85bbdff576`
+- GitHub Pages build: `1168058276`, completed at `2026-08-22T15:52:49Z`
+- Official URL: `https://trybulosomaster-max.github.io/Mentoria-Black/`
+- Applied migration history, in order:
+  `20260820161846`, `20260820195658`, `20260821205630`
+- Every migration passed an independent read-only catalog/history gate before the
+  next migration was started; the final preflight result was `GO`.
+- Final protected counts: transactions `179`, recurring `15`, goals `4`, accounts
+  `1`, cards `1`, assets `0`, liabilities `0`, Auth users `3`.
+- Final integrity counts: incompatible structured transactions `0`, cross-user
+  references `0`, duplicate operation identities `0`, duplicate recurring
+  occurrences `0`.
+- Transactional rollback-only production tests passed for owner isolation,
+  cross-user rejection, transfer, investment, rescue, reversal, UI investment
+  wrapper, recurring materialization and idempotency. Synthetic residue: `0`.
+- Security Advisor after promotion: `0` findings. Performance Advisor reported only
+  non-blocking optimization notices (`36 INFO`, `38 WARN`); no promotion-time
+  refactor was attempted.
+- Official active artifact: `16` files, byte-identical to the reviewed local
+  artifact; production project ref only; no Beta ref, administrative secret,
+  authenticated database URL, synthetic user or unknown script.
+- Delivery smoke: HTTPS `200`, official title/manifest/cache, Auth health/settings
+  `200`, and anonymous access to a private financial table rejected (`401`). The
+  functional modules are byte-identical to the Safari/mobile-homologated candidate.
+  No connected browser session was available, so no credential-bearing interactive
+  login or real-data view was attempted; no real financial data was mutated.
+- Rollback was not invoked. The physical backup remains untouched and the Beta
+  project, Beta branch and Beta site remain available.
