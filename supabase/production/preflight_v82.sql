@@ -139,7 +139,7 @@ begin
       ('accounts','opening_balance','numeric',true,'0'),('accounts','created_at','timestamp with time zone',true,'now()'),
       ('cards','id','uuid',true,'gen_random_uuid()'),('cards','user_id','uuid',true,null),
       ('categories','id','uuid',true,'gen_random_uuid()'),('categories','user_id','uuid',true,null),
-      ('categories','kind','text',true,$d$'expense'::text$d$),
+      ('categories','kind','text',false,$d$'expense'::text$d$),
       ('goals','id','uuid',true,'gen_random_uuid()'),('goals','user_id','uuid',true,null),
       ('assets','id','uuid',true,'gen_random_uuid()'),('assets','user_id','uuid',true,null),
       ('assets','current_value','numeric',true,'0'),('assets','created_at','timestamp with time zone',true,'now()'),
@@ -159,16 +159,17 @@ begin
     ) as expected(table_name,column_name,type_name,not_null,default_expression)
   loop
     if to_regclass('public.'||v_row.table_name) is null then continue; end if;
-    select pg_catalog.format_type(a.atttypid,a.atttypmod),a.attnotnull,
+    select a.atttypid,a.attnotnull,
            case when a.atthasdef then pg_get_expr(d.adbin,d.adrelid) end
-      into v_text,v_bool,v_text_two
+      into v_oid,v_bool,v_text_two
     from pg_attribute a
     left join pg_attrdef d on d.adrelid=a.attrelid and d.adnum=a.attnum
     where a.attrelid=to_regclass('public.'||v_row.table_name)
       and a.attname=v_row.column_name and a.attnum>0 and not a.attisdropped;
     if not found then
       v_blockers:=v_blockers||jsonb_build_array('column:'||v_row.table_name||'.'||v_row.column_name||':missing');
-    elsif v_text<>v_row.type_name or v_bool is distinct from v_row.not_null
+    elsif v_oid is distinct from to_regtype(v_row.type_name)::oid
+       or v_bool is distinct from v_row.not_null
        or (
          not ((v_row.table_name='recurring' and v_row.column_name='type')
               or (v_row.table_name='categories' and v_row.column_name='kind'))
@@ -228,7 +229,18 @@ begin
   loop
     select contype::text,pg_get_constraintdef(oid) into v_text,v_text_two
     from pg_constraint where conrelid=to_regclass('public.'||v_row.table_name) and conname=v_row.constraint_name;
-    if not found or v_text<>v_row.constraint_type
+    if not found and v_row.constraint_name in ('recurring_id_user_id_key','transactions_id_user_id_key')
+       and not v_m1_history then
+      select count(*) into v_count
+      from pg_constraint
+      where conrelid=to_regclass('public.'||v_row.table_name)
+        and contype=v_row.constraint_type::"char"
+        and regexp_replace(lower(pg_get_constraintdef(oid)),'[[:space:]]+',' ','g')
+            =regexp_replace(lower(v_row.definition),'[[:space:]]+',' ','g');
+      if v_count>1 then
+        v_blockers:=v_blockers||jsonb_build_array('constraint:'||v_row.table_name||'.'||v_row.constraint_name||':multiple_semantic_equivalents');
+      end if;
+    elsif not found or v_text<>v_row.constraint_type
        or regexp_replace(lower(coalesce(v_text_two,'')),'[[:space:]]+',' ','g')
           <>regexp_replace(lower(v_row.definition),'[[:space:]]+',' ','g') then
       v_blockers:=v_blockers||jsonb_build_array('constraint:'||v_row.table_name||'.'||v_row.constraint_name||':missing_or_incompatible');
@@ -599,6 +611,13 @@ begin
   -- Component totals are explicit and covered by the loops above.
   v_m1_complete:=v_m1_presence=47
     and not exists(select 1 from pg_constraint where conname in ('transactions_account_id_fkey','transactions_card_id_fkey','recurring_account_id_fkey','recurring_card_id_fkey'))
+    and 2=(
+      select count(*) from pg_constraint
+      where (conrelid='public.transactions'::regclass and conname='transactions_id_user_id_key'
+             and contype='u' and pg_get_constraintdef(oid)='UNIQUE (id, user_id)')
+         or (conrelid='public.recurring'::regclass and conname='recurring_id_user_id_key'
+             and contype='u' and pg_get_constraintdef(oid)='UNIQUE (id, user_id)')
+    )
     and v_m1_function_issues=0;
   v_m2_complete:=v_m2_presence=16 and v_m2_function_issues=0;
   v_m3_complete:=v_m3_canonical_policy_count=9

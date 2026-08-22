@@ -22,6 +22,8 @@ databases=(
   "mb_v82_recovery_access_compatible_${suffix}"
   "mb_v82_recovery_access_drift_${suffix}"
   "mb_v82_recovery_policy_drift_${suffix}"
+  "mb_v82_recovery_real_legacy_${suffix}"
+  "mb_v82_recovery_constraint_drift_${suffix}"
 )
 pgtap_assertions=0
 
@@ -65,6 +67,31 @@ assert_sql() {
   fi
 }
 
+run_preflight_go() {
+  local database="$1"
+  local output="$task_tmp_dir/${database}.preflight-go"
+  if ! psql_db "$database" < "$preflight_sql" >"$output" 2>&1; then
+    sed -n '1,220p' "$output" >&2
+    echo "expected preflight GO" >&2
+    exit 1
+  fi
+  rg -q 'MB_V82_PREFLIGHT_RESULT=GO' "$output"
+}
+
+run_preflight_no_go() {
+  local database="$1" expected="$2"
+  local output="$task_tmp_dir/${database}.preflight-no-go"
+  if psql_db "$database" < "$preflight_sql" >"$output" 2>&1; then
+    echo "expected preflight NO-GO: $expected" >&2
+    exit 1
+  fi
+  if ! rg -q 'MB_V82_PREFLIGHT_RESULT=NO-GO' "$output" || ! rg -q "$expected" "$output"; then
+    sed -n '1,220p' "$output" >&2
+    echo "preflight NO-GO missing expected diagnostic: $expected" >&2
+    exit 1
+  fi
+}
+
 create_v81_database() {
   local database="$1"
   if [[ "$database" != mb_v82_recovery_* ]]; then
@@ -94,11 +121,17 @@ grant select on auth.users to authenticated;
 SQL
   apply_file "$database" "$baseline"
   psql_db "$database" >/dev/null <<'SQL'
+alter table public.accounts alter column opening_balance type numeric(14,2);
+alter table public.assets alter column current_value type numeric(14,2);
+alter table public.recurring alter column amount type numeric(14,2);
+alter table public.transactions alter column amount type numeric(14,2);
+alter table public.recurring drop constraint recurring_id_user_id_key;
+alter table public.transactions drop constraint transactions_id_user_id_key;
 create table public.categories(
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   name text not null,
-  kind text not null default 'expense' check (kind in ('receita','despesa','income','expense')),
+  kind text default 'expense' check (kind in ('receita','despesa','income','expense')),
   created_at timestamptz not null default now()
 );
 create table public.monthly_plans(
@@ -184,8 +217,15 @@ apply_file "$partial_two_db" "$migration_two"
 
 compatible_db="${databases[3]}"
 create_v81_database "$compatible_db"
-psql_db "$compatible_db" -qc "alter table public.accounts add column balance_as_of date" >/dev/null
+psql_db "$compatible_db" >/dev/null <<'SQL'
+alter table public.accounts add column balance_as_of date;
+alter table public.transactions add constraint legacy_transactions_owner_unique unique(id,user_id);
+alter table public.recurring add constraint legacy_recurring_owner_unique unique(id,user_id);
+SQL
 apply_file "$compatible_db" "$migration_one"
+assert_sql "$compatible_db" "select count(*) from pg_constraint where conrelid='public.transactions'::regclass and conname='transactions_id_user_id_key' and pg_get_constraintdef(oid)='UNIQUE (id, user_id)'" "1" "equivalent transaction ownership constraint reused"
+assert_sql "$compatible_db" "select count(*) from pg_constraint where conrelid='public.recurring'::regclass and conname='recurring_id_user_id_key' and pg_get_constraintdef(oid)='UNIQUE (id, user_id)'" "1" "equivalent recurring ownership constraint reused"
+assert_sql "$compatible_db" "select count(*) from pg_constraint where conname in ('legacy_transactions_owner_unique','legacy_recurring_owner_unique')" "0" "equivalent constraints renamed canonically"
 apply_file "$compatible_db" "$migration_two"
 
 drift_db="${databases[4]}"
@@ -240,6 +280,130 @@ if apply_file "$policy_drift_db" "$migration_three" 2>/dev/null; then
 fi
 assert_sql "$policy_drift_db" "select count(*) from pg_policies where schemaname='public' and tablename='transactions' and qual='true'" "1" "unsafe policy drift remains untouched"
 
+real_legacy_db="${databases[9]}"
+create_v81_database "$real_legacy_db"
+psql_db "$real_legacy_db" >/dev/null <<'SQL'
+insert into auth.users(id,email) values
+  ('00000000-0000-0000-0000-000000000001','synthetic-a@example.invalid'),
+  ('00000000-0000-0000-0000-000000000002','synthetic-b@example.invalid'),
+  ('00000000-0000-0000-0000-000000000003','synthetic-c@example.invalid');
+insert into public.accounts(id,user_id,name)
+values ('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000001','Synthetic account');
+insert into public.cards(id,user_id,name)
+values ('20000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000001','Synthetic card');
+insert into public.categories(id,user_id,name,kind)
+values ('21000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000001','Synthetic nullable legacy kind',null);
+insert into public.goals(user_id,name)
+select '00000000-0000-0000-0000-000000000001',format('Synthetic goal %s',n)
+from generate_series(1,4) n;
+insert into public.recurring(user_id,name,type,amount,frequency)
+select '00000000-0000-0000-0000-000000000001',format('Synthetic recurring %s',n),'expense',100,'monthly'
+from generate_series(1,15) n;
+insert into public.transactions(user_id,transaction_date,description,amount,transaction_type,status)
+select '00000000-0000-0000-0000-000000000001',current_date,format('Synthetic ordinary %s',n),100,'despesa','realizado'
+from generate_series(1,179) n;
+insert into public.transactions(id,user_id,transaction_date,description,amount,transaction_type,status,account_id) values
+  ('30000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000001',current_date,'Synthetic pending investment 1',100,'investimento','pendente','10000000-0000-0000-0000-000000000001'),
+  ('30000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000001',current_date,'Synthetic pending investment 2',100,'investimento','pendente','10000000-0000-0000-0000-000000000001'),
+  ('30000000-0000-0000-0000-000000000003','00000000-0000-0000-0000-000000000001',current_date,'Synthetic realized investment',100,'investimento','realizado',null),
+  ('30000000-0000-0000-0000-000000000004','00000000-0000-0000-0000-000000000001',current_date,'Synthetic realized transfer',100,'transferencia','realizado',null);
+SQL
+assert_sql "$real_legacy_db" "select count(*) from public.transactions" "183" "real legacy fixture transaction count"
+assert_sql "$real_legacy_db" "select count(*) from public.transactions where transaction_type in ('investimento','transferencia','resgate')" "4" "real legacy candidate count"
+run_preflight_no_go "$real_legacy_db" 'legacy:transactions_incompatible_v82_shape'
+rg -q '"transactions_incompatible_v82_shape_count": 4' "$task_tmp_dir/${real_legacy_db}.preflight-no-go"
+
+synthetic_export="$task_tmp_dir/real-legacy-four.csv"
+psql_db "$real_legacy_db" -c "copy (select * from public.transactions where id in ('30000000-0000-0000-0000-000000000001','30000000-0000-0000-0000-000000000002','30000000-0000-0000-0000-000000000003','30000000-0000-0000-0000-000000000004') order by id) to stdout with (format csv,header true)" >"$synthetic_export"
+chmod 600 "$synthetic_export"
+[[ -s "$synthetic_export" ]]
+[[ "$(stat -f '%Lp' "$synthetic_export")" == "600" ]]
+shasum -a 256 "$synthetic_export" >/dev/null
+
+psql_db "$real_legacy_db" >/dev/null <<'SQL'
+begin;
+create temporary table mb_v82_cleanup_ids(id uuid primary key) on commit drop;
+insert into mb_v82_cleanup_ids(id)
+select id from public.transactions
+where id in (
+  '30000000-0000-0000-0000-000000000001',
+  '30000000-0000-0000-0000-000000000002',
+  '30000000-0000-0000-0000-000000000003',
+  '30000000-0000-0000-0000-000000000004'
+)
+for update;
+do $cleanup$
+declare v_count bigint;
+begin
+  select count(*) into v_count from mb_v82_cleanup_ids;
+  if v_count<>4 then raise exception 'controlled cleanup requires exactly four locked IDs'; end if;
+  if (select count(*) from public.transactions)<>183 then raise exception 'unexpected transaction pre-count'; end if;
+  if (select count(*) from public.recurring)<>15
+     or (select count(*) from public.goals)<>4
+     or (select count(*) from public.accounts)<>1
+     or (select count(*) from public.cards)<>1
+     or (select count(*) from public.assets)<>0
+     or (select count(*) from public.liabilities)<>0
+     or (select count(*) from auth.users)<>3 then
+    raise exception 'protected table pre-count mismatch';
+  end if;
+end
+$cleanup$;
+do $delete$
+declare v_deleted bigint;
+begin
+  delete from public.transactions t using mb_v82_cleanup_ids c where t.id=c.id;
+  get diagnostics v_deleted=row_count;
+  if v_deleted<>4 then raise exception 'controlled cleanup deleted % rows, expected four',v_deleted; end if;
+  if (select count(*) from public.transactions)<>179 then raise exception 'unexpected transaction post-count'; end if;
+  if (select count(*) from public.recurring)<>15
+     or (select count(*) from public.goals)<>4
+     or (select count(*) from public.accounts)<>1
+     or (select count(*) from public.cards)<>1
+     or (select count(*) from public.assets)<>0
+     or (select count(*) from public.liabilities)<>0
+     or (select count(*) from auth.users)<>3 then
+    raise exception 'protected table post-count mismatch';
+  end if;
+end
+$delete$;
+commit;
+SQL
+assert_sql "$real_legacy_db" "select count(*) from public.transactions" "179" "controlled cleanup post-count"
+assert_sql "$real_legacy_db" "select count(*) from public.transactions where transaction_type in ('investimento','transferencia','resgate')" "0" "controlled cleanup leaves no incompatible structured legacy"
+run_preflight_go "$real_legacy_db"
+apply_file "$real_legacy_db" "$migration_one"
+assert_sql "$real_legacy_db" "select count(*) from pg_constraint where conname in ('transactions_id_user_id_key','recurring_id_user_id_key') and pg_get_constraintdef(oid)='UNIQUE (id, user_id)'" "2" "migration one installs ownership keys before dependent FKs"
+assert_sql "$real_legacy_db" "select string_agg(format_type(a.atttypid,a.atttypmod),',' order by a.attrelid::regclass::text,a.attname) from pg_attribute a where (a.attrelid,a.attname) in (('public.accounts'::regclass,'opening_balance'),('public.assets'::regclass,'current_value'),('public.recurring'::regclass,'amount'),('public.transactions'::regclass,'amount'))" "numeric(14,2),numeric(14,2),numeric(14,2),numeric(14,2)" "migration one preserves V81 numeric typmods"
+assert_sql "$real_legacy_db" "select count(*) from public.transactions" "179" "migration one preserves cleaned transaction rows"
+apply_file "$real_legacy_db" "$migration_two"
+apply_file "$real_legacy_db" "$migration_three"
+assert_sql "$real_legacy_db" "select count(*) from public.categories where id='21000000-0000-0000-0000-000000000001' and kind is null" "1" "migration three does not rewrite nullable historical category kind"
+assert_sql "$real_legacy_db" "select count(*) from public.recurring where type='expense'" "15" "migration three does not rewrite historical recurring type"
+assert_sql "$real_legacy_db" "select pg_get_expr(d.adbin,d.adrelid) from pg_attribute a join pg_attrdef d on d.adrelid=a.attrelid and d.adnum=a.attnum where a.attrelid='public.categories'::regclass and a.attname='kind'" "'despesa'::text" "migration three changes only the future category default"
+psql_db "$real_legacy_db" -qc "insert into supabase_migrations.schema_migrations(version,name) values ('20260820161846','add_v82_structured_financial_operations'),('20260820195658','structure_recurring_financial_operations_v82'),('20260821205630','reconcile_v82_production_access_contract')" >/dev/null
+run_preflight_go "$real_legacy_db"
+apply_file "$real_legacy_db" "$migration_one"
+apply_file "$real_legacy_db" "$migration_two"
+apply_file "$real_legacy_db" "$migration_three"
+if psql_db "$real_legacy_db" -qc "insert into public.transactions(user_id,transaction_date,description,amount,transaction_type,status) values ('00000000-0000-0000-0000-000000000001',current_date,'Incomplete investment must fail',100,'investimento','realizado')" >/dev/null 2>&1; then
+  echo "incomplete structured transaction unexpectedly succeeded" >&2
+  exit 1
+fi
+if psql_db "$real_legacy_db" -qc "insert into public.recurring(user_id,name,type,amount) values ('00000000-0000-0000-0000-000000000001','Incomplete rescue must fail','resgate',100)" >/dev/null 2>&1; then
+  echo "incomplete structured recurring rule unexpectedly succeeded" >&2
+  exit 1
+fi
+
+constraint_drift_db="${databases[10]}"
+create_v81_database "$constraint_drift_db"
+psql_db "$constraint_drift_db" -qc "alter table public.transactions add constraint transactions_id_user_id_key unique(user_id,id)" >/dev/null
+if apply_file "$constraint_drift_db" "$migration_one" 2>/dev/null; then
+  echo "incompatible ownership constraint drift unexpectedly succeeded" >&2
+  exit 1
+fi
+assert_sql "$constraint_drift_db" "select count(*) from information_schema.columns where table_schema='public' and table_name='transactions' and column_name='operation_id'" "0" "ownership drift failure rolls back all V82 writes"
+
 apply_file "$normal_db" "$rollback_sql"
 assert_sql "$normal_db" "select has_function_privilege('authenticated','public.create_transfer_v82(uuid,uuid,uuid,numeric,date,text)','execute')" "f" "writer rollback revoke"
 assert_sql "$normal_db" "select count(*) from information_schema.columns where table_schema='public' and table_name='transactions' and column_name='operation_id'" "1" "writer rollback preserves schema"
@@ -254,4 +418,4 @@ run_pgtap "$normal_db" "$repo_root/supabase/tests/v82_financial_integrity_test.s
 run_pgtap "$normal_db" "$repo_root/supabase/tests/v82_recurring_operations_test.sql"
 run_pgtap "$normal_db" "$repo_root/supabase/tests/v82_production_access_contract_test.sql"
 
-echo "v82 production migration recovery: 13 scenarios and ${pgtap_assertions} pgTAP assertions passed"
+echo "v82 production migration recovery: 15 scenarios and ${pgtap_assertions} pgTAP assertions passed"

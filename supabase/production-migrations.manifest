@@ -1,6 +1,8 @@
 # Production-eligible migration candidates. Review and copy only these files into
 # a clean, environment-specific migration chain after reconciling remote history.
 # Never feed this manifest directly to an automated deploy without an approved gate.
+# SHA-256 values are frozen in V82_PRODUCTION_PROMOTION_MANIFEST.md and must be
+# recomputed after any byte change before a production window is authorized.
 supabase/migrations/20260820161846_add_v82_structured_financial_operations.sql
 supabase/migrations/20260820195658_structure_recurring_financial_operations_v82.sql
 supabase/migrations/20260821205630_reconcile_v82_production_access_contract.sql

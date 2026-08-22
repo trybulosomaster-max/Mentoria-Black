@@ -75,9 +75,15 @@ grant select on auth.users to authenticated;
 SQL
   psql_db "$database" < "$baseline" >/dev/null
   psql_db "$database" >/dev/null <<'SQL'
+alter table public.accounts alter column opening_balance type numeric(14,2);
+alter table public.assets alter column current_value type numeric(14,2);
+alter table public.recurring alter column amount type numeric(14,2);
+alter table public.transactions alter column amount type numeric(14,2);
+alter table public.recurring drop constraint recurring_id_user_id_key;
+alter table public.transactions drop constraint transactions_id_user_id_key;
 create table public.categories(
   id uuid primary key default gen_random_uuid(),user_id uuid not null references auth.users(id),
-  name text not null,kind text not null default 'expense' check(kind in ('receita','despesa','income','expense'))
+  name text not null,kind text default 'expense' check(kind in ('receita','despesa','income','expense'))
 );
 create table public.monthly_plans(
   id uuid primary key default gen_random_uuid(),user_id uuid not null references auth.users(id),

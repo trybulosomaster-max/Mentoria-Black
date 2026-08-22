@@ -1,6 +1,7 @@
 # V82 Production Promotion Manifest
 
-Status: gate pre-production approved; promotion requires a separate, explicit authorization.
+Status: migration inputs reconciled locally; production promotion remains blocked until
+the controlled four-row legacy cleanup and its post-cleanup read-only gate are complete.
 
 This document freezes the reviewed production inputs and the operational sequence. It
 does not authorize or perform a database migration, Git merge, or production deploy.
@@ -41,9 +42,16 @@ Apply exactly these files, cumulatively and in this order:
 
 | Order | Migration | SHA-256 |
 | --- | --- | --- |
-| 1 | `20260820161846_add_v82_structured_financial_operations.sql` | `4a8b67b89d6987781241f389527fc13c414c42899b575d04f1584420f377f3ba` |
+| 1 | `20260820161846_add_v82_structured_financial_operations.sql` | `4676784a87862fdf6c046638ac970ae8bdd199d266ddf3f5805ff15e1fe2153f` |
 | 2 | `20260820195658_structure_recurring_financial_operations_v82.sql` | `315d030541901f3d79273bde176e6f2533fbf135e46b3067763bc3c94cf64576` |
 | 3 | `20260821205630_reconcile_v82_production_access_contract.sql` | `39ed7a5f9cad496cbf08c1f3eacf0d6800378b8f1d413ce3df9841bf979bf0e8` |
+
+The previously frozen migration-1 checksum
+`4a8b67b89d6987781241f389527fc13c414c42899b575d04f1584420f377f3ba`
+is superseded and must not be used. Migrations 2 and 3 are byte-identical to their
+previously reviewed versions. The new migration-1 checksum covers semantic reuse of
+equivalent ownership keys and creation of the missing canonical transaction/recurring
+keys before dependent FKs.
 
 The local baseline `20260820161844_local_v81_structural_baseline.sql` is expressly
 prohibited in production. No seed, fixture, Beta-only migration, generic `db push`,
@@ -58,6 +66,35 @@ pg_advisory_xact_lock(hashtextextended('mentoria-black:v82:production-chain', 0)
 
 The lock serializes each migration transaction. A competing deployment, lock timeout,
 statement timeout, semantic drift error, or checksum mismatch is an automatic stop.
+
+## Reconciled V81 input and controlled cleanup prerequisite
+
+The verified V81 pre-state accepts `numeric(14,2)` for the reviewed account, asset,
+recurring and transaction amount fields, preserves their existing defaults and
+nullability, accepts nullable `categories.kind DEFAULT 'expense'`, and expects the
+compound transaction/recurring ownership keys to be absent. No value rewrite or
+inferred relationship is permitted. Migration 3 changes only the future default of
+`categories.kind` and `recurring.type` to `despesa`.
+
+Before any migration, exactly four objectively audited incompatible test transactions
+must be exported to a restricted file outside Git and deleted in one transaction by
+their exact locked IDs. Required aggregate counts are:
+
+| Object | Before | After |
+| --- | ---: | ---: |
+| `transactions` | 183 | 179 |
+| `recurring` | 15 | 15 |
+| `goals` | 4 | 4 |
+| `accounts` | 1 | 1 |
+| `cards` | 1 | 1 |
+| `assets` | 0 | 0 |
+| `liabilities` | 0 | 0 |
+| Auth users | 3 | 3 |
+
+The execution record may contain only cleanup time, count `4`, aggregate before/after
+counts, restricted-export SHA-256, backup availability, post-cleanup preflight result,
+and Advisor result. It must never contain row IDs, descriptions, notes, values, or user
+identifiers. Any deviation rolls back and blocks promotion.
 
 ## Preconditions for the separately authorized window
 

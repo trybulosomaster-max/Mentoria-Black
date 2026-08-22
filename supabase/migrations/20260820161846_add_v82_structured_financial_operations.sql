@@ -51,12 +51,28 @@ end$$;
 create or replace function pg_temp.mb_v82_ensure_constraint(
   p_table regclass,p_name name,p_type "char",p_expected text,p_create text,p_not_valid boolean default false
 ) returns void language plpgsql as $$
-declare v_type "char";v_definition text;v_validated boolean;
+declare
+  v_type "char";
+  v_definition text;
+  v_validated boolean;
+  v_equivalent_count integer;
+  v_equivalent_name name;
 begin
   select contype,pg_get_constraintdef(oid),convalidated into v_type,v_definition,v_validated
   from pg_constraint where conrelid=p_table and conname=p_name;
   if not found then
-    execute p_create;
+    select count(*),min(conname::text)::name
+      into v_equivalent_count,v_equivalent_name
+    from pg_constraint
+    where conrelid=p_table and contype=p_type
+      and pg_temp.mb_v82_normalize(pg_get_constraintdef(oid))=pg_temp.mb_v82_normalize(p_expected);
+    if v_equivalent_count>1 then
+      raise exception 'V82 schema drift: constraint %.% has multiple semantic equivalents',p_table,p_name using errcode='P0001';
+    elsif v_equivalent_count=1 then
+      execute format('alter table %s rename constraint %I to %I',p_table,v_equivalent_name,p_name);
+    else
+      execute p_create;
+    end if;
     select contype,pg_get_constraintdef(oid),convalidated into v_type,v_definition,v_validated
     from pg_constraint where conrelid=p_table and conname=p_name;
   end if;
@@ -145,6 +161,10 @@ select pg_temp.mb_v82_ensure_constraint('public.assets','assets_id_user_id_key',
   'alter table public.assets add constraint assets_id_user_id_key unique (id,user_id)');
 select pg_temp.mb_v82_ensure_constraint('public.liabilities','liabilities_id_user_id_key','u','unique (id, user_id)',
   'alter table public.liabilities add constraint liabilities_id_user_id_key unique (id,user_id)');
+select pg_temp.mb_v82_ensure_constraint('public.transactions','transactions_id_user_id_key','u','unique (id, user_id)',
+  'alter table public.transactions add constraint transactions_id_user_id_key unique (id,user_id)');
+select pg_temp.mb_v82_ensure_constraint('public.recurring','recurring_id_user_id_key','u','unique (id, user_id)',
+  'alter table public.recurring add constraint recurring_id_user_id_key unique (id,user_id)');
 
 select pg_temp.mb_v82_retire_constraint('public.transactions','transactions_account_id_fkey','foreign key (account_id) references accounts(id) on delete set null');
 select pg_temp.mb_v82_retire_constraint('public.transactions','transactions_card_id_fkey','foreign key (card_id) references cards(id) on delete set null');

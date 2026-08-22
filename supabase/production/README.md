@@ -17,6 +17,24 @@ back. Reapplying a completed file is supported: compatible objects are verified 
 retained, functions are replaced only after their signature/body/security contract
 matches, and grants are restored to the reviewed state.
 
+## Reconciled V81 production pre-state
+
+The read-only production audit established these exact contracts as valid V81 input:
+
+- `accounts.opening_balance`: `numeric(14,2) NOT NULL DEFAULT 0`;
+- `assets.current_value`: `numeric(14,2) NOT NULL DEFAULT 0`;
+- `categories.kind`: nullable `text DEFAULT 'expense'`;
+- `recurring.amount`: `numeric(14,2) NOT NULL DEFAULT 0`;
+- `transactions.amount`: `numeric(14,2) NOT NULL` with no default;
+- `transactions_id_user_id_key` and `recurring_id_user_id_key`: absent.
+
+The preflight compares the base PostgreSQL type OID separately from the numeric typmod,
+so the reviewed `numeric(14,2)` contracts are accepted while another base type,
+nullability, or default is rejected. Migration 1 creates the two missing
+`UNIQUE(id,user_id)` keys before any dependent compound FK. An equivalent constraint
+under another name is verified and renamed to the canonical name; an incompatible
+object under the canonical name causes transactional failure.
+
 ## Object reconciliation contract
 
 For every row below, “missing” means create it, “compatible” means retain/verify it,
@@ -25,7 +43,7 @@ and “incompatible” means raise `V82 schema drift` and roll the whole migrati
 | Class | Objects | Expected before | Expected after | Partial/retry behavior |
 |---|---|---|---|---|
 | Nullable columns | `accounts.balance_as_of`; `assets.opening_value`, `assets.value_as_of`; transaction structural IDs/dates/numbers; recurring source/destination/asset IDs | Missing or exact nullable type with no default | Exact nullable `date`, `numeric`, `uuid`, or `integer` type | Exact existing columns are accepted; wrong type, `NOT NULL`, or default fails safely |
-| Ownership unique keys | `accounts_id_user_id_key`, `cards_id_user_id_key`, `assets_id_user_id_key`, `liabilities_id_user_id_key` | Missing or exact `UNIQUE(id,user_id)` | Exact validated unique constraint | Compatible key is retained; other definition under the reviewed name fails |
+| Ownership unique keys | `accounts_id_user_id_key`, `cards_id_user_id_key`, `assets_id_user_id_key`, `liabilities_id_user_id_key`, `transactions_id_user_id_key`, `recurring_id_user_id_key` | Missing, exact `UNIQUE(id,user_id)`, or one semantically exact equivalent under another name | Exact validated canonical unique constraint | Compatible key is retained or canonically renamed; multiple equivalents or another definition under the reviewed name fails |
 | Retired legacy FKs | `transactions_account_id_fkey`, `transactions_card_id_fkey`, `recurring_account_id_fkey`, `recurring_card_id_fkey` | Exact single-column V81 FK or already absent | Absent, replaced by compound ownership FK | Exact legacy FK is dropped; absence is recoverable; incompatible same-name FK fails |
 | Compound transaction FKs | Account, card, source, destination, asset, liability, recurring series, reversal | Missing or exact reviewed definition | `(resource_id,user_id)` FK, `NOT VALID`, reviewed delete action | Compatible unvalidated FK is retained; validated or different target/action fails |
 | Compound recurring FKs | Legacy account/card plus structured source/destination/asset | Missing or exact reviewed definition | `(resource_id,user_id)` FK, `NOT VALID` | Same as transaction ownership FKs |
@@ -44,6 +62,29 @@ and “incompatible” means raise `V82 schema drift` and roll the whole migrati
 All new relationship fields remain nullable. `NOT VALID` avoids scanning or rejecting
 ambiguous legacy rows during deployment, while PostgreSQL still enforces the checks
 and foreign keys for new or changed rows.
+
+## Controlled incompatible-test cleanup gate
+
+The production preflight must report exactly four incompatible structured test
+transactions before cleanup. No type-only delete is permitted. The approved operator
+procedure is:
+
+1. audit the four distinct row IDs without logging descriptions, notes, amounts, IDs,
+   or personal data;
+2. prove one owner, the reviewed type/status distribution, no reconstructible asset or
+   transfer endpoints, no card/goal association, and no inbound FK dependency;
+3. export the exact four full rows to a mode-`0600` file outside the repository and
+   record only its SHA-256;
+4. begin one database transaction, lock those exact four IDs, recheck all protected
+   counts, delete by the captured ID list, require `ROW_COUNT = 4`, and recheck
+   `transactions = 179` plus all protected counts before commit;
+5. commit no migration in the cleanup transaction; rerun the read-only preflight and
+   Security Advisor afterward.
+
+Any candidate count other than four, dependency, count change, identity ambiguity, or
+catalog drift requires rollback and an immediate stop. The physical backup remains the
+disaster-recovery gate; the four-row restricted export is an additional surgical
+recovery artifact, not a substitute for that backup.
 
 ## Pre-flight and application
 
@@ -149,7 +190,11 @@ Database rollback is application-first and non-destructive:
 5. Do not drop `operation_id`, recurrence identity, reversal links or user data.
 
 The local recovery test proves atomic rollback, normal retry, compatible partial state,
-incompatible drift rejection, writer-disable rollback, grant restoration and pgTAP:
+incompatible drift rejection, writer-disable rollback, grant restoration and pgTAP. It
+also models the reconciled production V81 typmods and counts, identifies exactly four
+synthetic incompatible rows, exports them with restricted permissions, deletes only
+their fixed IDs atomically, verifies `183 -> 179`, and applies/retries the complete
+chain without inference:
 
 ```sh
 bash supabase/tests/v82_production_migration_recovery_test.sh
