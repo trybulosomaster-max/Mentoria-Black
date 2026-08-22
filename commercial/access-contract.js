@@ -2,57 +2,70 @@
 
 const PRODUCT_CODES=Object.freeze({APP:'APP',KNOWLEDGE:'KNOWLEDGE',COMPLETE:'COMPLETE'});
 const ACCESS_TYPES=Object.freeze(['paid','trial','manual','lifetime']);
-const ACCESS_STATES=Object.freeze(['active','grace_period','past_due','expired','revoked','refunded','chargeback']);
+const ACCESS_STATES=Object.freeze(['active','grace_period','past_due','expired','revoked','refunded','chargeback','administrative_review','none']);
+const TRIAL_RESULTS=Object.freeze(['started','already_active','already_used','not_eligible']);
 
 function entitlement(value){
   const source=value&&typeof value==='object'?value:{};
+  const accessType=source.access_type||source.type;
+  const state=source.state||source.status||'none';
   return Object.freeze({
-    access:source.access===true,
-    type:ACCESS_TYPES.includes(source.type)?source.type:null,
+    hasAccess:source.has_access===true||source.access===true,
+    access:source.has_access===true||source.access===true,
+    accessType:ACCESS_TYPES.includes(accessType)?accessType:null,
+    type:ACCESS_TYPES.includes(accessType)?accessType:null,
     source:typeof source.source==='string'?source.source:null,
-    status:ACCESS_STATES.includes(source.status)?source.status:null,
+    state:ACCESS_STATES.includes(state)?state:'none',
+    status:ACCESS_STATES.includes(state)?state:'none',
     expiresAt:source.expires_at||null,
-    graceUntil:source.grace_until||null
+    graceUntil:source.grace_until||null,
+    trialRemainingSeconds:Number.isFinite(Number(source.trial_remaining_seconds))?Math.max(0,Number(source.trial_remaining_seconds)):null,
+    commercialState:typeof source.commercial_state==='string'?source.commercial_state:null
   });
 }
 
 function normalizeEntitlements(payload){
   if(!payload||typeof payload!=='object')throw new TypeError('invalid entitlement response');
   if(!payload.server_now)throw new TypeError('server_now is required');
-  return Object.freeze({
-    serverNow:String(payload.server_now),
-    app:entitlement(payload.app),
-    knowledge:entitlement(payload.knowledge),
-    trial:Object.freeze(payload.trial&&typeof payload.trial==='object'?{...payload.trial}:{state:'eligible'})
-  });
+  return Object.freeze({serverNow:String(payload.server_now),app:entitlement(payload.app),knowledge:entitlement(payload.knowledge),trial:Object.freeze(payload.trial&&typeof payload.trial==='object'?{...payload.trial}:{state:'eligible'})});
 }
 
 function resolveExperience(entitlements){
   const state=normalizeEntitlements(entitlements);
-  if(state.app.access&&state.knowledge.access)return 'complete';
-  if(state.app.access)return state.app.type==='trial'?'app_trial':'app';
-  if(state.knowledge.access)return 'knowledge';
-  return state.trial.state==='expired'?'trial_expired':'no_access';
+  if(state.app.hasAccess&&state.knowledge.hasAccess)return 'complete';
+  if(state.app.hasAccess)return state.app.accessType==='trial'?'app_trial':'app';
+  if(state.knowledge.hasAccess)return 'knowledge';
+  return state.trial.state==='expired'||state.app.state==='expired'?'trial_expired':'no_access';
 }
 
 function trialRemaining(entitlements){
   const state=normalizeEntitlements(entitlements);
+  if(state.app.trialRemainingSeconds!==null)return state.app.trialRemainingSeconds*1000;
   const end=Date.parse(state.trial.expires_at||'');
   const server=Date.parse(state.serverNow);
-  if(!Number.isFinite(end)||!Number.isFinite(server))return 0;
-  return Math.max(0,end-server);
+  return Number.isFinite(end)&&Number.isFinite(server)?Math.max(0,end-server):0;
+}
+
+function trialNotice(entitlements){
+  const remaining=trialRemaining(entitlements);
+  if(!remaining)return '';
+  const hours=Math.ceil(remaining/3600000);
+  if(hours<=24)return `Teste gratuito — ${hours===1?'menos de 1 hora':`${hours} horas restantes`}`;
+  return `Teste gratuito — ${Math.ceil(hours/24)} dias restantes`;
 }
 
 async function beginCommercialSession(client){
   if(!client||typeof client.rpc!=='function')throw new TypeError('Supabase client is required');
   const trial=await client.rpc('start_my_app_trial');
   if(trial.error)throw trial.error;
+  const trialRow=Array.isArray(trial.data)?trial.data[0]:trial.data;
+  if(trialRow?.result&&!TRIAL_RESULTS.includes(trialRow.result))throw new TypeError('invalid trial result');
   const resolved=await client.rpc('get_my_entitlements');
   if(resolved.error)throw resolved.error;
   const entitlements=normalizeEntitlements(resolved.data);
-  return Object.freeze({entitlements,experience:resolveExperience(resolved.data)});
+  return Object.freeze({trialResult:trialRow?.result||null,entitlements,experience:resolveExperience(resolved.data)});
 }
 
-const api={PRODUCT_CODES,ACCESS_TYPES,ACCESS_STATES,normalizeEntitlements,resolveExperience,trialRemaining,beginCommercialSession};
+const api={PRODUCT_CODES,ACCESS_TYPES,ACCESS_STATES,TRIAL_RESULTS,normalizeEntitlements,resolveExperience,trialRemaining,trialNotice,beginCommercialSession};
 if(typeof module!=='undefined'&&module.exports)module.exports=api;
 if(typeof globalThis!=='undefined')globalThis.MBCommercialAccess=Object.freeze(api);

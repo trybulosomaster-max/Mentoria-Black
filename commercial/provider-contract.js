@@ -3,27 +3,21 @@
 const PROVIDERS=Object.freeze(['asaas','kiwify','hotmart','eduzz','manual','trial']);
 const BILLING_MODES=Object.freeze(['subscription','one_time']);
 const ASAAS_PAYMENT_METHODS=Object.freeze(['PIX','CREDIT_CARD']);
+const OFFER_CODES=Object.freeze({appMonthly:'APP_MONTHLY',appAnnual:'APP_ANNUAL',knowledge:'KNOWLEDGE_LIFETIME',completeMonthly:'COMPLETE_MONTHLY',completeAnnual:'COMPLETE_ANNUAL'});
 
-function requireSandbox(environment){
-  if(environment!=='sandbox')throw new Error('commercial access v1 provider adapters are sandbox-only');
-  return environment;
-}
-
+function requireSandbox(environment){if(environment!=='sandbox')throw new Error('commercial access v2 provider adapters are sandbox-only');return environment}
 function checkoutIntent(input){
   if(!input||typeof input!=='object')throw new TypeError('checkout input is required');
-  const environment=requireSandbox(input.environment);
-  const offerCode=String(input.offerCode||'').trim().toUpperCase();
-  const paymentMethod=String(input.paymentMethod||'').trim().toUpperCase();
-  if(!/^[A-Z][A-Z0-9_]{1,63}$/.test(offerCode))throw new TypeError('invalid offer code');
+  const environment=requireSandbox(input.environment),offerCode=String(input.offerCode||'').trim().toUpperCase(),paymentMethod=String(input.paymentMethod||'').trim().toUpperCase();
+  if(!Object.values(OFFER_CODES).includes(offerCode))throw new TypeError('invalid offer code');
   if(!ASAAS_PAYMENT_METHODS.includes(paymentMethod))throw new TypeError('unsupported sandbox payment method');
   return Object.freeze({environment,offerCode,paymentMethod});
 }
-
-function assertProviderAdapter(adapter){
-  for(const method of ['createCustomer','createCheckout','createSubscription','fetchPayment']){
-    if(typeof adapter?.[method]!=='function')throw new TypeError(`provider adapter missing ${method}`);
-  }
-  return adapter;
+function createMockCheckoutAdapter(){
+  const create=offerCode=>async input=>Object.freeze({mock:true,network:false,checkoutCreated:false,offerCode,paymentMethod:String(input?.paymentMethod||'PIX').toUpperCase(),message:'Checkout Sandbox ainda não configurado.'});
+  return Object.freeze({createAppMonthlyCheckout:create(OFFER_CODES.appMonthly),createAppAnnualCheckout:create(OFFER_CODES.appAnnual),createKnowledgeCheckout:create(OFFER_CODES.knowledge),createCompleteCheckout:create(OFFER_CODES.completeMonthly)});
 }
-
-module.exports={PROVIDERS,BILLING_MODES,ASAAS_PAYMENT_METHODS,requireSandbox,checkoutIntent,assertProviderAdapter};
+function assertProviderAdapter(adapter){for(const method of ['createCustomer','createCheckout','createSubscription','fetchPayment'])if(typeof adapter?.[method]!=='function')throw new TypeError(`provider adapter missing ${method}`);return adapter}
+const api={PROVIDERS,BILLING_MODES,ASAAS_PAYMENT_METHODS,OFFER_CODES,requireSandbox,checkoutIntent,createMockCheckoutAdapter,assertProviderAdapter};
+if(typeof module!=='undefined'&&module.exports)module.exports=api;
+if(typeof globalThis!=='undefined')globalThis.MBCommercialProvider=Object.freeze(api);

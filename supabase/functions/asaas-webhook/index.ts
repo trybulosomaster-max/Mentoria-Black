@@ -29,7 +29,15 @@ async function recordEvent(event:Record<string,unknown>){
   });
   if(!response.ok)throw new Error(`payment event persistence failed (${response.status})`);
   const rows=await response.json();
-  return {duplicate:Array.isArray(rows)&&rows.length===0};
+  const duplicate=Array.isArray(rows)&&rows.length===0;
+  if(!duplicate&&rows[0]?.id){
+    const processed=await fetch(`${supabaseUrl}/rest/v1/rpc/process_payment_event_v1`,{
+      method:'POST',headers:{apikey:serviceRoleKey,authorization:`Bearer ${serviceRoleKey}`,'content-type':'application/json'},
+      body:JSON.stringify({p_event_id:rows[0].id})
+    });
+    if(!processed.ok)throw new Error(`payment event processing failed (${processed.status})`);
+  }
+  return {duplicate};
 }
 
 let handler:ReturnType<typeof createAsaasWebhookHandler>;

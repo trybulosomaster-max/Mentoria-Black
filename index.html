@@ -23,6 +23,8 @@
 <script src="js/reports-integration.js"></script>
 <script src="js/dashboard-financial-integration.js"></script>
 <script src="js/health-integration.js"></script>
+<script src="commercial/access-contract.js"></script>
+<script src="commercial/provider-contract.js"></script>
 <style>
 :root{--bg:#050505;--panel:#0d0d0d;--panel2:#111;--line:#2b2b2b;--text:#f5f5f5;--muted:#999;--gold:#c9a227;--gold2:#e4c55b;--danger:#d88b8b;--ok:#86bb91;--shadow:0 14px 45px #0008}
 *{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--text);font:14px Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}body{min-height:100vh}button,input,select,textarea{font:inherit}button{cursor:pointer}.hidden{display:none!important}
@@ -52,7 +54,9 @@
 .card{box-shadow:inset 0 1px 0 rgba(255,255,255,.02)}
 .integrity-alert{margin:0 0 12px;padding:11px 13px;border:1px solid #6d5520;background:#17130a;border-radius:12px;color:#e9cf7a;font-size:12px}
 .integrity-alert b{color:#fff}
-.v18-loading{position:fixed;inset:0;background:#050505;display:grid;place-items:center;z-index:9999}.v18-loading-box{text-align:center;color:#bbb}.v18-spinner{width:28px;height:28px;border:2px solid #333;border-top-color:var(--gold);border-radius:50%;animation:v18spin .7s linear infinite;margin:0 auto 12px}@keyframes v18spin{to{transform:rotate(360deg)}}.btn:disabled{opacity:.55;cursor:not-allowed}</style>
+.v18-loading{position:fixed;inset:0;background:#050505;display:grid;place-items:center;z-index:9999}.v18-loading-box{text-align:center;color:#bbb}.v18-spinner{width:28px;height:28px;border:2px solid #333;border-top-color:var(--gold);border-radius:50%;animation:v18spin .7s linear infinite;margin:0 auto 12px}@keyframes v18spin{to{transform:rotate(360deg)}}.btn:disabled{opacity:.55;cursor:not-allowed}
+.commercial-gate{min-height:100vh;display:grid;place-items:center;padding:22px}.commercial-card{width:min(760px,100%);background:linear-gradient(145deg,#12100a,#0b0b0b);border:1px solid #5b4a1f;border-radius:20px;padding:28px;box-shadow:var(--shadow)}.commercial-card h1{font:700 32px Georgia,serif;margin:0 0 8px}.commercial-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:22px 0}.commercial-option{background:#0b0b0b;border:1px solid #393021;border-radius:12px;padding:14px}.commercial-status{color:var(--gold2);font-size:12px;text-align:center;margin:5px 0 9px}.knowledge-shell{max-width:900px;margin:auto}.knowledge-sample{border:1px solid #4b4026;background:#131008;border-radius:14px;padding:18px}@media(max-width:650px){.commercial-grid{grid-template-columns:1fr}.commercial-card{padding:20px}.commercial-card h1{font-size:26px}}
+</style>
 </head>
 <body>
 <div id="v18Loading" class="v18-loading"><div class="v18-loading-box"><div class="v18-spinner"></div><div>Carregando Mentoria Black…</div></div></div>
@@ -93,11 +97,20 @@
     </svg>
     <div class="title">MENTORIA BLACK</div><div class="sub">GESTÃO FINANCEIRA</div>
    </div>
+   <div id="commercialStatus" class="commercial-status hidden"></div>
    <div class="row" style="justify-content:space-between;margin-top:10px"><span class="muted small" id="userEmail"></span><div class="actions"><button class="btn" id="refresh">Atualizar</button><button class="btn" id="print">PDF / Imprimir</button><button class="btn" id="logout">Sair</button></div></div>
   </header>
   <nav id="nav" class="nav"></nav>
   <main id="view"></main>
   <div class="footer">Mentoria Black — Gestão Financeira V82 • dados protegidos por usuário no Supabase</div>
+ </div>
+</section>
+
+<section id="commercialGate" class="commercial-gate hidden">
+ <div class="commercial-card">
+  <div class="brand-full"><div class="title">MENTORIA BLACK</div><div class="sub">ACESSO PREMIUM</div></div>
+  <div id="commercialGateBody"></div>
+  <div class="actions" style="justify-content:center;margin-top:18px"><button class="btn" id="commercialLogout">Sair</button></div>
  </div>
 </section>
 
@@ -119,7 +132,7 @@ const esc=s=>String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&
 const MONTHS=["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
 const CAT_ORDER=["Gastos Fixos","Investimentos","Conforto","Metas","Lazer","Conhecimento"];
 const DEFAULT_COLORS=["#d9ad37","#8e72d9","#4f9ed7","#7dbb72","#e48b3c","#48aaa5"];
-let USER=null,TAB="dashboard",CHARTS={};
+let USER=null,TAB="dashboard",CHARTS={},COMMERCIAL_STATE=null;
 let DATA={accounts:[],cards:[],categories:[],transactions:[],goals:[],recurring:[],assets:[],liabilities:[],monthly:[],rules:[],imports:[]};
 let FILTERS={year:new Date().getFullYear(),month:new Date().getMonth()+1,txType:"",txCategory:"",txMonth:"",search:""};
 const defaultReportFilters=()=>({periodMode:"month",year:new Date().getFullYear(),month:new Date().getMonth()+1,years:[],dateFrom:"",dateTo:"",types:[],category:"",statuses:["realizado","pendente"],includeFuture:true,accountId:"",cardId:"",goalId:""});
@@ -423,7 +436,7 @@ function accountOptions(value=""){return `<option value="">Nenhuma</option>`+DAT
 function cardOptions(value=""){return `<option value="">Nenhum</option>`+DATA.cards.map(c=>`<option value="${c.id}" ${c.id===value?"selected":""}>${esc(c.name)}</option>`).join("")}
 function assetOptions(value=""){return `<option value="">Nenhum</option>`+(DATA.assets||[]).map(a=>`<option value="${a.id}" ${a.id===value?"selected":""}>${esc(a.name)}${a.institution?" — "+esc(a.institution):""}</option>`).join("")}
 function nav(){
- const tabs=[["dashboard","Dashboard"],["transactions","Lançamentos"],["planning","Planejamento"],["accounts","Contas"],["cards","Cartões"],["categories","Categorias"],["goals","Metas"],["recurring","Recorrências"],["wealth","Patrimônio"],["reports","Relatórios"]];
+ const tabs=[["dashboard","Dashboard"],["transactions","Lançamentos"],["planning","Planejamento"],["accounts","Contas"],["cards","Cartões"],["categories","Categorias"],["goals","Metas"],["recurring","Recorrências"],["wealth","Patrimônio"],["reports","Relatórios"],["knowledge","Conhecimento"]];
  $("nav").innerHTML=tabs.map(([id,l])=>`<button class="btn ${TAB===id?"active":""}" data-tab="${id}">${l}</button>`).join("");
  $("nav").querySelectorAll("[data-tab]").forEach(b=>b.onclick=()=>{TAB=b.dataset.tab;render()});
 }
@@ -852,7 +865,11 @@ function bindFilters(){
  const s=$("txSearch"),typ=$("txType"),cat=$("txCategory");if(s)s.oninput=()=>{FILTERS.search=s.value;clearTimeout(window.__txDebounce);window.__txDebounce=setTimeout(()=>render(),180)};if(typ)typ.onchange=()=>{FILTERS.txType=typ.value;render()};if(cat)cat.onchange=()=>{FILTERS.txCategory=cat.value;render()};
  if(TAB==="reports")bindReportFilters();
 }
-function render(){nav();$("view").innerHTML=TAB==="dashboard"?window.dashboard():TAB==="transactions"?window.transactions():TAB==="planning"?planning():TAB==="accounts"?accounts():TAB==="cards"?cards():TAB==="categories"?window.categories():TAB==="goals"?goals():TAB==="recurring"?recurring():TAB==="wealth"?wealth():reports();bindFilters();requestAnimationFrame(()=>window.drawCharts())}
+function knowledge(){
+ const granted=COMMERCIAL_STATE?.entitlements?.knowledge?.hasAccess;
+ return pageHead("Área de Conhecimento","Conteúdo premium Mentoria Black")+`<div class="knowledge-shell"><section class="knowledge-sample"><h2>${granted?'Área de Conhecimento — acesso liberado':'Amostra gratuita'}</h2><p class="muted">${granted?'A estrutura está pronta para receber o livro, capítulos, progresso e materiais complementares.':'Uma amostra pública será disponibilizada aqui. O conteúdo completo exige o acesso KNOWLEDGE.'}</p>${granted?'':'<button class="btn gold" onclick="commercialCheckout(\'knowledge\')">Conhecer acesso completo</button>'}</section></div>`;
+}
+function render(){nav();$("view").innerHTML=TAB==="dashboard"?window.dashboard():TAB==="transactions"?window.transactions():TAB==="planning"?planning():TAB==="accounts"?accounts():TAB==="cards"?cards():TAB==="categories"?window.categories():TAB==="goals"?goals():TAB==="recurring"?recurring():TAB==="wealth"?wealth():TAB==="knowledge"?knowledge():reports();bindFilters();requestAnimationFrame(()=>window.drawCharts())}
 function drawCharts(){
   Object.values(CHARTS).forEach(c=>{try{c.destroy()}catch{}});CHARTS={};
   const rows=expensesByCat();
@@ -1048,6 +1065,25 @@ if("serviceWorker" in navigator){
    Recorrências materializadas com horizonte de 12 meses e carregadas antes do primeiro render.
 */
 (function(){
+  const checkoutAdapter=window.MBCommercialProvider.createMockCheckoutAdapter();
+  window.commercialCheckout=async function(kind){
+    const action={monthly:'createAppMonthlyCheckout',annual:'createAppAnnualCheckout',knowledge:'createKnowledgeCheckout',complete:'createCompleteCheckout'}[kind];
+    const result=await checkoutAdapter[action]({paymentMethod:'PIX'});
+    toast(result.message);
+    return result;
+  };
+  function showCommercialGate(state){
+    const knowledge=state.entitlements.knowledge.hasAccess;
+    const expired=state.experience==='trial_expired';
+    $("auth").classList.add("hidden");$("app").classList.add("hidden");$("commercialGate").classList.remove("hidden");
+    $("commercialGateBody").innerHTML=`<h1>${expired?'Seu período gratuito terminou.':'Seu acesso está pronto para evoluir.'}</h1><p class="muted">Seus dados financeiros permanecem preservados. Assim que um acesso APP for confirmado, você continua com a mesma conta.</p><div class="commercial-grid"><div class="commercial-option"><h2>Plano Mensal</h2><p class="muted">Aplicativo financeiro completo.</p><button class="btn gold" onclick="commercialCheckout('monthly')">Assinar mensal</button></div><div class="commercial-option"><h2>Plano Anual</h2><p class="muted">Aplicativo financeiro completo.</p><button class="btn gold" onclick="commercialCheckout('annual')">Assinar anual</button></div><div class="commercial-option"><h2>Plano Completo</h2><p class="muted">APP + KNOWLEDGE em concessões independentes.</p><button class="btn gold" onclick="commercialCheckout('complete')">Conhecer plano completo</button></div></div><section class="knowledge-sample"><h2>${knowledge?'Área de Conhecimento — acesso liberado':'Amostra da Área de Conhecimento'}</h2><p class="muted">${knowledge?'Seu acesso KNOWLEDGE continua disponível independentemente do APP.':'O trial do APP não libera o conteúdo completo.'}</p>${knowledge?'':'<button class="btn" onclick="commercialCheckout(\'knowledge\')">Conhecer o livro</button>'}</section>`;
+    $("v18Loading")?.classList.add("hidden");
+  }
+  async function resolveCommercialSession(){
+    const state=await window.MBCommercialAccess.beginCommercialSession(sb);
+    COMMERCIAL_STATE=state;
+    return state;
+  }
   function addMonthsV17(dateStr,n){
     const d=new Date(String(dateStr)+"T12:00:00");
     const day=d.getDate();
@@ -1079,6 +1115,10 @@ if("serviceWorker" in navigator){
   }
   // V18 lifecycle: one parallel load + one batched materialization, avoiding the old double reload.
   window.reload=async function(){
+    const resolved=await sb.rpc("get_my_entitlements");
+    if(resolved.error)throw resolved.error;
+    const entitlement=window.MBCommercialAccess.normalizeEntitlements(resolved.data);
+    if(!entitlement.app.hasAccess){showCommercialGate({entitlements:entitlement,experience:window.MBCommercialAccess.resolveExperience(resolved.data)});return}
     await load();
     const result=await materializeRecurringV17();
     if(result?.transactions?.length) DATA.transactions.push(...result.transactions);
@@ -1088,6 +1128,8 @@ if("serviceWorker" in navigator){
   window.start=async function(){
     try{
       $("authMsg").textContent="Carregando seus dados…";
+      const commercial=await resolveCommercialSession();
+      if(!commercial.entitlements.app.hasAccess){showCommercialGate(commercial);return}
       await load();
       const result=await materializeRecurringV17();
       if(result?.transactions?.length) DATA.transactions.push(...result.transactions);
@@ -1095,6 +1137,9 @@ if("serviceWorker" in navigator){
       $("app").classList.remove("hidden");
       $("v18Loading")?.classList.add("hidden");
       $("userEmail").textContent=USER.email||"";
+      const notice=window.MBCommercialAccess.trialNotice(commercial.entitlements);
+      $("commercialStatus").textContent=commercial.entitlements.app.state==="grace_period"?"Pagamento pendente — período de tolerância ativo":notice;
+      $("commercialStatus").classList.toggle("hidden",!$("commercialStatus").textContent);
       render();
     }catch(e){
       $("v18Loading")?.classList.add("hidden");
@@ -1117,6 +1162,7 @@ if("serviceWorker" in navigator){
   };
 
   $("logout").onclick=async()=>{await sb.auth.signOut();location.reload()};
+  $("commercialLogout").onclick=async()=>{await sb.auth.signOut();location.reload()};
   $("refresh").onclick=async()=>{try{await window.reload();toast("Dados atualizados.")}catch(e){toast(e.message,true)}};
 
   (async()=>{

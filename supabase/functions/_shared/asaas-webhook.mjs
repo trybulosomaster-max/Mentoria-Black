@@ -19,7 +19,8 @@ export function classifyAsaasEvent(event){
   if(event==='PAYMENT_OVERDUE')return 'past_due';
   if(event==='PAYMENT_CREDIT_CARD_CAPTURE_REFUSED')return 'failed';
   if(event==='PAYMENT_DELETED'||event==='SUBSCRIPTION_INACTIVATED'||event==='SUBSCRIPTION_DELETED')return 'cancelled';
-  if(event==='PAYMENT_REFUNDED'||event==='PAYMENT_PARTIALLY_REFUNDED'||event==='PAYMENT_RECEIVED_IN_CASH_UNDONE')return 'refunded';
+  if(event==='PAYMENT_PARTIALLY_REFUNDED')return 'administrative_review';
+  if(event==='PAYMENT_REFUNDED'||event==='PAYMENT_RECEIVED_IN_CASH_UNDONE')return 'refunded';
   if(event.startsWith('PAYMENT_CHARGEBACK_')||event==='PAYMENT_AWAITING_CHARGEBACK_REVERSAL')return 'chargeback';
   if(event==='SUBSCRIPTION_CREATED'||event==='SUBSCRIPTION_UPDATED')return 'subscription_update';
   return 'ignored';
@@ -58,7 +59,7 @@ export function safeEventMetadata(payload,payloadHash){
 }
 
 export function createAsaasWebhookHandler({expectedToken,environment='sandbox',recordEvent}){
-  if(environment!=='sandbox')throw new Error('commercial access v1 webhook is sandbox-only');
+  if(environment!=='sandbox')throw new Error('commercial access v2 webhook is sandbox-only');
   if(!expectedToken||expectedToken.length<32)throw new Error('strong sandbox webhook token is required');
   if(typeof recordEvent!=='function')throw new TypeError('recordEvent adapter is required');
   return async request=>{

@@ -10,10 +10,11 @@ suffix="${BASHPID:-$$}"
 normal_db="mb_commercial_v1_normal_${suffix}"
 partial_db="mb_commercial_v1_partial_${suffix}"
 drift_db="mb_commercial_v1_drift_${suffix}"
+concurrent_db="mb_commercial_v1_concurrent_${suffix}"
 tmp_dir="$(mktemp -d "${TMPDIR:-/tmp}/mb-commercial-v1.XXXXXX")"
 
 cleanup(){
-  for database in "$normal_db" "$partial_db" "$drift_db"; do
+  for database in "$normal_db" "$partial_db" "$drift_db" "$concurrent_db"; do
     case "$database" in mb_commercial_v1_*) docker exec "$db_container" dropdb -U postgres --if-exists "$database" >/dev/null 2>&1 || true;; esac
   done
   case "$tmp_dir" in "${TMPDIR:-/tmp}"/mb-commercial-v1.*) rm -rf "$tmp_dir";; esac
@@ -59,7 +60,12 @@ SQL
 
 create_base "$normal_db"
 apply_file "$normal_db" "$migration"
-apply_file "$normal_db" "$test_sql"
+test_output="$(psql_db "$normal_db" < "$test_sql")"
+if rg -q 'not ok [0-9]+' <<<"$test_output"; then
+  echo "$test_output" >&2
+  exit 1
+fi
+test_assertions="$(rg -c 'ok [0-9]+ -' <<<"$test_output")"
 
 create_base "$partial_db"
 awk '{print; if(index($0,"create table public.access_grants")){armed=1} else if(armed&&/^\);$/){print "select 1/0;";armed=0}}' "$migration" > "$tmp_dir/partial.sql"
@@ -77,4 +83,14 @@ fi
 rg -q 'reconcile it explicitly' "$tmp_dir/drift.err"
 assert_sql "$drift_db" "select count(*) from information_schema.tables where table_schema='public' and table_name='access_grants'" "0" "drift failure leaves no partial schema"
 
-echo "commercial access v1 SQL: normal, RLS/trial/entitlements, partial rollback and drift refusal passed"
+create_base "$concurrent_db"
+apply_file "$concurrent_db" "$migration"
+psql_db "$concurrent_db" -qc "insert into auth.users(id,email,email_confirmed_at) values ('f0000000-0000-4000-8000-000000000006','race@example.invalid',now())" >/dev/null
+for run in 1 2; do
+  psql_db "$concurrent_db" -qc "begin; set local role authenticated; set local request.jwt.claim.sub='f0000000-0000-4000-8000-000000000006'; select * from public.start_my_app_trial(); commit" >"$tmp_dir/race-${run}.out" &
+done
+wait
+assert_sql "$concurrent_db" "select count(*) from public.product_trials where user_id='f0000000-0000-4000-8000-000000000006'" "1" "concurrent start creates one trial"
+assert_sql "$concurrent_db" "select count(*) from public.access_grants where user_id='f0000000-0000-4000-8000-000000000006' and access_type='trial'" "1" "concurrent start creates one grant"
+
+echo "commercial access v2 SQL: ${test_assertions} pgTAP assertions; normal, RLS/trial/admin/events, concurrency, partial rollback and drift refusal passed"

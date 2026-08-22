@@ -1,5 +1,9 @@
 # Mentoria Black Commercial Access V1
 
+> Superseded locally by `COMMERCIAL_ACCESS_V2.md`. This file remains the V1 audit
+> record; its unresolved decisions and "future wiring" notes are no longer the active
+> proposal.
+
 Status: local architecture proposal. No remote Supabase change, deploy, charge, webhook
 registration or production configuration is authorized by this document.
 
