@@ -23,7 +23,7 @@ await test('commercial bootstrap starts trial then resolves before app data',asy
  const result=await access.beginCommercialSession(client);equal(calls.join(','),'start_my_app_trial,get_my_entitlements');equal(result.trialResult,'started');equal(result.experience,'app_trial');
 });
 await test('checkout adapter exposes four named sandbox mocks with zero network',async()=>{
- const mock=provider.createMockCheckoutAdapter();for(const method of ['createAppMonthlyCheckout','createAppAnnualCheckout','createKnowledgeCheckout','createCompleteCheckout']){const result=await mock[method]({paymentMethod:'PIX'});ok(result.mock);equal(result.network,false)}
+ const mock=provider.createMockCheckoutAdapter();for(const method of ['createAppMonthlyCheckout','createAppAnnualCheckout','createKnowledgeCheckout','createCompleteCheckout']){const result=await mock[method]({paymentMethod:'PIX'});ok(result.mock);equal(result.network,false);equal(result.checkoutCreated,false);ok(!/mock|sandbox|teste|homologa/i.test(result.message));ok(result.message.includes('Nenhuma cobrança foi realizada.'))}
  equal(provider.checkoutIntent({environment:'sandbox',offerCode:'APP_MONTHLY',paymentMethod:'pix'}).offerCode,'APP_MONTHLY');
  assert.throws(()=>provider.checkoutIntent({environment:'production',offerCode:'APP_MONTHLY',paymentMethod:'PIX'}),/sandbox-only/);assertions++;
  const calls=[],server=provider.createAsaasSandboxCheckoutAdapter({invoke:async(name,options)=>(calls.push({name,options}),{data:{checkoutUrl:'https://sandbox.asaas.com/checkoutSession/show/synthetic',status:'pending_confirmation'},error:null})});

@@ -14,7 +14,7 @@ function checkoutIntent(input){
   return Object.freeze({environment,offerCode,paymentMethod});
 }
 function createMockCheckoutAdapter(){
-  const create=offerCode=>async input=>Object.freeze({mock:true,network:false,checkoutCreated:false,offerCode,paymentMethod:String(input?.paymentMethod||'PIX').toUpperCase(),message:'Checkout Sandbox ainda não configurado.'});
+  const create=offerCode=>async input=>Object.freeze({mock:true,network:false,checkoutCreated:false,offerCode,paymentMethod:String(input?.paymentMethod||'PIX').toUpperCase(),message:'Contratação online ainda não disponível. Nenhuma cobrança foi realizada.'});
   return Object.freeze({createAppMonthlyCheckout:create(OFFER_CODES.appMonthly),createAppAnnualCheckout:create(OFFER_CODES.appAnnual),createKnowledgeCheckout:create(OFFER_CODES.knowledge),createCompleteCheckout:create(OFFER_CODES.complete)});
 }
 function createAsaasSandboxCheckoutAdapter({invoke}={}){
