@@ -22,6 +22,33 @@ await test('commercial bootstrap starts trial then resolves before app data',asy
  const calls=[],client={rpc:async name=>{calls.push(name);return name==='start_my_app_trial'?{data:[{result:'started',trial_state:'active'}],error:null}:{data:{server_now:'2026-08-22T00:00:00Z',app:{has_access:true,access_type:'trial'},knowledge:{has_access:false},trial:{state:'active'}},error:null}}};
  const result=await access.beginCommercialSession(client);equal(calls.join(','),'start_my_app_trial,get_my_entitlements');equal(result.trialResult,'started');equal(result.experience,'app_trial');
 });
+await test('existing login reuses only server-normalized entitlements',async()=>{
+ const profiles=[
+  ['trial',{app:{has_access:true,access_type:'trial',state:'active',trial_remaining_seconds:604800},knowledge:{has_access:false},trial:{state:'active'}},'app_trial'],
+  ['app',{app:{has_access:true,access_type:'paid',state:'active'},knowledge:{has_access:false},trial:{state:'used'}},'app'],
+  ['grace',{app:{has_access:true,access_type:'paid',state:'grace_period'},knowledge:{has_access:false},trial:{state:'used'}},'app'],
+  ['knowledge',{app:{has_access:false,state:'none'},knowledge:{has_access:true,access_type:'lifetime',state:'active'},trial:{state:'used'}},'knowledge'],
+  ['complete',{app:{has_access:true,access_type:'paid',state:'active'},knowledge:{has_access:true,access_type:'lifetime',state:'active'},trial:{state:'used'}},'complete'],
+  ['revoked',{app:{has_access:false,state:'revoked'},knowledge:{has_access:false,state:'revoked'},trial:{state:'used'}},'no_access'],
+  ['expired',{app:{has_access:false,state:'expired'},knowledge:{has_access:false},trial:{state:'expired'}},'trial_expired']
+ ];
+ for(const [label,payload,experience] of profiles){
+  const client={rpc:async name=>name==='start_my_app_trial'?{data:[{result:'already_used'}],error:null}:{data:{server_now:'2026-08-22T00:00:00Z',...payload},error:null}};
+  const session=await access.beginCommercialSession(client);
+  equal(access.normalizeEntitlements(session.entitlements),session.entitlements,`${label} keeps the trusted normalized response`);
+  equal(access.resolveExperience(session.entitlements),experience,`${label} resolves after login`);
+  equal(typeof access.trialNotice(session.entitlements),'string',`${label} renders without requiring server_now again`);
+ }
+ assert.throws(()=>access.normalizeEntitlements({serverNow:'2099-01-01T00:00:00Z',app:{hasAccess:true}}),/server_now is required/);assertions++;
+});
+await test('browser clock cannot extend server-derived access display',()=>{
+ const state={server_now:'2026-08-22T00:00:00Z',app:{has_access:true,access_type:'trial',state:'active',trial_remaining_seconds:3600},knowledge:{has_access:false},trial:{state:'active',expires_at:'2026-08-29T00:00:00Z'}};
+ const normalized=access.normalizeEntitlements(state),originalNow=Date.now;
+ try{
+  Date.now=()=>Date.parse('1900-01-01T00:00:00Z');equal(access.trialRemaining(normalized),3600000);
+  Date.now=()=>Date.parse('2999-01-01T00:00:00Z');equal(access.trialRemaining(normalized),3600000);
+ }finally{Date.now=originalNow}
+});
 await test('checkout adapter exposes four named sandbox mocks with zero network',async()=>{
  const mock=provider.createMockCheckoutAdapter();for(const method of ['createAppMonthlyCheckout','createAppAnnualCheckout','createKnowledgeCheckout','createCompleteCheckout']){const result=await mock[method]({paymentMethod:'PIX'});ok(result.mock);equal(result.network,false);equal(result.checkoutCreated,false);ok(!/mock|sandbox|teste|homologa/i.test(result.message));ok(result.message.includes('Nenhuma cobrança foi realizada.'))}
  equal(provider.checkoutIntent({environment:'sandbox',offerCode:'APP_MONTHLY',paymentMethod:'pix'}).offerCode,'APP_MONTHLY');

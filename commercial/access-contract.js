@@ -4,6 +4,7 @@ const PRODUCT_CODES=Object.freeze({APP:'APP',KNOWLEDGE:'KNOWLEDGE',COMPLETE:'COM
 const ACCESS_TYPES=Object.freeze(['paid','trial','manual','lifetime']);
 const ACCESS_STATES=Object.freeze(['active','grace_period','past_due','expired','revoked','refunded','chargeback','administrative_review','none']);
 const TRIAL_RESULTS=Object.freeze(['started','already_active','already_used','not_eligible']);
+const NORMALIZED_ENTITLEMENTS=new WeakSet();
 
 function entitlement(value){
   const source=value&&typeof value==='object'?value:{};
@@ -26,8 +27,11 @@ function entitlement(value){
 
 function normalizeEntitlements(payload){
   if(!payload||typeof payload!=='object')throw new TypeError('invalid entitlement response');
+  if(NORMALIZED_ENTITLEMENTS.has(payload))return payload;
   if(!payload.server_now)throw new TypeError('server_now is required');
-  return Object.freeze({serverNow:String(payload.server_now),app:entitlement(payload.app),knowledge:entitlement(payload.knowledge),trial:Object.freeze(payload.trial&&typeof payload.trial==='object'?{...payload.trial}:{state:'eligible'})});
+  const normalized=Object.freeze({serverNow:String(payload.server_now),app:entitlement(payload.app),knowledge:entitlement(payload.knowledge),trial:Object.freeze(payload.trial&&typeof payload.trial==='object'?{...payload.trial}:{state:'eligible'})});
+  NORMALIZED_ENTITLEMENTS.add(normalized);
+  return normalized;
 }
 
 function resolveExperience(entitlements){
