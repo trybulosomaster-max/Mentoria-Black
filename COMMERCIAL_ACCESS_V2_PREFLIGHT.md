@@ -5,8 +5,8 @@ credential, Asaas endpoint, `main`, Beta or visual branch is accessed by this te
 
 Candidate: `20260822212119_commercial_access_v1.sql`
 
-SHA-256: `7ccfb4e48b13b13cf3b096be4effe26fa442b9c71f2dddc785f751773cafa89d`; the prior
-`6117a48991d2652c17af94fa55be20315ca43bda015cf68d0d6cd2324eaa00cc` is superseded.
+SHA-256: `e9acee521d8a4daf8eacf20829598055927fccbf4df1dec822b95efeba0fe0e0`; the prior
+`7ccfb4e48b13b13cf3b096be4effe26fa442b9c71f2dddc785f751773cafa89d` is superseded.
 
 ## Clone construction
 
@@ -35,12 +35,16 @@ or Beta data is copied.
   partial V2 objects or unknown state abort before any migration write.
 
 The dedicated fixture `commercial_access_kiwify_upgrade_test.sh` reproduces the remote
-legacy state with synthetic data: 1 product, 1 grant and 2 Kiwify events. It proves the
+legacy state with synthetic data: 1 product, 1 manual grant and 2 Kiwify events. It proves the
 three row identities and both historical payloads survive in place. The migration
 maps only the single `mentoria-black` legacy product to APP, records both historical
 event environments as `legacy`, preserves `set_kiwify_webhook_token(text)` byte-
 semantically, and adds Asaas/other provider support without making Asaas depend on
 Vault or Kiwify.
+
+The fixture also reproduces the production `NOT NULL` audit timestamps and the
+`payment_events.user_id` FK to `auth.users(id) ON DELETE SET NULL`; incompatible
+nullability or FK actions fail the read-only preflight.
 
 The future remote script `supabase/production/preflight_commercial_access_v2.sql`
 begins a read-only transaction. It returns only technical names and aggregate counts;

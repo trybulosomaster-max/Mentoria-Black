@@ -5,14 +5,15 @@ migration, Auth change, webhook registration, checkout, billing, merge or deploy
 
 Proposed migration: `20260822212119_commercial_access_v1.sql`
 
-SHA-256: `7ccfb4e48b13b13cf3b096be4effe26fa442b9c71f2dddc785f751773cafa89d`. The prior
-`6117a48991d2652c17af94fa55be20315ca43bda015cf68d0d6cd2324eaa00cc` is superseded
-by the opaque Asaas order-reference, billing-period and renewal reconciliation.
+SHA-256: `e9acee521d8a4daf8eacf20829598055927fccbf4df1dec822b95efeba0fe0e0`. The prior
+`7ccfb4e48b13b13cf3b096be4effe26fa442b9c71f2dddc785f751773cafa89d` is superseded
+by the production-exact Kiwify pre-state checks added during the final gate.
 
 ## Remote Kiwify legacy reconciliation
 
 The read-only production inventory established an unversioned legacy contract with
-exactly one `products` row, one `access_grants` row, two `payment_events` rows,
+exactly one `products` row, one manual `access_grants` row, two Kiwify
+`payment_events` rows,
 `has_active_access(text)` and `set_kiwify_webhook_token(text)`. The migration now
 classifies its pre-state before any schema write:
 
@@ -22,6 +23,11 @@ classifies its pre-state before any schema write:
   required tables/functions/indexes and the pre-enforcement V82 policies intact;
 - **D — partial, unknown or incompatible:** raises `NO-GO` and the transaction writes
   nothing.
+
+The production-exact gate also requires the legacy audit timestamps to remain
+`NOT NULL` and validates the nullable `payment_events.user_id` FK to
+`auth.users(id) ON DELETE SET NULL`. The upgrade preserves those contracts instead
+of relaxing them.
 
 For state B, the legacy product UUID, slug, display fields and row are preserved. The
 existing `mentoria-black` slug is mapped in place to the APP entitlement only because

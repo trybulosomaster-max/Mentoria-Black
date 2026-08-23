@@ -107,7 +107,9 @@ Migration local: `supabase/migrations/20260823000450_knowledge_area_v1.sql`.
 
 Extensão editorial local: `supabase/migrations/20260823012822_extend_knowledge_editorial_contract_v1.sql`.
 
-SHA-256 validado: `61a43c61b2c7f9044d8bae5439745a3447e1c6ebb8e8362164be2ed2525b0450`.
+SHA-256 da migration base: `091b6748d1ba8f87cd5106c22230b5a5f8ba257a92427ba4e798f68100175b2e`.
+
+SHA-256 da extensão editorial: `b1aa17cb3405d6a7c297599d36539ad68a77d023d0d0aca1175b60c8820d4627`.
 
 Características:
 
@@ -115,6 +117,8 @@ Características:
 - pré-condição explícita do Commercial Access V2;
 - recusa schema parcial, colunas incompatíveis, RPC insegura e policy permissiva;
 - retry sem recriar dados;
+- retry da cadeia completa não rebaixa os validadores editoriais quando a migration
+  base é reapresentada depois da extensão;
 - constraints compostas preservam capítulo/publicação e seção/capítulo;
 - falha parcial volta toda a transação.
 
