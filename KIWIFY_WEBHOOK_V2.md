@@ -1,9 +1,9 @@
 # Mentoria Black — Kiwify webhook dual-compatible
 
-Status: the legacy-token reader fix is homologated only on Supabase Beta
-`amzgqfvyjaiaoohnbcfl`. Production remains on `kiwify-webhook` v4 and was not
-accessed or altered during this work. Repeating production Checkpoint 1 is blocked
-by the new-user issue recorded below.
+Status: the legacy-token reader and bounded new-buyer password are homologated only
+on Supabase Beta `amzgqfvyjaiaoohnbcfl`. Production remains on `kiwify-webhook` v4
+and was not accessed or altered during this work. The candidate is ready for a newly
+authorized repetition of production Checkpoint 1.
 
 ## Compatibility contract
 
@@ -77,35 +77,38 @@ token; Beta used only ephemeral synthetic values that were removed immediately.
   `13cd08c6621b8893190fda2fccbefdb4958ef5be9eadbbf79b25802efdf4ff8e`, then restored
   the token-reader candidate as Beta v14, `ACTIVE`, with bundle SHA-256
   `5428337e6898090a8b8f435a7941513d93ece2f654415c919f3c17bd2012c415`.
+- Beta v15 is the final candidate, bundle SHA-256
+  `df68b86291ece198236fb1a2d352cae4b9731bb3a8fe132c0850ae8861a06396`, from
+  functional commit `3f61612b952734772d377bfb1b4ceb81ec0962ca`.
 
 Beta Advisor findings remained the previously accepted server-only RLS/function
 notices plus the pre-existing leaked-password warning. No new client grant or RLS
 finding was introduced by the Kiwify contract.
 
-## Production blocker discovered during re-homologation
+## New-buyer password correction
 
-An additional approval probe for a purchaser without an existing Mentoria Black
-account failed before grant creation. The Auth log identifies the exact cause:
-the temporary password is built as two UUIDs plus a hyphen (73 bytes), while bcrypt
-accepts at most 72 bytes. Existing-user approval and every token-compatibility gate
-pass, but a new Kiwify purchaser would fail account creation.
+The former generator joined two 36-character UUIDs with a hyphen, producing 73 ASCII
+characters and therefore 73 UTF-8 bytes, one byte beyond bcrypt's limit. The bounded
+generator now obtains 32 bytes from `crypto.getRandomValues()` and encodes them as 64
+lowercase hexadecimal ASCII characters: exactly 64 UTF-8 bytes and 256 bits of source
+entropy. It accepts no input and therefore cannot derive the password from PII.
 
-This task deliberately did not change that writer behavior because its authorization
-was limited to the token reader. Production Checkpoint 1 must not be repeated until a
-separate, reviewed change generates a cryptographically strong temporary password of
-at most 72 bytes, adds an actual-entrypoint new-user test, and is re-homologated on
-Beta. No synthetic user, grant, event or token from the failed probe remains.
+The actual-entrypoint test covers 1,000 generator invocations, new-user creation,
+grant/event creation, duplicate retry and later renewal without a second Auth user or
+credential. A remote Beta approval created exactly one confirmed Auth user, one APP
+grant and one processed event; retry returned `duplicate=true`, with zero raw payload
+and zero active conflicts. The temporary user, grant, event and token were removed,
+restoring Beta to its prior 2/0/0 counts.
 
 ## Future controlled production order
 
-1. fix and re-homologate the bounded new-user password generation on Beta;
-2. repeat the production gate, backup, project-ref, source-hash and v4-hash checks;
-3. deploy the dual-compatible writer while production still has the legacy schema;
-4. send one controlled legacy event and prove idempotency;
-5. apply `20260822212119_commercial_access_v1.sql` transactionally;
-6. immediately apply `20260823104202_install_kiwify_webhook_v2_contract.sql`;
-7. retry/validate Kiwify in V2 and prove 1/1/2 historical rows unchanged;
-8. continue with Knowledge, Editorial, protected content and frontend gates.
+1. repeat the production gate, backup, project-ref, source-hash and v4-hash checks;
+2. deploy the dual-compatible writer while production still has the legacy schema;
+3. send one controlled legacy event and prove idempotency, including buyer-new;
+4. apply `20260822212119_commercial_access_v1.sql` transactionally;
+5. immediately apply `20260823104202_install_kiwify_webhook_v2_contract.sql`;
+6. retry/validate Kiwify in V2 and prove 1/1/2 historical rows unchanged;
+7. continue with Knowledge, Editorial, protected content and frontend gates.
 
 Between steps 4 and 5, the writer intentionally returns a retryable failure rather
 than using the removed legacy conflict target. Rollback before Commercial is the v4
