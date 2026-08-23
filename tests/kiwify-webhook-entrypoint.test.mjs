@@ -44,9 +44,9 @@ function adminClient(storedToken){
   };
 }
 
-async function loadActualEntrypoint(storedToken){
+async function loadActualEntrypoint(storedToken,createClient=()=>adminClient(storedToken)){
   let capturedHandler=null;
-  globalThis.__kiwifyCreateClient=()=>adminClient(storedToken);
+  globalThis.__kiwifyCreateClient=createClient;
   globalThis.Deno={
     env:{get:name=>({
       SUPABASE_URL:'https://synthetic-beta.invalid',
@@ -59,6 +59,69 @@ async function loadActualEntrypoint(storedToken){
   await import(entrypoint.href);
   assert.equal(typeof capturedHandler,'function','the real entrypoint must register its request handler');
   return capturedHandler;
+}
+
+function buyerNewAdmin(storedToken){
+  const state={users:[],events:new Map(),grants:new Map(),createdPasswords:[]};
+  const userId='a1000000-0000-4000-8000-000000000001';
+  const productId='b1000000-0000-4000-8000-000000000001';
+  const chain=result=>{
+    const query={
+      select(){return query;},eq(){return query;},
+      async maybeSingle(){return result();},async single(){return result();},
+      then(resolve,reject){return Promise.resolve(result()).then(resolve,reject);}
+    };
+    return query;
+  };
+  const client={
+    rpc:async name=>{
+      if(name==='get_kiwify_webhook_token')return {data:storedToken,error:null};
+      if(name==='get_kiwify_webhook_contract_v2')return {data:null,error:{code:'PGRST202'}};
+      throw new Error(`unexpected RPC in buyer-new test: ${name}`);
+    },
+    auth:{admin:{
+      listUsers:async()=>({data:{users:[...state.users]},error:null}),
+      createUser:async input=>{
+        state.createdPasswords.push(input.password);
+        const user={id:userId,email:input.email};state.users.push(user);
+        return {data:{user},error:null};
+      }
+    }},
+    from:table=>{
+      if(table==='commercial_enforcement_state')return queryResult({error:{code:'PGRST205'}});
+      if(table==='profiles')return {upsert:async()=>({data:null,error:{code:'PGRST205'}})};
+      if(table==='products')return chain(()=>({data:{id:productId},error:null}));
+      if(table==='payment_events'){
+        const filters={};
+        const query={
+          select(){return query;},eq(column,value){filters[column]=value;return query;},
+          async maybeSingle(){
+            return {data:state.events.get(filters.event_id)||null,error:null};
+          },
+          async insert(row){state.events.set(row.event_id,{...row,id:`id-${row.event_id}`});return {error:null};},
+          update(patch){
+            return {
+              eq(column,value){filters[column]=value;return this;},
+              then(resolve,reject){
+                const row=state.events.get(filters.event_id);
+                if(row)Object.assign(row,patch);
+                return Promise.resolve({error:null}).then(resolve,reject);
+              }
+            };
+          }
+        };
+        return query;
+      }
+      if(table==='access_grants')return {
+        upsert:async(row,options)=>{
+          state.grants.set(`${row.user_id}:${row.product_id}`,{...row,options});
+          return {error:null};
+        }
+      };
+      throw new Error(`unexpected table in buyer-new test: ${table}`);
+    }
+  };
+  return {client,state};
 }
 
 function request(token,payload={}){
@@ -112,4 +175,49 @@ test('the real Edge entrypoint preserves legacy reads without weakening V2 write
   assert.deepEqual(await response.json(),{
     ok:true,status:'test_event_received',duplicate:false,contract:'legacy'
   });
+});
+
+test('the real Edge entrypoint creates a new buyer with a bcrypt-safe private password',async()=>{
+  const token='legacy-profile-token';
+  const {client,state}=buyerNewAdmin(token);
+  const handler=await loadActualEntrypoint(token,()=>client);
+  const approved={
+    provider:'kiwify',environment:'production',webhook_event_type:'purchase_approved',
+    event_id:'buyer-new-approved',order_id:'buyer-new-order',
+    Customer:{id:'buyer-new-customer',email:'buyer-new@example.invalid',full_name:'Synthetic Buyer'},
+    Product:{product_id:'legacy-product',product_name:'Mentoria Black'},
+    Subscription:{id:'buyer-new-subscription',customer_access:{access_until:'2026-09-23T00:00:00Z'}}
+  };
+  let response=await handler(request(token,approved));
+  assert.equal(response.status,200);
+  assert.deepEqual(await response.json(),{
+    ok:true,status:'access_granted',duplicate:false,contract:'legacy'
+  });
+  assert.equal(state.users.length,1);
+  assert.equal(state.createdPasswords.length,1);
+  assert.equal(Buffer.byteLength(state.createdPasswords[0],'utf8'),64);
+  assert.match(state.createdPasswords[0],/^[0-9a-f]{64}$/);
+  assert.equal(state.grants.size,1);
+  assert.equal(state.events.size,1);
+
+  response=await handler(request(token,approved));
+  assert.equal(response.status,200);
+  assert.equal((await response.json()).duplicate,true);
+  assert.equal(state.users.length,1,'retry must not create a second Auth user');
+  assert.equal(state.createdPasswords.length,1,'retry must not generate or expose another credential');
+  assert.equal(state.grants.size,1);
+  assert.equal(state.events.size,1);
+
+  const renewal={
+    ...approved,webhook_event_type:'subscription_renewed',event_id:'buyer-new-renewal',
+    order_id:'buyer-new-renewal-order',
+    Subscription:{id:'buyer-new-subscription',customer_access:{access_until:'2026-10-23T00:00:00Z'}}
+  };
+  response=await handler(request(token,renewal));
+  assert.equal(response.status,200);
+  assert.equal((await response.json()).status,'access_granted');
+  assert.equal(state.users.length,1,'a later event for the buyer must reuse the Auth identity');
+  assert.equal(state.createdPasswords.length,1);
+  assert.equal(state.grants.size,1,'renewal must update the existing legacy grant');
+  assert.equal(state.events.size,2);
 });

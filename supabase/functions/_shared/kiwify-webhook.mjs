@@ -1,6 +1,18 @@
 export const KIWIFY_PAYLOAD_LIMIT_BYTES=256000;
 export const KIWIFY_LEGACY_TOKEN_MIN_LENGTH=8;
 export const KIWIFY_TOKEN_MAX_LENGTH=255;
+export const KIWIFY_TEMPORARY_PASSWORD_BYTES=32;
+
+export function generateTemporaryPassword(){
+  const random=new Uint8Array(KIWIFY_TEMPORARY_PASSWORD_BYTES);
+  crypto.getRandomValues(random);
+  const password=[...random].map(byte=>byte.toString(16).padStart(2,'0')).join('');
+  const byteLength=new TextEncoder().encode(password).byteLength;
+  if(password.length<32||byteLength>72||!/^[0-9a-f]+$/.test(password)){
+    throw new Error('temporary password generation failed');
+  }
+  return password;
+}
 
 export function validateStoredKiwifyWebhookToken(value){
   if(

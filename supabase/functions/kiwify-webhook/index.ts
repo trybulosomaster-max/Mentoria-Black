@@ -1,6 +1,7 @@
 import {createClient} from '@supabase/supabase-js';
 import {
-  buildLegacyGrantWrite,createKiwifyWebhookHandler,validateStoredKiwifyWebhookToken
+  buildLegacyGrantWrite,createKiwifyWebhookHandler,generateTemporaryPassword,
+  validateStoredKiwifyWebhookToken
 } from '../_shared/kiwify-webhook.mjs';
 
 const supabaseUrl=Deno.env.get('SUPABASE_URL')||'';
@@ -58,7 +59,7 @@ async function resolveUser(metadata:Record<string,unknown>){
   let user=await findUserByEmail(email),newlyCreated=false;
   if(!user){
     const created=await admin.auth.admin.createUser({
-      email,password:`${crypto.randomUUID()}-${crypto.randomUUID()}`,email_confirm:true,
+      email,password:generateTemporaryPassword(),email_confirm:true,
       user_metadata:{source:'kiwify'}
     });
     if(created.error||!created.data.user){

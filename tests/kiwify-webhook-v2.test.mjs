@@ -3,10 +3,21 @@ import {readFileSync} from 'node:fs';
 import test from 'node:test';
 import {
   KIWIFY_EVENT_TYPES,buildLegacyGrantWrite,createKiwifyWebhookHandler,
-  hmacSha1Hex,parseKiwifyMetadata,sha256Hex
+  generateTemporaryPassword,hmacSha1Hex,parseKiwifyMetadata,sha256Hex
 } from '../supabase/functions/_shared/kiwify-webhook.mjs';
 
 const TOKEN='synthetic-kiwify-webhook-token-000000000001';
+
+test('generates 1,000 bounded high-variability temporary passwords without PII input',()=>{
+  const passwords=Array.from({length:1000},()=>generateTemporaryPassword());
+  assert.equal(generateTemporaryPassword.length,0,'the generator accepts no PII or caller-controlled input');
+  assert.equal(new Set(passwords).size,passwords.length,'the sample must contain no duplicate passwords');
+  for(const password of passwords){
+    assert.equal(password.length,64);
+    assert.ok(Buffer.byteLength(password,'utf8')<=72);
+    assert.match(password,/^[0-9a-f]{64}$/);
+  }
+});
 
 function payload(overrides={}){
   return {
@@ -131,4 +142,4 @@ test('uses the supported paginated Admin API for dual-contract user resolution',
   assert.match(source,/page<=100/);
 });
 
-console.log('kiwify-webhook-v2: 10 tests passed');
+console.log('kiwify-webhook-v2: 11 tests passed');
