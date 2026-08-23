@@ -13,12 +13,13 @@ suffix="${BASHPID:-$$}"
 normal_db="mb_knowledge_parts_1_4_normal_${suffix}"
 partial_db="mb_knowledge_parts_1_4_partial_${suffix}"
 drift_db="mb_knowledge_parts_1_4_drift_${suffix}"
+remote_db="mb_knowledge_remote_homologation_${suffix}"
 tmp_dir="$(mktemp -d "${TMPDIR:-/tmp}/mb-knowledge-parts-1-4.XXXXXX")"
 shell_assertions=0
 
 cleanup(){
-  for database in "$drift_db" "$partial_db" "$normal_db";do
-    case "$database" in mb_knowledge_parts_1_4_*) docker exec "$db_container" dropdb -U postgres --if-exists "$database" >/dev/null 2>&1||true;;esac
+  for database in "$remote_db" "$drift_db" "$partial_db" "$normal_db";do
+    case "$database" in mb_knowledge_parts_1_4_*|mb_knowledge_remote_homologation_*) docker exec "$db_container" dropdb -U postgres --if-exists "$database" >/dev/null 2>&1||true;;esac
   done
   case "$tmp_dir" in "${TMPDIR:-/tmp}"/mb-knowledge-parts-1-4.*) rm -rf "$tmp_dir";;esac
 }
@@ -104,5 +105,23 @@ if apply_file "$partial_db" "$tmp_dir/editorial-partial.sql" 2>/dev/null;then ec
 assert_sql "$partial_db" "select count(*) from pg_constraint where conrelid='knowledge_sections'::regclass and conname='knowledge_sections_type_check' and pg_get_constraintdef(oid) like '%subheading%'" "0" "partial editorial migration rolls back"
 apply_file "$partial_db" "$editorial"
 assert_sql "$partial_db" "select count(*) from pg_constraint where conrelid='knowledge_sections'::regclass and conname='knowledge_sections_type_check' and pg_get_constraintdef(oid) like '%exercise_black%'" "1" "editorial migration resumes after rollback"
+
+content_version="$(node -e "console.log(require(process.argv[1]).editorial_metadata.content_version)" "$source_document")"
+if [[ "$content_version" == "parts-1-4-v2" ]];then
+  canonical_hash="$(node -e "console.log(require(process.argv[1]).editorial_metadata.canonical_hash)" "$source_document")"
+  node "$repo_root/scripts/prepare-knowledge-import-sql.js" --input "$source_document" --output "$tmp_dir/remote-import.sql" \
+    --target remote-beta --project-ref amzgqfvyjaiaoohnbcfl --canonical-hash "$canonical_hash" >/dev/null
+  node "$repo_root/scripts/prepare-knowledge-homologation-rollback-sql.js" --input "$source_document" --output "$tmp_dir/remote-rollback.sql" \
+    --project-ref amzgqfvyjaiaoohnbcfl >/dev/null
+  create_base "$remote_db"
+  apply_file "$remote_db" "$knowledge"
+  apply_file "$remote_db" "$editorial"
+  apply_file "$remote_db" "$tmp_dir/remote-import.sql"
+  assert_sql "$remote_db" "select concat_ws(',',(select count(*) from knowledge_publications),(select count(*) from knowledge_parts),(select count(*) from knowledge_chapters),(select count(*) from knowledge_sections))" "1,4,26,$expected_total" "remote homologation import counts"
+  apply_file "$remote_db" "$tmp_dir/remote-rollback.sql"
+  assert_sql "$remote_db" "select concat_ws(',',(select count(*) from knowledge_publications),(select count(*) from knowledge_parts),(select count(*) from knowledge_chapters),(select count(*) from knowledge_sections),(select count(*) from products))" "0,0,0,0,3" "remote homologation rollback preserves commercial schema"
+  apply_file "$remote_db" "$tmp_dir/remote-import.sql"
+  assert_sql "$remote_db" "select concat_ws(',',(select count(*) from knowledge_publications),(select count(*) from knowledge_parts),(select count(*) from knowledge_chapters),(select count(*) from knowledge_sections))" "1,4,26,$expected_total" "remote homologation final reimport counts"
+fi
 
 echo "knowledge parts 1-4 local clone: ${pgtap_assertions} pgTAP + ${shell_assertions} shell assertions; import, retry, rollback, drift, RLS and search passed"

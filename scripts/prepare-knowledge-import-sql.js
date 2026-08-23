@@ -6,6 +6,10 @@ const fs=require('fs');
 const path=require('path');
 const {validateKnowledgeDocument}=require('../knowledge/import-contract');
 
+const PRODUCTION_REF='mwjqfzbpjmwiscvtxvfc';
+const HOMOLOGATION_REF='amzgqfvyjaiaoohnbcfl';
+const HOMOLOGATION_CANONICAL_HASH='9c9d90e12ea90f36ea85da291091ab9bb49b76590d9638c856f936dd41a670ad';
+
 function fail(message){throw new Error(message)}
 function hash(value){return crypto.createHash('sha256').update(value).digest('hex')}
 function uuidFor(value){
@@ -35,11 +39,37 @@ function protectedOutput(target){
   return resolved;
 }
 
-function build(document){
+function targetContract(args,document){
+  const target=args.target||'local';
+  if(target==='local')return {target,projectRef:null};
+  if(target!=='remote-beta')fail('target must be local or remote-beta');
+  if(!args['project-ref'])fail('--project-ref is required for remote-beta');
+  if(args['project-ref']===PRODUCTION_REF)fail('production project ref is forbidden');
+  if(args['project-ref']!==HOMOLOGATION_REF)fail('remote-beta project ref differs from the approved homologation target');
+  if(args['canonical-hash']!==HOMOLOGATION_CANONICAL_HASH)fail('remote-beta canonical hash differs from the approved revision');
+  if(document.editorial_metadata.canonical_hash!==HOMOLOGATION_CANONICAL_HASH||document.editorial_metadata.content_version!=='parts-1-4-v2')fail('remote-beta input is not the approved canonical V2 document');
+  return {target,projectRef:args['project-ref']};
+}
+
+function build(document,contract={target:'local',projectRef:null}){
   const publication=document.publication,publicationId=uuidFor(`publication:${publication.slug}`),lines=[];
   const parts=document.parts,chapters=parts.flatMap(part=>part.chapters),sections=chapters.flatMap(chapter=>chapter.sections);
-  lines.push('begin;',"set local lock_timeout='5s';","set local statement_timeout='120s';",`select pg_advisory_xact_lock(hashtextextended(${sql(`knowledge-import:${document.editorial_metadata.source_hash}`)},0));`);
-  lines.push("do $local_only$ begin if current_database() !~ '^mb_knowledge_parts_1_4_' then raise exception 'protected book import is restricted to the disposable local clone' using errcode='42501'; end if; end $local_only$;");
+  lines.push(`-- target: ${contract.target}${contract.projectRef?` (${contract.projectRef})`:''}`,'begin;',"set local lock_timeout='5s';","set local statement_timeout='120s';",`select pg_advisory_xact_lock(hashtextextended(${sql(`knowledge-import:${document.editorial_metadata.canonical_hash||document.editorial_metadata.source_hash}`)},0));`);
+  if(contract.target==='remote-beta'){
+    lines.push(`do $homologation_only$ begin
+      if current_database()<>'postgres' and current_database() !~ '^mb_knowledge_remote_homologation_' then
+        raise exception 'protected remote import is restricted to the approved homologation database' using errcode='42501';
+      end if;
+      if to_regclass('public.commercial_enforcement_state') is null
+         or to_regclass('public.knowledge_sections') is null
+         or to_regprocedure('public.get_my_entitlements()') is null
+         or to_regprocedure('public.search_my_knowledge_v1(text,integer)') is null then
+        raise exception 'remote homologation schema contract is incomplete' using errcode='P0001';
+      end if;
+    end $homologation_only$;`);
+  }else{
+    lines.push("do $local_only$ begin if current_database() !~ '^mb_knowledge_parts_1_4_' then raise exception 'protected book import is restricted to the disposable local clone' using errcode='42501'; end if; end $local_only$;");
+  }
   lines.push(`do $preflight$ begin
     if to_regclass('public.knowledge_sections') is null or to_regprocedure('public.has_active_access(text)') is null then
       raise exception 'Knowledge Area V1 and Commercial Access V2 are required' using errcode='P0001';
@@ -112,8 +142,8 @@ function build(document){
 try{
   const args=parseArgs(process.argv);
   if(!args.input||!args.output)fail('usage: --input <protected.json> --output <protected.sql>');
-  const document=validateKnowledgeDocument(JSON.parse(fs.readFileSync(path.resolve(args.input),'utf8'))),result=build(document),output=protectedOutput(args.output);
+  const document=validateKnowledgeDocument(JSON.parse(fs.readFileSync(path.resolve(args.input),'utf8'))),contract=targetContract(args,document),result=build(document,contract),output=protectedOutput(args.output);
   fs.mkdirSync(path.dirname(output),{recursive:true});
   fs.writeFileSync(output,result.sql,{encoding:'utf8',mode:0o600});fs.chmodSync(output,0o600);
-  console.log(`knowledge-import-sql: prepared (${result.counts.parts} parts, ${result.counts.chapters} chapters, ${result.counts.sections} sections; protected output)`);
+  console.log(`knowledge-import-sql: prepared (${result.counts.parts} parts, ${result.counts.chapters} chapters, ${result.counts.sections} sections; ${contract.target}; protected output)`);
 }catch(error){console.error(`knowledge-import-sql: ${error.message}`);process.exitCode=1}
