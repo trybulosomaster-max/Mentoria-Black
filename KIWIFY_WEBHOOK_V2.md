@@ -55,7 +55,7 @@ future production gate; this homologation did not read or change the token value
 
 ## Evidence
 
-- faithful legacy-to-V2 clone: 109 pgTAP + 82 shell assertions, preserving the exact
+- faithful legacy-to-V2 clone: 109 pgTAP + 88 shell assertions, preserving the exact
   1 product / 1 grant / 2 Kiwify event history;
 - Node request/contract suite: authentication, HMAC, routing, size/shape validation,
   supported Admin API and non-leaking duplicate responses;

@@ -1,15 +1,18 @@
 # Mentoria Black — gate final Commercial Access + Knowledge Area
 
-Status: **bloqueador do writer Kiwify resolvido e homologado na Beta; repetir o gate
-final antes de qualquer promoção**. Este documento não autoriza nem executa migration,
-importação, enforcement, merge ou deploy.
+Status: **gate final repetido e aprovado em modo estritamente read-only na produção**.
+Este documento congela o pacote candidato e a futura ordem controlada; não autoriza
+nem executa migration, importação, enforcement, merge ou deploy.
 
 ## Identidade e pacote imutável
 
 - Produção Supabase: `mwjqfzbpjmwiscvtxvfc` (`sa-east-1`, saudável), somente leitura neste gate.
 - Beta homologada: `amzgqfvyjaiaoohnbcfl` (`sa-east-1`).
-- HEAD homologado recebido: `b9d58109086f3eafa98a38f31bb709f13ff058ef`.
-- Commit de hardening das migrations e do clone fiel: `77b95c459f6f907329f10f997826db9156221996`.
+- HEAD candidato final: `4058f7893b055be9d08d0645856837ddfb40b87f`.
+- Edge Function candidata: `kiwify-webhook` Beta v7, bundle SHA-256
+  `13cd08c6621b8893190fda2fccbefdb4958ef5be9eadbbf79b25802efdf4ff8e`.
+- Edge Function atual de produção: `kiwify-webhook` v4, bundle/source SHA-256
+  `4e05db916526212b9b22bf9b2d44794e86d3008f9d23fb54f8a336b3c083c301`.
 - Versão protegida do conteúdo: `parts-1-4-v2`.
 - Canonical hash: `9c9d90e12ea90f36ea85da291091ab9bb49b76590d9638c856f936dd41a670ad`.
 - Source hash preservado fora do Git: `92e9b55f22dc6ae132ade8965242dc2d34e69a0b956339b22e1b4d5e2dc9f069`.
@@ -17,12 +20,23 @@ importação, enforcement, merge ou deploy.
 
 Migrations do pacote, na ordem:
 
-1. `20260822212119_commercial_access_v1.sql`  
+1. `20260822212119_commercial_access_v1.sql`
    SHA-256 `e9acee521d8a4daf8eacf20829598055927fccbf4df1dec822b95efeba0fe0e0`
-2. `20260823000450_knowledge_area_v1.sql`  
+2. `20260823104202_install_kiwify_webhook_v2_contract.sql`
+   SHA-256 `d631eb47ccdabc9405e609cdeabd9f9080ae325359ad11c2b56f34d02ec45582`
+3. `20260823000450_knowledge_area_v1.sql`
    SHA-256 `091b6748d1ba8f87cd5106c22230b5a5f8ba257a92427ba4e798f68100175b2e`
-3. `20260823012822_extend_knowledge_editorial_contract_v1.sql`  
+4. `20260823012822_extend_knowledge_editorial_contract_v1.sql`
    SHA-256 `b1aa17cb3405d6a7c297599d36539ad68a77d023d0d0aca1175b60c8820d4627`
+
+Artefato protegido de importação (fora do Git):
+
+- SQL server-side SHA-256
+  `305ced774640c5582654abf96e3e8370fe744475925d11fcf919ef5b01414705`;
+- arquivo canônico local SHA-256
+  `24e5d8c1730abf560ec819ab0333236f603ff243a77c34bbde074660836a092f`;
+- verificação editorial interna: `parts-1-4-v2` / canonical hash
+  `9c9d90e12ea90f36ea85da291091ab9bb49b76590d9638c856f936dd41a670ad`.
 
 As migrations Beta-only `20260823022320` e `20260823023324` estão
 **expressamente fora** do pacote. A primeira seria nominalmente no-op na produção
@@ -51,7 +65,8 @@ recurring; 4 goals; 1 account; 1 card; 0 assets; 0 liabilities; 1 product; 1 gra
 2 payment events. Essas contagens são gates de preservação, não fixtures de escrita.
 
 Histórico V82 de produção confirmado até `20260821205630`; nenhuma migration
-Commercial/Knowledge estava registrada. Security Advisor de produção: zero achados.
+Commercial/Kiwify V2/Knowledge estava registrada. Security Advisor de produção: zero
+achados. A produção permaneceu read-only durante todo o gate.
 
 ## Compatibilidade e lints aceitos
 
@@ -80,6 +95,24 @@ Commercial/Knowledge estava registrada. Security Advisor de produção: zero ach
 - Leaked Password Protection está habilitada na produção e o Advisor está limpo.
   O aviso equivalente da Beta é pré-existente e não integra este gate.
 
+## Matriz v4 × writer dual-compatible
+
+| Evento | Produção v4 | Candidata dual | Legado | V2 | Risco e resultado |
+|---|---|---|---|---|---|
+| approved | cria/atualiza APP por `UNIQUE(user_id,product_id)` | mantém o caminho legado ou usa a RPC V2 transacional | sim | sim | **GO**; dual writer deve entrar antes da migration Commercial |
+| renewal | repete o upsert do grant único | atualiza somente o APP elegível da assinatura | sim | sim | **GO**; não cria segundo grant ativo |
+| cancellation | mantém acesso até `access_until`, quando informado | mantém APP até o fim pago e preserva KNOWLEDGE lifetime | sim | sim | **GO** |
+| expiration | sem classificação explícita; apenas registra evento desconhecido | expira o APP vinculado, sem apagar dados | sim | sim | limitação v4 resolvida; **GO** somente com a candidata |
+| full refund | revoga pelo `external_purchase_id` | revoga os grants vinculados à aquisição | sim | sim | **GO** |
+| partial refund | sem semântica específica; registra sem decisão administrativa | `administrative_review`, sem mutar grants automaticamente | sim | sim | limitação v4 resolvida; **GO** |
+| chargeback | usa o mesmo caminho de revogação do refund integral | suspende/revoga os grants vinculados conforme o contrato V2 | sim | sim | **GO** |
+| retry | depende do evento legado e do conflito antigo | retorna `duplicate=true` por `provider + environment + external_event_id` | sim | sim | **GO**, zero efeito adicional |
+| replay/out-of-order | pode concluir um update vazio e marcar o evento | falha fechada em `administrative_review` quando não há vínculo inequívoco | sim | sim | limitação v4 resolvida; **GO** |
+
+O alvo removido `onConflict: user_id,product_id` permanece exclusivamente no helper
+legado. O caminho V2 não depende dele: detecta o marker/contrato exato e chama
+`process_kiwify_webhook_event_v2()`; estado parcial ou drift falha fechado.
+
 ## Evidência de reconciliação do writer
 
 1. legado e V2 foram testados em clones descartáveis, com 1/1/2 rows históricas
@@ -92,27 +125,35 @@ Commercial/Knowledge estava registrada. Security Advisor de produção: zero ach
    restaurado imediatamente;
 5. o `UNIQUE (user_id,product_id)` continua corretamente aposentado no V2.
 
-## Ordem autorizável depois da correção
+O contrato de secrets permanece server-side: token Kiwify no Vault, nenhuma leitura
+do valor neste gate, getter/setter/processador somente para `service_role`, HMAC/token
+comparado em tempo constante e nenhum segredo no frontend ou Git. O reader dual
+aceita com segurança o mínimo legado da v4; a rotação futura para 32+ caracteres é
+hardening separado, não pré-condição oculta da migration.
 
-1. confirmar backup físico e novo snapshot/preflight read-only;
-2. comparar SHAs, hashes e contagens deste manifesto;
-3. implantar a Edge Function Kiwify dual-compatible e provar o caminho legado;
-4. aplicar somente a migration Commercial em transação;
-5. aplicar imediatamente `20260823104202_install_kiwify_webhook_v2_contract.sql`;
-6. validar 1 produto/1 grant/2 eventos legados preservados, funções Kiwify e
+## Ordem final para uma promoção futura e separadamente autorizada
+
+1. confirmar backup físico, refs, SHAs e novo snapshot/preflight read-only;
+2. comparar todos os hashes e contagens deste manifesto;
+3. implantar o bundle Kiwify dual-compatible congelado sobre o schema legado;
+4. testar um evento Kiwify controlado ainda no legado e provar retry/idempotência;
+5. aplicar somente `20260822212119_commercial_access_v1.sql` em transação;
+6. aplicar imediatamente `20260823104202_install_kiwify_webhook_v2_contract.sql`;
+7. retestar Kiwify no V2 e validar 1 produto/1 grant/2 eventos legados preservados,
+   funções Kiwify e
    `commercial_enforcement_state.enforced = false`;
-7. validar explicitamente cobertura APP dos proprietários legados autorizados, sem
+8. validar explicitamente cobertura APP dos proprietários legados autorizados, sem
    ativar enforcement;
-8. aplicar a migration Knowledge em transação;
-9. aplicar a extensão editorial em transação;
-10. validar RLS, grants, RPCs e Advisors antes do conteúdo;
-11. importar `parts-1-4-v2` server-side e idempotentemente;
-12. validar 1/4/26/1469, 67/1.402, canonical hash e source hashes;
-13. testar anon, APP, KNOWLEDGE, COMPLETE, revoked, FTS sem vazamento,
+9. aplicar `20260823000450_knowledge_area_v1.sql` em transação;
+10. aplicar `20260823012822_extend_knowledge_editorial_contract_v1.sql` em transação;
+11. validar RLS, grants, RPCs e Advisors antes do conteúdo;
+12. importar `parts-1-4-v2` server-side e idempotentemente;
+13. validar 1/4/26/1469, 67/1.402, canonical hash e source hashes;
+14. testar anon, APP, KNOWLEDGE, COMPLETE, revoked, FTS sem vazamento,
     progress/bookmarks e cross-user;
-14. executar regressão financeira focal e teste de rollback seletivo;
-15. somente depois preparar/deployar o frontend em etapa separada;
-16. ativar enforcement financeiro apenas em autorização e janela próprias.
+15. executar regressão financeira focal e teste de rollback seletivo;
+16. somente depois preparar/deployar o frontend em etapa separada;
+17. ativar enforcement financeiro apenas em autorização e janela próprias.
 
 Parar imediatamente em checksum, schema, policy, função, contagem, hash, acesso,
 Advisor de segurança ou preservação Kiwify divergente. Não usar `db push` genérico,
@@ -120,6 +161,11 @@ baseline, backfill por inferência ou conteúdo público.
 
 ## Rollback por camada
 
+- **Antes da Commercial V2:** o bundle v4 congelado ainda é rollback temporário
+  tecnicamente válido, porque `UNIQUE(user_id,product_id)` ainda existe no legado.
+- **Depois da Commercial V2:** a v4 deixa de ser rollback seguro. O conflict target
+  foi removido para preservar histórico; manter o dual writer e executar rollback
+  application-first. Nunca voltar à v4 sobre o schema V2.
 - **Commercial:** application-first. Como enforcement permanece desligado, não há
   bloqueio financeiro no deploy estrutural. Revogar writers novos se necessário e
   preservar tabelas, grants, eventos e payloads históricos. Não fazer `DROP`.
@@ -138,17 +184,31 @@ Não existe ponto de não retorno antes de novos eventos/progressos reais. Depoi
 disso, rollback destrutivo de schema fica proibido; permanece apenas rollback
 application-first e reconciliação preservando histórico.
 
-## Evidência local
+## Evidência final do clone fiel
 
 O clone fiel reproduziu o legado de banco (1 produto, 1 grant manual, 2 eventos Kiwify),
-aplicou Commercial → Knowledge → Editorial → conteúdo, preservou todas as rows e
-payloads e chegou a 1/4/26/1469, 67/1.402. Retry completo, falha transacional, drift
-incompatível, rollback seletivo e reimport foram aprovados. RLS, FTS, progress,
-bookmarks, compatibilidade dos inserts Kiwify simples, Commercial Access e adapters
-Asaas sintéticos também passaram. A reconciliação posterior homologou o writer novo
-na Beta sem escrever na produção. O gate final deve agora ser repetido com o novo
-arquivo, checksum, função e ordem; nenhuma rede Asaas, produção escrita, merge ou
-deploy oficial foi usado.
+exercitou o writer dual no legado e aplicou exatamente Commercial → contrato Kiwify
+V2 → Knowledge → Editorial → conteúdo. Preservou todas as rows e payloads e chegou a
+1/4/26/1469, 67/1.402. O resultado foi `109 pgTAP + 88` asserções shell; a suíte Node
+do writer acrescentou 10 testes, e as suítes Commercial/Knowledge/editorial/ingestão
+somaram 173 asserções. Retry completo, concorrência/idempotência, falha transacional,
+drift incompatível, zero grant ativo conflitante, FTS sem vazamento, RLS, progress,
+bookmarks, rollback seletivo e reimport foram aprovados.
 
-Backup observado: físico de `2026-08-22 06:13:54 UTC`, Restore disponível, retenção
-Pro de 7 dias. Nenhuma restauração foi executada.
+Backup observado no painel oficial: físico de `2026-08-23 06:21:54 UTC`, Restore
+disponível e retenção Pro de 7 dias. Backups físicos diários anteriores continuam
+listados. Nenhuma restauração foi executada. Nenhuma rede Asaas, escrita na produção,
+merge ou deploy oficial foi usado neste gate.
+
+## Decisão do gate
+
+- dual writer aprovado no legado e no V2;
+- produto, grant, dois eventos e payloads históricos preservados;
+- migrations e hashes congelados;
+- pacote Beta-only excluído;
+- conteúdo protegido fora do Git e hash canônico aprovado;
+- backup e Advisor aprovados;
+- rollback anterior/posterior à Commercial explicitamente separado;
+- enforcement financeiro permanece desligado.
+
+Resultado: **GO para uma promoção controlada futura, mediante autorização própria**.
