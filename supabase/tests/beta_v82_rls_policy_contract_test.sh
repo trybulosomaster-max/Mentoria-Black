@@ -3,6 +3,7 @@ set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 migration="$repo_root/supabase/migrations/20260823022320_reconcile_beta_v82_rls_policy_contract.sql"
+predicate_migration="$repo_root/supabase/migrations/20260823023324_canonicalize_beta_v82_rls_policy_predicate.sql"
 db_host="127.0.0.1"
 db_port="54322"
 db_user="postgres"
@@ -70,13 +71,16 @@ assert_scalar() {
 
 setup_fixture "$normal_db"
 psql -X -v ON_ERROR_STOP=1 -h "$db_host" -p "$db_port" -U "$db_user" -d "$normal_db" -f "$migration" >/dev/null
+psql -X -v ON_ERROR_STOP=1 -h "$db_host" -p "$db_port" -U "$db_user" -d "$normal_db" -f "$predicate_migration" >/dev/null
 assert_scalar "$normal_db" "select count(*) from pg_policies where schemaname='public' and policyname='mb_v82_own_rows'" "9" "canonical policies"
 assert_scalar "$normal_db" "select count(*) from pg_policies where schemaname='public' and policyname like '%\\_own\\_rows' escape '\\' and policyname<>'mb_v82_own_rows'" "0" "legacy policies removed"
 assert_scalar "$normal_db" "select count(*) from pg_policies where schemaname='public' and cmd='ALL' and roles=array['authenticated']::name[] and permissive='PERMISSIVE' and qual=with_check" "9" "policy semantics preserved"
+assert_scalar "$normal_db" "select count(*) from pg_policies where schemaname='public' and regexp_replace(lower(qual),'[[:space:]()]','','g') in ('selectauth.uidasuid=user_id','selectauth.uid=user_id') and regexp_replace(lower(with_check),'[[:space:]()]','','g') in ('selectauth.uidasuid=user_id','selectauth.uid=user_id')" "9" "canonical predicates installed"
 assert_scalar "$normal_db" "select sum(rows) from (select count(*) rows from accounts union all select count(*) from cards union all select count(*) from categories union all select count(*) from goals union all select count(*) from assets union all select count(*) from liabilities union all select count(*) from recurring union all select count(*) from transactions union all select count(*) from monthly_plans) s" "18" "row counts preserved"
 
 # A second execution must be a semantic no-op.
 psql -X -v ON_ERROR_STOP=1 -h "$db_host" -p "$db_port" -U "$db_user" -d "$normal_db" -f "$migration" >/dev/null
+psql -X -v ON_ERROR_STOP=1 -h "$db_host" -p "$db_port" -U "$db_user" -d "$normal_db" -f "$predicate_migration" >/dev/null
 assert_scalar "$normal_db" "select count(*) from pg_policies where schemaname='public' and policyname='mb_v82_own_rows'" "9" "retry is idempotent"
 
 # Real role checks run in a transaction and leave no rows behind.
