@@ -28,24 +28,39 @@ await test('section renderer escapes content and supports all approved types',()
  const unsafe=knowledge.renderSection({section_type:'paragraph',content:{text:'<img src=x onerror=bad()>'}});
  ok(!unsafe.includes('<img'));ok(unsafe.includes('&lt;img'));
  equal(knowledge.safeAssetPath('../secret.png'),'');equal(knowledge.safeAssetPath('https://bad.invalid/x.png'),'');equal(knowledge.safeAssetPath('assets/mock.png'),'assets/mock.png');
+ ok(knowledge.renderSection({section_type:'rule_black',content:{text:'Regra'}}).includes('knowledge-rule-black'));
+ ok(knowledge.renderSection({section_type:'impact_phrase',content:{text:'Impacto'}}).includes('knowledge-impact-phrase'));
+ ok(knowledge.renderSection({section_type:'chapter_checklist',content:{items:['Item']}}).includes('knowledge-list chapter_checklist'));
+ ok(knowledge.renderSection({section_type:'table',content:{columns:['A'],rows:[['B']]}}).includes('knowledge-table-wrap'));
 });
 
 await test('library is publication-driven and supports an empty state',()=>{
  const state={publications:[{id:'p1',title:'Mentoria Black',description:'Mock',publication_type:'book'}],chapters:[{id:'c1',publication_id:'p1'}],progress:[{chapter_id:'c1',progress_percent:50}]};
- const html=knowledge.renderLibrary(state);ok(html.includes('Área de Conhecimento'));ok(html.includes('50% concluído'));ok(html.includes('Continuar leitura'));
+ const html=knowledge.renderLibrary(state);ok(html.includes('Área de Conhecimento'));ok(html.includes('50% concluído'));ok(html.includes('Continuar leitura'));ok(html.includes('mentoria-black-icon-512.png'));ok(!html.includes('knowledge-cover-placeholder'));
  ok(knowledge.renderLibrary({publications:[],chapters:[],progress:[]}).includes('Nenhuma publicação'));
+});
+
+await test('official production cover is deterministic',()=>{
+ const html=knowledge.renderLibrary({publications:[{id:'cover',title:'Mentoria Black'}],chapters:[],progress:[]});
+ ok(html.includes('data-cover="premium"'));ok(html.includes('assets/branding/mentoria-black-icon-512.png'));
+});
+
+await test('local visual preview isolates its cover switch from the production runtime',()=>{
+ const preview=fs.readFileSync(path.join(__dirname,'../knowledge/preview.local.html'),'utf8'),script=fs.readFileSync(path.join(__dirname,'../knowledge/preview.local.js'),'utf8'),runtime=fs.readFileSync(path.join(__dirname,'../knowledge/knowledge-area.js'),'utf8');
+ ok(preview.includes('?cover=minimal'));ok(preview.includes('?cover=premium'));ok(preview.includes('?cover=book'));
+ ok(script.includes('new URLSearchParams(location.search).get(\'cover\')'));ok(!runtime.includes('MBKnowledgeCoverVariant'));
 });
 
 await test('table of contents exposes titles while locking protected bodies',()=>{
  const state={entitlements:{knowledge:{hasAccess:false}},publications:[{id:'p1',title:'Mentoria Black'}],parts:[{id:'part1',publication_id:'p1',position:1,title:'Parte'}],chapters:[{id:'sample',publication_id:'p1',part_id:'part1',position:1,title:'Amostra',access_level:'sample',estimated_read_minutes:2},{id:'locked',publication_id:'p1',part_id:'part1',position:2,title:'Protegido',access_level:'knowledge',estimated_read_minutes:3}],progress:[],bookmarks:[],sections:[]};
- const html=knowledge.renderToc(state,'p1');ok(html.includes('Amostra'));ok(html.includes('Protegido'));ok(html.includes('Bloqueado'));ok(html.includes('Adquirir Livro Digital'));
+ const html=knowledge.renderToc(state,'p1');ok(html.includes('Amostra'));ok(html.includes('Protegido'));ok(html.includes('Conteúdo completo · bloqueado'));ok(html.includes('Conhecer acesso completo'));
  equal(knowledge.chapterAllowed(state.chapters[1],state.entitlements),false);
  state.entitlements.knowledge.hasAccess=true;equal(knowledge.chapterAllowed(state.chapters[1],state.entitlements),true);
 });
 
 await test('reader renders a server-authorized sample without exposing protected body',()=>{
  const state={entitlements:{knowledge:{hasAccess:false}},parts:[{id:'z-part',position:1},{id:'a-part',position:2}],chapters:[{id:'c1',publication_id:'p1',part_id:'z-part',position:1,title:'Protegido',excerpt:'Apenas trecho',access_level:'knowledge'},{id:'c2',publication_id:'p1',part_id:'a-part',position:1,title:'Seguinte',access_level:'knowledge'}],sections:[{chapter_id:'c1',section_type:'paragraph',access_level:'sample',content:{text:'SAMPLE_BODY'} }],progress:[],bookmarks:[]};
- const html=knowledge.renderReader(state,'c1');ok(html.includes('Este conteúdo faz parte'));ok(html.includes('SAMPLE_BODY'));ok(!html.includes('Marcar como concluído'));
+ const html=knowledge.renderReader(state,'c1');ok(html.includes('Continue sua leitura'));ok(html.includes('SAMPLE_BODY'));ok(!html.includes('Marcar como concluído'));
  state.sections.push({chapter_id:'c1',section_type:'paragraph',access_level:'knowledge',content:{text:'PROTECTED_BODY'}});
  state.entitlements.knowledge.hasAccess=true;const reader=knowledge.renderReader(state,'c1');ok(reader.includes('PROTECTED_BODY'));ok(reader.includes('Marcar como concluído'));ok(reader.includes('data-id="c2"'));
 });

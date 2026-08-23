@@ -48,7 +48,7 @@ const protectedParagraph=sourceChapterNine.sections.find(section=>section.access
 const sampleParagraph=sampleSections.find(section=>section.section_type==='paragraph');
 const readerState={entitlements:{knowledge:{hasAccess:false}},parts:[{id:'part-2',position:2}],chapters:[readerChapter],sections:sampleSections,progress:[],bookmarks:[]};
 const sampleHtml=knowledgeArea.renderReader(readerState,'chapter-9');
-check(sampleHtml.includes('Este conteúdo faz parte'),'mixed chapter ends in the KNOWLEDGE paywall');
+check(sampleHtml.includes('Continue sua leitura')&&sampleHtml.includes('data-offer="knowledge"'),'mixed chapter ends in the KNOWLEDGE paywall');
 check(sampleParagraph&&sampleHtml.includes(knowledgeArea.safe(sampleParagraph.content.text)),'mixed chapter renders its authorized opening');
 check(protectedParagraph&&!sampleHtml.includes(knowledgeArea.safe(protectedParagraph.content.text)),'mixed chapter does not render protected body');
 readerState.entitlements.knowledge.hasAccess=true;readerState.sections=sourceChapterNine.sections.map(section=>({...section,chapter_id:'chapter-9'}));

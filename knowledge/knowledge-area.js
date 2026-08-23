@@ -18,6 +18,10 @@
     const path=String(value||'');
     return /^[A-Za-z0-9][A-Za-z0-9_./-]*$/.test(path)&&!/(^|\/)\.\.(\/|$)/.test(path)&&!/^[A-Za-z]+:/.test(path)?path:'';
   }
+  function renderOfficialCover(publication){
+    const mark='assets/branding/mentoria-black-icon-512.png';
+    return `<figure class="knowledge-cover knowledge-cover-official" data-cover="premium"><img src="${safe(mark)}" alt="Símbolo oficial Mentoria Black"><figcaption><span>Mentoria Black</span><small>Área de Conhecimento</small></figcaption></figure>`;
+  }
   function renderSection(section){
     if(!SECTION_TYPES.has(section?.section_type))return '';
     const content=section.content&&typeof section.content==='object'?section.content:{};
@@ -66,9 +70,9 @@
   function renderLibrary(state){
     const publications=state.publications||[],chapters=state.chapters||[],progress=state.progress||[];
     if(!publications.length)return `<section class="knowledge-empty"><h2>Biblioteca em preparação</h2><p>Nenhuma publicação está disponível no momento.</p></section>`;
-    return `<header class="knowledge-title"><span class="knowledge-kicker">Biblioteca</span><h1>Área de Conhecimento</h1><p>Conhecimento para transformar organização em direção.</p></header><div class="knowledge-library">${publications.map(publication=>{
+    return `<header class="knowledge-title"><span class="knowledge-kicker">Mentoria Black</span><h1>Área de Conhecimento</h1><p>Conhecimento para transformar organização em direção.</p></header><div class="knowledge-library">${publications.map(publication=>{
       const percent=publicationProgress(publication.id,chapters,progress),started=percent>0;
-      return `<article class="knowledge-publication-card">${publication.cover_path?`<img class="knowledge-cover" src="${safe(safeAssetPath(publication.cover_path))}" alt="Capa de ${safe(publication.title)}">`:`<div class="knowledge-cover knowledge-cover-placeholder" aria-hidden="true">MB</div>`}<div><span class="knowledge-kicker">${safe(publication.publication_type||'Publicação')}</span><h2>${safe(publication.title)}</h2>${publication.subtitle?`<p class="knowledge-subtitle">${safe(publication.subtitle)}</p>`:''}<p>${safe(publication.description||'')}</p><div class="knowledge-progress" aria-label="${percent}% concluído"><span style="width:${percent}%"></span></div><small>${percent}% concluído</small><div class="knowledge-actions"><button class="btn gold" data-knowledge-action="open-publication" data-id="${safe(publication.id)}">${started?'Continuar leitura':'Começar leitura'}</button></div></div></article>`;
+      return `<article class="knowledge-publication-card">${publication.cover_path?`<img class="knowledge-cover" src="${safe(safeAssetPath(publication.cover_path))}" alt="Capa de ${safe(publication.title)}">`:renderOfficialCover(publication)}<div class="knowledge-publication-copy"><span class="knowledge-kicker">${safe(publication.publication_type||'Publicação')}</span><h2>${safe(publication.title)}</h2>${publication.subtitle?`<p class="knowledge-subtitle">${safe(publication.subtitle)}</p>`:''}<p>${safe(publication.description||'')}</p><div class="knowledge-progress" aria-label="${percent}% concluído"><span style="width:${percent}%"></span></div><small>${percent}% concluído</small><div class="knowledge-actions"><button class="btn gold" data-knowledge-action="open-publication" data-id="${safe(publication.id)}">${started?'Continuar leitura':'Começar leitura'}</button></div></div></article>`;
     }).join('')}</div>`;
   }
 
@@ -78,8 +82,8 @@
     const parts=state.parts.filter(item=>item.publication_id===publicationId).sort(byPosition);
     const chapters=state.chapters.filter(item=>item.publication_id===publicationId),entitled=hasKnowledge(state.entitlements);
     return `<div class="knowledge-toolbar"><button class="btn" data-knowledge-action="library">← Biblioteca</button><button class="btn" data-knowledge-action="bookmarks">Meus favoritos</button></div><header class="knowledge-title compact"><span class="knowledge-kicker">Sumário</span><h1>${safe(publication.title)}</h1><p>${safe(publication.subtitle||publication.description||'')}</p></header><form class="knowledge-search" data-knowledge-search><label class="sr-only" for="knowledgeSearch">Buscar conteúdo autorizado</label><input id="knowledgeSearch" name="query" minlength="2" maxlength="160" placeholder="Buscar na biblioteca"><button class="btn" type="submit">Buscar</button></form><div class="knowledge-toc">${parts.map(part=>`<section><h2>Parte ${safe(part.position)} · ${safe(part.title)}</h2>${chapters.filter(chapter=>chapter.part_id===part.id).sort(byPosition).map(chapter=>{
-      const allowed=chapterAllowed(chapter,state.entitlements),item=progressFor(chapter.id,state.progress),status=progressLabel(item);
-      return `<article class="knowledge-chapter-row ${allowed?'':'locked'}"><div><span class="knowledge-status">${chapter.access_level==='sample'?'Amostra':allowed?status:'Bloqueado'}</span><h3>${safe(chapter.title)}</h3>${chapter.subtitle?`<p>${safe(chapter.subtitle)}</p>`:''}<small>${safe(chapter.estimated_read_minutes)} min de leitura</small></div><button class="btn ${allowed?'gold':''}" data-knowledge-action="open-chapter" data-id="${safe(chapter.id)}">${allowed?(item?'Continuar':'Ler'):'🔒 Ver acesso'}</button></article>`;
+      const allowed=chapterAllowed(chapter,state.entitlements),item=progressFor(chapter.id,state.progress),status=progressLabel(item),accessLabel=chapter.access_level==='sample'?'Amostra':allowed?'Conteúdo completo':'Conteúdo completo · bloqueado';
+      return `<article class="knowledge-chapter-row ${allowed?'':'locked'}"><div><div class="knowledge-chapter-labels"><span class="knowledge-status ${chapter.access_level==='sample'?'sample':''}">${accessLabel}</span>${allowed&&item?`<span class="knowledge-progress-status">${status}</span>`:''}</div><h3>${safe(chapter.title)}</h3>${chapter.subtitle?`<p>${safe(chapter.subtitle)}</p>`:''}<small>${safe(chapter.estimated_read_minutes)} min de leitura</small></div><button class="btn ${allowed?'gold':''}" data-knowledge-action="open-chapter" data-id="${safe(chapter.id)}">${allowed?(item?'Continuar':'Ler'):'Ver acesso'}</button></article>`;
     }).join('')}</section>`).join('')}</div>${!entitled?renderPaywall():''}`;
   }
 
@@ -97,7 +101,7 @@
   }
 
   function renderPaywall(chapter){
-    return `<section class="knowledge-paywall"><span class="knowledge-lock" aria-hidden="true">◆</span><h2>Este conteúdo faz parte da Área de Conhecimento Mentoria Black.</h2>${chapter?`<p>${safe(chapter.excerpt||'O corpo completo deste capítulo é protegido.')}</p>`:'<p>Leia a amostra gratuita ou libere a biblioteca completa.</p>'}<div class="knowledge-actions"><button class="btn gold" data-knowledge-action="checkout" data-offer="knowledge">Adquirir Livro Digital</button><button class="btn" data-knowledge-action="checkout" data-offer="complete">Conhecer Mentoria Black Completa</button></div></section>`;
+    return `<section class="knowledge-paywall"><svg class="knowledge-lock" aria-hidden="true" viewBox="0 0 24 24"><path d="M7 10V7a5 5 0 0 1 10 0v3M6 10h12v10H6zM12 14v2"/></svg><span class="knowledge-kicker">Conteúdo completo</span><h2>Continue sua leitura com a Área de Conhecimento.</h2>${chapter?`<p>${safe(chapter.excerpt||'O corpo completo deste capítulo é protegido.')}</p>`:'<p>Leia a amostra disponível ou conheça as opções de acesso à biblioteca.</p>'}<div class="knowledge-actions"><button class="btn gold" data-knowledge-action="checkout" data-offer="knowledge">Conhecer acesso completo</button><button class="btn" data-knowledge-action="checkout" data-offer="complete">Conhecer Mentoria Black Completa</button></div><small class="knowledge-paywall-note">Contratação online ainda não disponível. Nenhuma cobrança foi realizada.</small></section>`;
   }
 
   function renderBookmarks(state){

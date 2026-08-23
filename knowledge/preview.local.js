@@ -1,5 +1,7 @@
 'use strict';
 (async()=>{
+  const requestedCover=String(new URLSearchParams(location.search).get('cover')||'premium').toLowerCase(),cover=['minimal','premium','book'].includes(requestedCover)?requestedCover:'premium';
+  document.getElementById('coverName').textContent=cover;
   const fixture=await fetch('fixtures/mentoria-black.mock.json').then(response=>response.json());
   const ids={publication:'preview-publication'},publications=[{id:ids.publication,...fixture.publication,publication_type:'book'}],parts=[],chapters=[],sections=[];
   fixture.parts.forEach((part,partIndex)=>{
@@ -36,10 +38,18 @@
       return {data:null,error:new Error('RPC mock desconhecida')};
     }
   };
+  const previewRoot=document.getElementById('knowledgePreview');
+  function syncPreviewCover(){
+    previewRoot.querySelectorAll('.knowledge-cover-official').forEach(coverElement=>{
+      coverElement.dataset.cover=cover;
+      const image=coverElement.querySelector('img');if(image)image.src='../assets/branding/mentoria-black-icon-512.png';
+    });
+  }
+  new MutationObserver(syncPreviewCover).observe(previewRoot,{childList:true,subtree:true});
   async function mount(access){
     window.previewKnowledgeAccess=access;
     document.getElementById('withAccess').classList.toggle('gold',access);document.getElementById('withoutAccess').classList.toggle('gold',!access);
-    await window.MBKnowledgeArea.createKnowledgeArea({client,entitlements:{knowledge:{hasAccess:access}},checkout:offer=>alert(`Checkout mock: ${offer}`),notify:message=>console.info(message)}).mount(document.getElementById('knowledgePreview'));
+    await window.MBKnowledgeArea.createKnowledgeArea({client,entitlements:{knowledge:{hasAccess:access}},checkout:offer=>alert(`Checkout mock: ${offer}`),notify:message=>console.info(message)}).mount(previewRoot);syncPreviewCover();
   }
   document.getElementById('withAccess').onclick=()=>mount(true);document.getElementById('withoutAccess').onclick=()=>mount(false);
   await mount(true);

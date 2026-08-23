@@ -1,0 +1,13 @@
+/* Small final overrides kept separate so the base Knowledge stylesheet remains reusable. */
+.knowledge-actions .btn,
+.knowledge-toolbar .btn,
+.knowledge-reader-footer .btn{min-height:44px}
+
+.knowledge-cover-official[data-cover="book"] figcaption span,
+.knowledge-cover-official[data-cover="book"] figcaption small{font-size:0}
+.knowledge-cover-official[data-cover="book"] figcaption span:after{content:"MENTORIA BLACK";font-size:12px}
+.knowledge-cover-official[data-cover="book"] figcaption small:after{content:"Conhecimento. Estratégia. Liberdade.";font-size:8px}
+
+@media(max-width:700px){
+  .knowledge-chapter-row .btn{min-height:44px}
+}

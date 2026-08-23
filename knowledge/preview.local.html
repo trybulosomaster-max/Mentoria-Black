@@ -6,13 +6,14 @@
   <title>Knowledge Area V1 — Preview local</title>
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="../knowledge/knowledge-area.css">
+  <link rel="stylesheet" href="../knowledge/knowledge-area-premium.css">
   <style>
-    :root{--gold:#c9a227;--gold2:#e4c55b}*{box-sizing:border-box}body{margin:0;background:#050505;color:#f5f5f5;font:14px Inter,system-ui,sans-serif}.preview-bar{position:sticky;top:0;z-index:4;display:flex;gap:8px;align-items:center;padding:10px 16px;background:#0c0c0cf2;border-bottom:1px solid #282828}.preview-bar strong{margin-right:auto}.btn{background:#101010;color:#eee;border:1px solid #3a3a3a;border-radius:9px;padding:10px 13px;cursor:pointer}.btn.gold{background:var(--gold);border-color:var(--gold);color:#080808;font-weight:800}.btn:disabled{opacity:.5}.preview-shell{max-width:1180px;margin:auto;padding:18px}.preview-note{color:#8f8981;font-size:11px}.knowledge-root input{width:100%;background:#090909;color:#eee;border:1px solid #373737;border-radius:9px;padding:11px;outline:none}.knowledge-root input:focus{border-color:var(--gold)}
+    :root{--gold:#c9a227;--gold2:#e4c55b}*{box-sizing:border-box}body{margin:0;background:#050505;color:#f5f5f5;font:14px Inter,system-ui,sans-serif}.preview-bar{position:sticky;top:0;z-index:4;display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 16px;background:#0c0c0cf2;border-bottom:1px solid #282828}.preview-bar strong{margin-right:auto}.btn{background:#101010;color:#eee;border:1px solid #3a3a3a;border-radius:9px;padding:10px 13px;cursor:pointer}.btn.gold{background:var(--gold);border-color:var(--gold);color:#080808;font-weight:800}.btn:disabled{opacity:.5}.preview-shell{max-width:1180px;margin:auto;padding:18px}.preview-note{color:#8f8981;font-size:11px}.knowledge-root input{width:100%;background:#090909;color:#eee;border:1px solid #373737;border-radius:9px;padding:11px;outline:none}.knowledge-root input:focus{border-color:var(--gold)}@media(max-width:520px){.preview-bar{gap:7px;padding:9px 12px}.preview-bar strong{flex-basis:100%;margin:0}.preview-bar .btn{padding:8px 10px;font-size:12px}}
   </style>
 </head>
 <body>
-  <nav class="preview-bar"><strong>Preview local — dados MOCK</strong><button class="btn gold" id="withAccess">KNOWLEDGE</button><button class="btn" id="withoutAccess">SAMPLE</button></nav>
-  <main class="preview-shell"><p class="preview-note">Este preview não usa Supabase, Auth, Asaas ou rede externa.</p><div id="knowledgePreview" class="knowledge-root"></div></main>
+  <nav class="preview-bar"><strong>Preview local · capa <span id="coverName">premium</span></strong><a class="btn" href="?cover=minimal">Minimal</a><a class="btn" href="?cover=premium">Premium</a><a class="btn" href="?cover=book">Book</a><button class="btn gold" id="withAccess">KNOWLEDGE</button><button class="btn" id="withoutAccess">SAMPLE</button></nav>
+  <main class="preview-shell"><p class="preview-note">Artefato visual local com dados sintéticos. Não usa Supabase, Auth, Asaas ou rede externa.</p><div id="knowledgePreview" class="knowledge-root"></div></main>
   <script src="../knowledge/knowledge-area.js"></script>
   <script src="../knowledge/preview.local.js"></script>
 </body>
