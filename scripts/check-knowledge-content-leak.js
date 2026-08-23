@@ -9,7 +9,8 @@ const root=path.resolve(__dirname,'..');
 const source=path.resolve(process.env.MB_KNOWLEDGE_SOURCE_TEXT||path.join(root,'.local-content/mentoria-black-partes-1-a-4.txt'));
 const protectedPaths=[
   path.join(root,'.local-content/mentoria-black-partes-1-a-4.pdf'),source,
-  path.join(root,'.local-content/mentoria-black-partes-1-a-4.structured.json')
+  path.join(root,'.local-content/mentoria-black-partes-1-a-4.structured.json'),
+  path.join(root,'.local-content/mentoria-black-partes-1-a-4.canonical-v2.json')
 ];
 const normalize=value=>String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
 const words=normalize(fs.readFileSync(source,'utf8')).split(/\s+/).filter(Boolean),width=12,sourceShingles=new Set();

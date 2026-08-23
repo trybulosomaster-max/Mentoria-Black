@@ -77,6 +77,20 @@ O emissor `scripts/prepare-knowledge-import-sql.js` recusa saída versionada e o
 
 O relatório `knowledge/reports/parts-1-4-editorial.md` agrega localização e sugestão para nomenclaturas antigas ou inconsistentes. Nenhuma sugestão altera automaticamente o PDF ou o JSON protegido.
 
+A reconciliação canônica parte exclusivamente da V1 estruturada e não a sobrescreve:
+
+```sh
+node scripts/reconcile-knowledge-editorial.js --validate-only \
+  --input .local-content/mentoria-black-partes-1-a-4.structured.json
+
+node scripts/reconcile-knowledge-editorial.js --dry-run \
+  --input .local-content/mentoria-black-partes-1-a-4.structured.json
+```
+
+O modo de escrita gera `.local-content/mentoria-black-partes-1-a-4.canonical-v2.json`, sempre fora do Git. A V2 preserva o `source_hash` do PDF, incrementa `content_version` e registra um `canonical_hash` reproduzível calculado sobre a publicação e o conteúdo estruturado.
+
+Somente regras determinísticas, métricas, hashes e excertos curtos entram no versionamento. O texto comercial integral permanece proibido em arquivos rastreados.
+
 ## Próxima etapa
 
 1. aprovar ou rejeitar cada apontamento editorial;

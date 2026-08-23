@@ -1,0 +1,61 @@
+{
+  "mode": "generated",
+  "source_hash": "92e9b55f22dc6ae132ade8965242dc2d34e69a0b956339b22e1b4d5e2dc9f069",
+  "canonical_hash": "9c9d90e12ea90f36ea85da291091ab9bb49b76590d9638c856f936dd41a670ad",
+  "content_version": "parts-1-4-v2",
+  "corrections_applied": 27,
+  "changed_fields": 26,
+  "preserved_after_semantic_review": 16,
+  "metrics": {
+    "parts": 4,
+    "chapters": 26,
+    "sections": 1469,
+    "rules_black": 26,
+    "exercises": 28,
+    "exercises_black": 8,
+    "checklists": 26,
+    "impact_phrases": 26,
+    "tables": 8,
+    "conclusions": 3,
+    "transitions": 6,
+    "access_levels": {
+      "sample": 67,
+      "knowledge": 1402
+    },
+    "section_types": {
+      "paragraph": 1123,
+      "subheading": 109,
+      "quote": 32,
+      "transition": 6,
+      "rule_black": 26,
+      "exercise_black": 8,
+      "chapter_checklist": 26,
+      "impact_phrase": 26,
+      "callout": 22,
+      "list": 45,
+      "table": 8,
+      "example": 18,
+      "exercise": 20
+    }
+  },
+  "terms_before": {
+    "black_8": 5,
+    "grandes_projetos": 2,
+    "liberdade_financeira": 10,
+    "pequenos_imprevistos": 15,
+    "metodo_black": 4,
+    "sistema_black_6": 6,
+    "duas_cartas": 1,
+    "apos_de_oito_anos": 1
+  },
+  "terms_after": {
+    "black_8": 0,
+    "grandes_projetos": 0,
+    "liberdade_financeira": 8,
+    "pequenos_imprevistos": 2,
+    "metodo_black": 3,
+    "sistema_black_6": 12,
+    "duas_cartas": 0,
+    "apos_de_oito_anos": 0
+  }
+}

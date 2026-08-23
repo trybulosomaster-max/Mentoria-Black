@@ -80,6 +80,15 @@ function validateKnowledgeDocument(input){
   const editorial=object(document.editorial_metadata,'editorial_metadata');
   ['publication_version','content_version','structure_version'].forEach(key=>text(editorial[key],`editorial_metadata.${key}`,{max:100}));
   if(!SHA256.test(editorial.source_hash||''))fail('editorial_metadata.source_hash','expected SHA-256');
+  if(editorial.canonical_hash!==undefined&&!SHA256.test(editorial.canonical_hash||''))fail('editorial_metadata.canonical_hash','expected SHA-256');
+  if(editorial.editorial_revision!==undefined){
+    const revision=object(editorial.editorial_revision,'editorial_metadata.editorial_revision');
+    ['revision','base_content_version','ruleset_version'].forEach(key=>text(revision[key],`editorial_metadata.editorial_revision.${key}`,{max:100}));
+    if(typeof revision.revised_at!=='string'||!Number.isFinite(Date.parse(revision.revised_at)))fail('editorial_metadata.editorial_revision.revised_at','expected ISO timestamp');
+    ['original_findings','supplemental_findings','reviewed_occurrences','corrections_applied','changed_fields','preserved_after_semantic_review'].forEach(key=>{
+      if(!Number.isInteger(revision[key])||revision[key]<0)fail(`editorial_metadata.editorial_revision.${key}`,'expected non-negative integer');
+    });
+  }
   if(typeof editorial.converted_at!=='string'||!Number.isFinite(Date.parse(editorial.converted_at)))fail('editorial_metadata.converted_at','expected ISO timestamp');
   const slug=text(publication.slug,'publication.slug',{max:100});
   if(!SLUG.test(slug))fail('publication.slug','invalid slug');
