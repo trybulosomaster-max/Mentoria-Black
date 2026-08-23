@@ -9,6 +9,7 @@ v82_one="$repo_root/supabase/migrations/20260820161846_add_v82_structured_financ
 v82_two="$repo_root/supabase/migrations/20260820195658_structure_recurring_financial_operations_v82.sql"
 v82_three="$repo_root/supabase/migrations/20260821205630_reconcile_v82_production_access_contract.sql"
 commercial="$repo_root/supabase/migrations/20260822212119_commercial_access_v1.sql"
+kiwify_contract="$repo_root/supabase/migrations/20260823104202_install_kiwify_webhook_v2_contract.sql"
 knowledge="$repo_root/supabase/migrations/20260823000450_knowledge_area_v1.sql"
 editorial="$repo_root/supabase/migrations/20260823012822_extend_knowledge_editorial_contract_v1.sql"
 commercial_tests="$repo_root/supabase/tests/commercial_access_v1_test.sql"
@@ -18,12 +19,13 @@ suffix="${BASHPID:-$$}"
 upgrade_db="mb_kiwify_upgrade_${suffix}"
 partial_db="mb_kiwify_partial_${suffix}"
 drift_db="mb_kiwify_drift_${suffix}"
+absent_db="mb_kiwify_absent_${suffix}"
 full_gate_db="mb_knowledge_parts_1_4_production_gate_${suffix}"
 tmp_dir="$(mktemp -d "${TMPDIR:-/tmp}/mb-kiwify-upgrade.XXXXXX")"
 assertions=0
 
 cleanup(){
-  for database in "$upgrade_db" "$partial_db" "$drift_db" "$full_gate_db"; do
+  for database in "$upgrade_db" "$partial_db" "$drift_db" "$absent_db" "$full_gate_db"; do
     case "$database" in mb_kiwify_*|mb_knowledge_parts_1_4_production_gate_*) docker exec "$db_container" dropdb -U postgres --if-exists "$database" >/dev/null 2>&1 || true;; esac
   done
   case "$tmp_dir" in "${TMPDIR:-/tmp}"/mb-kiwify-upgrade.*) rm -rf "$tmp_dir";; esac
@@ -79,7 +81,8 @@ create_kiwify_fixture(){
 insert into auth.users(id,email,email_confirmed_at) values
  ('91000000-0000-4000-8000-000000000001','legacy-owner@example.invalid',now()),
  ('92000000-0000-4000-8000-000000000002','future-trial@example.invalid',now()),
- ('93000000-0000-4000-8000-000000000003','other-user@example.invalid',now());
+ ('93000000-0000-4000-8000-000000000003','other-user@example.invalid',now()),
+ ('98000000-0000-4000-8000-000000000008','kiwify-app@example.invalid',now());
 insert into public.accounts(id,user_id,name) values('91100000-0000-4000-8000-000000000001','91000000-0000-4000-8000-000000000001','Synthetic legacy account');
 
 create table public.products(
@@ -116,9 +119,13 @@ language sql stable security invoker set search_path=public as $$
     and (g.expires_at is null or g.expires_at>now()))
 $$;
 grant execute on function public.has_active_access(text) to authenticated;
+create function public.get_kiwify_webhook_token() returns text
+language sql security definer set search_path=public,vault as $$select null::text$$;
 create function public.set_kiwify_webhook_token(p_token text) returns void
 language plpgsql security definer set search_path=public,vault as $$begin perform length(p_token);end$$;
+revoke all on function public.get_kiwify_webhook_token() from public,anon,authenticated;
 revoke all on function public.set_kiwify_webhook_token(text) from public,anon,authenticated;
+grant execute on function public.get_kiwify_webhook_token() to service_role;
 grant execute on function public.set_kiwify_webhook_token(text) to service_role;
 
 insert into public.products(id,name,slug,description) values('94000000-0000-4000-8000-000000000004','Legacy Mentoria Black','mentoria-black','Synthetic legacy product');
@@ -131,6 +138,53 @@ SQL
 }
 
 create_kiwify_fixture "$upgrade_db"
+# Exercise the exact legacy conflict/event contract in a rollback-only transaction.
+psql_db "$upgrade_db" >/dev/null <<'SQL'
+begin;
+insert into public.payment_events(event_id,event_type,user_id,payload)
+values('legacy-runtime-approved','purchase_approved','98000000-0000-4000-8000-000000000008','{"fixture":"approval"}')
+on conflict(provider,event_id) do nothing;
+insert into public.access_grants(user_id,product_id,status,source,external_purchase_id,expires_at)
+select '98000000-0000-4000-8000-000000000008',id,'active','kiwify','legacy-runtime-purchase',now()+interval '30 days'
+from public.products where slug='mentoria-black'
+on conflict(user_id,product_id) do update set status='active',expires_at=excluded.expires_at;
+-- Retry the same delivery and legacy grant upsert.
+insert into public.payment_events(event_id,event_type,user_id,payload)
+values('legacy-runtime-approved','purchase_approved','98000000-0000-4000-8000-000000000008','{"fixture":"approval"}')
+on conflict(provider,event_id) do nothing;
+insert into public.access_grants(user_id,product_id,status,source,external_purchase_id,expires_at)
+select '98000000-0000-4000-8000-000000000008',id,'active','kiwify','legacy-runtime-purchase',now()+interval '60 days'
+from public.products where slug='mentoria-black'
+on conflict(user_id,product_id) do update set status='active',expires_at=excluded.expires_at;
+do $legacy_writer_contract$
+begin
+  if (select count(*) from public.payment_events where event_id='legacy-runtime-approved')<>1
+     or (select count(*) from public.access_grants where external_purchase_id='legacy-runtime-purchase')<>1 then
+    raise exception 'legacy retry duplicated event or grant';
+  end if;
+  update public.access_grants set expires_at=now()+interval '90 days'
+  where external_purchase_id='legacy-runtime-purchase';
+  if not exists(select 1 from public.access_grants where external_purchase_id='legacy-runtime-purchase' and expires_at>now()+interval '89 days') then
+    raise exception 'legacy renewal failed';
+  end if;
+  update public.access_grants set status='active' where external_purchase_id='legacy-runtime-purchase';
+  if not exists(select 1 from public.access_grants where external_purchase_id='legacy-runtime-purchase' and status='active') then
+    raise exception 'legacy cancellation changed access early';
+  end if;
+  update public.access_grants set status='revoked',revoked_at=now() where external_purchase_id='legacy-runtime-purchase';
+  if not exists(select 1 from public.access_grants where external_purchase_id='legacy-runtime-purchase' and status='revoked') then
+    raise exception 'legacy refund revocation failed';
+  end if;
+  update public.access_grants set status='active',revoked_at=null where external_purchase_id='legacy-runtime-purchase';
+  update public.access_grants set status='revoked',revoked_at=now() where external_purchase_id='legacy-runtime-purchase';
+  if not exists(select 1 from public.access_grants where external_purchase_id='legacy-runtime-purchase' and status='revoked') then
+    raise exception 'legacy chargeback revocation failed';
+  end if;
+end
+$legacy_writer_contract$;
+rollback;
+SQL
+assertions=$((assertions+6))
 node "$repo_root/scripts/prepare-knowledge-import-sql.js" --input "$source_document" --output "$tmp_dir/knowledge-import.sql" >/dev/null
 [[ "$(node -e "const d=require(process.argv[1]);process.stdout.write(d.editorial_metadata.content_version)" "$source_document")" == "parts-1-4-v2" ]]
 [[ "$(node -e "const d=require(process.argv[1]);process.stdout.write(d.editorial_metadata.canonical_hash)" "$source_document")" == "9c9d90e12ea90f36ea85da291091ab9bb49b76590d9638c856f936dd41a670ad" ]]
@@ -152,6 +206,7 @@ grant_legacy_before="$(psql_db "$upgrade_db" -Atqc "select md5(row_to_json(row_d
 events_legacy_before="$(psql_db "$upgrade_db" -Atqc "select md5(string_agg(row_to_json(row_data)::text,'|' order by id)) from(select id,provider,event_id,event_type,user_id,external_customer_id,external_purchase_id,payload,processed,processed_at,created_at from payment_events order by id) row_data")"
 kiwify_function_before="$(psql_db "$upgrade_db" -Atqc "select md5(pg_get_functiondef('public.set_kiwify_webhook_token(text)'::regprocedure))")"
 apply_file "$upgrade_db" "$commercial"
+apply_file "$upgrade_db" "$kiwify_contract"
 
 docker exec "$db_container" dropdb -U postgres --if-exists "$full_gate_db" >/dev/null
 docker exec "$db_container" createdb -U postgres -T "$upgrade_db" "$full_gate_db"
@@ -164,6 +219,7 @@ assert_sql "$full_gate_db" "select count(*) from pg_policies where schemaname='p
 assert_sql "$full_gate_db" "select ((select enforced from commercial_enforcement_state where singleton)=false and (select count(*) from pg_policies where schemaname='public' and policyname='mb_v82_own_rows')=9)::text" "true" "financial enforcement remains disabled after the complete chain"
 assert_sql "$full_gate_db" "select (to_regprocedure('public.set_kiwify_webhook_token(text)') is not null and (select count(*) from payment_events where provider='kiwify' and environment='legacy' and payload is not null)=2)::text" "true" "Kiwify RPC and historical payloads survive the complete chain"
 apply_file "$full_gate_db" "$commercial"
+apply_file "$full_gate_db" "$kiwify_contract"
 apply_file "$full_gate_db" "$knowledge"
 apply_file "$full_gate_db" "$editorial"
 apply_file "$full_gate_db" "$tmp_dir/knowledge-import.sql"
@@ -207,6 +263,49 @@ assert_sql "$upgrade_db" "set role authenticated;set request.jwt.claim.sub='9100
 assert_sql "$upgrade_db" "set role authenticated;set request.jwt.claim.sub='93000000-0000-4000-8000-000000000003';select count(*) from access_grants;reset role" "0" "cross-user grant read is rejected"
 assert_sql "$upgrade_db" "select count(*) from pg_constraint c where c.conrelid='public.access_grants'::regclass and c.contype='u' and (select array_agg(a.attname order by key.ordinality) from unnest(c.conkey) with ordinality key(attnum,ordinality) join pg_attribute a on a.attrelid=c.conrelid and a.attnum=key.attnum)=array['user_id','product_id']::name[]" "0" "legacy user-product unique is removed"
 
+psql_db "$upgrade_db" >/dev/null <<'SQL'
+update public.commercial_offers set provider='kiwify',external_offer_id='offer-app-monthly',active=true where code='APP_MONTHLY';
+update public.commercial_offers set provider='kiwify',external_offer_id='offer-knowledge',active=true where code='KNOWLEDGE_LIFETIME';
+update public.commercial_offers set provider='kiwify',external_offer_id='offer-complete',active=true where code='COMPLETE_MONTHLY';
+SQL
+assert_sql "$upgrade_db" "set role service_role;select public.get_kiwify_webhook_contract_v2();reset role" "commercial_access_v2_kiwify_webhook_v1" "dual writer detects the explicit V2 contract"
+assert_sql "$upgrade_db" "set role service_role;select public.resolve_kiwify_product_v2(null,'Mentoria Black');reset role" "APP" "legacy product name maps only to APP"
+assert_sql "$upgrade_db" "set role service_role;select public.resolve_kiwify_product_v2('offer-knowledge','ignored');reset role" "KNOWLEDGE" "configured Kiwify offer maps to KNOWLEDGE"
+assert_sql "$upgrade_db" "set role service_role;select public.resolve_kiwify_product_v2('offer-complete','ignored');reset role" "COMPLETE" "configured Kiwify offer maps to COMPLETE"
+
+assert_sql "$upgrade_db" "set role service_role;select process_kiwify_webhook_event_v2('kw-app-approved','purchase_approved','activate','98000000-0000-4000-8000-000000000008','APP','customer-app','purchase-app-1','subscription-app-1',statement_timestamp()+interval '30 days',repeat('1',64))->>'status';reset role" "processed" "Kiwify APP approval is processed"
+assert_sql "$upgrade_db" "set role service_role;select process_kiwify_webhook_event_v2('kw-app-approved','purchase_approved','activate','98000000-0000-4000-8000-000000000008','APP','customer-app','purchase-app-1','subscription-app-1',statement_timestamp()+interval '30 days',repeat('1',64))->>'duplicate';reset role" "true" "same Kiwify event is idempotent"
+assert_sql "$upgrade_db" "select count(*) from access_grants g join products p on p.id=g.product_id where g.user_id='98000000-0000-4000-8000-000000000008' and p.code='APP' and g.source='kiwify' and g.status='active'" "1" "APP approval creates one active Kiwify grant"
+assert_sql "$upgrade_db" "set role service_role;select process_kiwify_webhook_event_v2('kw-app-renewal','subscription_renewed','renewal','98000000-0000-4000-8000-000000000008','APP','customer-app','purchase-app-2','subscription-app-1',statement_timestamp()+interval '60 days',repeat('2',64))->>'status';reset role" "processed" "renewal updates the eligible APP grant"
+assert_sql "$upgrade_db" "select count(*) from access_grants g join products p on p.id=g.product_id where g.user_id='98000000-0000-4000-8000-000000000008' and p.code='APP' and g.source='kiwify' and g.status='active'" "1" "renewal does not duplicate active APP grants"
+assert_sql "$upgrade_db" "set role service_role;select process_kiwify_webhook_event_v2('kw-app-partial','purchase_partially_refunded','partial_refund',null,null,null,'purchase-app-2','subscription-app-1',null,repeat('3',64))->>'status';reset role" "administrative_review" "partial refund requires administrative review"
+assert_sql "$upgrade_db" "select status from access_grants where source='kiwify' and external_subscription_id='subscription-app-1'" "active" "partial refund does not change the grant"
+assert_sql "$upgrade_db" "set role service_role;select process_kiwify_webhook_event_v2('kw-app-late','subscription_late','late',null,null,null,'purchase-app-1','subscription-app-1',null,repeat('4',64))->>'status';reset role" "processed" "late subscription enters grace"
+assert_sql "$upgrade_db" "select (status='grace_period' and grace_until>statement_timestamp())::text from access_grants where source='kiwify' and external_subscription_id='subscription-app-1'" "true" "APP grace remains available for 72 hours"
+assert_sql "$upgrade_db" "set role service_role;select process_kiwify_webhook_event_v2('kw-app-cancel','subscription_canceled','cancel',null,null,null,'purchase-app-1','subscription-app-1',statement_timestamp()+interval '45 days',repeat('5',64))->>'status';reset role" "processed" "cancellation preserves the paid period"
+assert_sql "$upgrade_db" "select (expires_at>statement_timestamp() and status='active')::text from access_grants where source='kiwify' and external_subscription_id='subscription-app-1'" "true" "cancellation keeps APP active until expiry"
+assert_sql "$upgrade_db" "set role service_role;select process_kiwify_webhook_event_v2('kw-app-expire','subscription_expired','expire',null,null,null,'purchase-app-1','subscription-app-1',null,repeat('6',64))->>'status';reset role" "processed" "expiration is processed"
+assert_sql "$upgrade_db" "select status from access_grants where source='kiwify' and external_subscription_id='subscription-app-1'" "expired" "expiration blocks only the APP grant"
+
+assert_sql "$upgrade_db" "set role service_role;select process_kiwify_webhook_event_v2('kw-complete-approved','purchase_approved','activate','91000000-0000-4000-8000-000000000001','COMPLETE','customer-complete','purchase-complete-1','subscription-complete-1',statement_timestamp()+interval '30 days',repeat('7',64))->>'status';reset role" "processed" "COMPLETE approval is atomic"
+assert_sql "$upgrade_db" "select string_agg(p.code||':'||g.access_type||':'||g.status,',' order by p.code) from access_grants g join products p on p.id=g.product_id where g.user_id='91000000-0000-4000-8000-000000000001' and g.source='kiwify' and g.external_reference='purchase-complete-1'" "APP:paid:active,KNOWLEDGE:lifetime:active" "COMPLETE creates independent APP and KNOWLEDGE grants"
+assert_sql "$upgrade_db" "set role service_role;select process_kiwify_webhook_event_v2('kw-complete-cancel','subscription_canceled','cancel',null,null,null,'purchase-complete-1','subscription-complete-1',statement_timestamp()+interval '20 days',repeat('8',64))->>'status';reset role" "processed" "COMPLETE cancellation is processed"
+assert_sql "$upgrade_db" "select status from access_grants g join products p on p.id=g.product_id where g.external_reference='purchase-complete-1' and p.code='KNOWLEDGE'" "active" "COMPLETE cancellation preserves KNOWLEDGE lifetime"
+assert_sql "$upgrade_db" "set role service_role;select process_kiwify_webhook_event_v2('kw-complete-chargeback','chargeback','chargeback',null,null,null,'purchase-complete-1','subscription-complete-1',null,repeat('9',64))->>'status';reset role" "processed" "chargeback is processed"
+assert_sql "$upgrade_db" "select string_agg(p.code||':'||g.status,',' order by p.code) from access_grants g join products p on p.id=g.product_id where g.external_reference='purchase-complete-1'" "APP:chargeback,KNOWLEDGE:chargeback" "initial COMPLETE chargeback revokes both linked grants"
+
+assert_sql "$upgrade_db" "set role service_role;select process_kiwify_webhook_event_v2('kw-knowledge-approved','purchase_approved','activate','93000000-0000-4000-8000-000000000003','KNOWLEDGE','customer-knowledge','purchase-knowledge-1',null,null,repeat('a',64))->>'status';reset role" "processed" "KNOWLEDGE purchase grants lifetime access"
+assert_sql "$upgrade_db" "select access_type||':'||status from access_grants g join products p on p.id=g.product_id where g.external_reference='purchase-knowledge-1' and p.code='KNOWLEDGE'" "lifetime:active" "KNOWLEDGE is independent from APP"
+assert_sql "$upgrade_db" "set role service_role;select process_kiwify_webhook_event_v2('kw-knowledge-refund','purchase_refunded','refund',null,null,null,'purchase-knowledge-1',null,null,repeat('b',64))->>'status';reset role" "processed" "full refund is processed"
+assert_sql "$upgrade_db" "select status from access_grants where external_reference='purchase-knowledge-1'" "refunded" "full refund revokes the linked KNOWLEDGE grant"
+assert_sql "$upgrade_db" "set role service_role;select process_kiwify_webhook_event_v2('kw-out-of-order','subscription_canceled','cancel',null,null,null,'purchase-unknown','subscription-unknown',null,repeat('c',64))->>'status';reset role" "administrative_review" "out-of-order event fails closed for review"
+assert_sql "$upgrade_db" "select count(*) from payment_events where provider='kiwify' and environment='production' and external_event_id like 'kw-%' and payload is not null" "0" "new V2 Kiwify events never persist raw payloads"
+assert_sql "$upgrade_db" "select count(*) from (select user_id,product_id,count(*) from access_grants where source='kiwify' and status in('active','grace_period') group by user_id,product_id having count(*)>1) duplicate" "0" "no conflicting active Kiwify grants exist"
+
+# Restore the base test contract: the synthetic Kiwify mappings exercise the
+# writer, but no commercial offer remains enabled without approved pricing.
+psql_db "$upgrade_db" -qc "update public.commercial_offers set active=false where provider='kiwify'" >/dev/null
+
 assert_sql "$upgrade_db" "set role authenticated;set request.jwt.claim.sub='92000000-0000-4000-8000-000000000002';select result from start_my_app_trial();reset role" "started" "trial is accepted after Kiwify upgrade"
 psql_db "$upgrade_db" -qc "update product_trials set state='expired',started_at=statement_timestamp()-interval '168 hours',expires_at=statement_timestamp() where user_id='92000000-0000-4000-8000-000000000002';update access_grants set status='expired',started_at=statement_timestamp()-interval '168 hours',expires_at=statement_timestamp() where user_id='92000000-0000-4000-8000-000000000002' and access_type='trial';insert into access_grants(user_id,product_id,access_type,source,environment,status,external_reference,external_subscription_id,expires_at) select '92000000-0000-4000-8000-000000000002',id,'paid','asaas','sandbox','active','synthetic-paid-after-trial','sub-synthetic',statement_timestamp()+interval '30 days' from products where code='APP'" >/dev/null
 assert_sql "$upgrade_db" "select count(*) from access_grants g join products p on p.id=g.product_id where g.user_id='92000000-0000-4000-8000-000000000002' and p.code='APP'" "2" "expired trial and later paid grant coexist"
@@ -218,7 +317,7 @@ assert_sql "$upgrade_db" "select count(*) from payment_events where provider='as
 assert_sql "$upgrade_db" "select environment||':'||(payload_hash~'^[0-9a-f]{64}$')::text from payment_events where event_id='legacy-writer-event'" "production:true" "legacy Kiwify insert contract remains normalized"
 psql_db "$upgrade_db" -qc "update payment_events set processed=true,processed_at=clock_timestamp() where event_id='legacy-writer-event'" >/dev/null
 assert_sql "$upgrade_db" "select status||':'||processed::text from payment_events where event_id='legacy-writer-event'" "processed:true" "legacy Kiwify processed update stays synchronized"
-assert_sql "$upgrade_db" "select source||':'||access_type||':'||environment||':'||(external_reference=external_purchase_id)::text from access_grants where user_id='93000000-0000-4000-8000-000000000003'" "kiwify:paid:production:true" "legacy Kiwify grant insert contract remains normalized"
+assert_sql "$upgrade_db" "select g.source||':'||g.access_type||':'||g.environment||':'||(g.external_reference=g.external_purchase_id)::text from access_grants g join products p on p.id=g.product_id where g.user_id='93000000-0000-4000-8000-000000000003' and p.code='APP'" "kiwify:paid:production:true" "legacy Kiwify grant insert contract remains normalized"
 if psql_db "$upgrade_db" -qc "insert into payment_events(provider,environment,external_event_id,event_type,payload_hash) values('asaas','sandbox','same-event','PAYMENT_RECEIVED',repeat('c',64))" 2>"$tmp_dir/replay.err";then echo "same-environment replay unexpectedly succeeded" >&2;exit 1;fi
 rg -q 'duplicate key value' "$tmp_dir/replay.err";assertions=$((assertions+1))
 
@@ -228,6 +327,7 @@ pgtap_count="$(rg -c 'ok [0-9]+ -' <<<"$test_output")"
 
 counts_before_retry="$(psql_db "$upgrade_db" -Atqc "select concat_ws(',',(select count(*) from products),(select count(*) from access_grants),(select count(*) from payment_events))")"
 apply_file "$upgrade_db" "$commercial"
+apply_file "$upgrade_db" "$kiwify_contract"
 assert_sql "$upgrade_db" "select concat_ws(',',(select count(*) from products),(select count(*) from access_grants),(select count(*) from payment_events))" "$counts_before_retry" "semantic V2 retry preserves every row"
 psql_db "$upgrade_db" -qc "drop index access_grants_one_trial_uidx;create unique index access_grants_one_trial_uidx on access_grants(id)" >/dev/null
 if apply_file "$upgrade_db" "$commercial" 2>"$tmp_dir/v2-index-drift.err";then echo "semantic retry accepted an incompatible V2 index" >&2;exit 1;fi
@@ -253,5 +353,25 @@ rg -q 'products shape drift' "$tmp_dir/remote-drift.err";assertions=$((assertion
 if apply_file "$drift_db" "$commercial" 2>"$tmp_dir/drift.err";then echo "unknown Kiwify drift unexpectedly accepted" >&2;exit 1;fi
 rg -q 'public.products columns differ' "$tmp_dir/drift.err";assertions=$((assertions+1))
 assert_sql "$drift_db" "select count(*) from information_schema.columns where table_schema='public' and table_name='access_grants' and column_name='access_type'" "0" "drift NO-GO creates no partial V2 columns"
+
+# Exact Beta-style state: Commercial V2 exists but no legacy Kiwify Vault RPCs.
+create_v82_clone "$absent_db"
+apply_file "$absent_db" "$commercial"
+psql_db "$absent_db" >/dev/null <<'SQL'
+create table vault.secrets(
+  id uuid primary key default gen_random_uuid(),secret text not null,name text unique,description text
+);
+create view vault.decrypted_secrets as select id,secret as decrypted_secret,name,description from vault.secrets;
+create function vault.create_secret(new_secret text,new_name text,new_description text,new_key_id uuid default null)
+returns uuid language plpgsql as $$declare v_id uuid;begin insert into vault.secrets(secret,name,description) values(new_secret,new_name,new_description) returning id into v_id;return v_id;end$$;
+create function vault.update_secret(secret_id uuid,new_secret text,new_name text,new_description text,new_key_id uuid default null)
+returns void language plpgsql as $$begin update vault.secrets set secret=new_secret,name=new_name,description=new_description where id=secret_id;end$$;
+SQL
+apply_file "$absent_db" "$kiwify_contract"
+assert_sql "$absent_db" "select (to_regprocedure('public.get_kiwify_webhook_token()') is not null and to_regprocedure('public.set_kiwify_webhook_token(text)') is not null)::text" "true" "Beta-style installation creates the guarded Vault contract"
+assert_sql "$absent_db" "set role service_role;with configured as (select public.set_kiwify_webhook_token(repeat('s',32))) select length(public.get_kiwify_webhook_token()) from configured;reset role" "32" "Beta-style Vault token remains server-only and retrievable"
+assert_sql "$absent_db" "select (not has_function_privilege('authenticated','public.get_kiwify_webhook_token()','EXECUTE') and not has_function_privilege('authenticated','public.set_kiwify_webhook_token(text)','EXECUTE'))::text" "true" "clients cannot read or rotate the Kiwify token"
+apply_file "$absent_db" "$kiwify_contract"
+assert_sql "$absent_db" "select count(*) from vault.secrets where name='kiwify_webhook_token'" "1" "Beta-style contract retry preserves the configured token"
 
 echo "commercial Kiwify upgrade: ${pgtap_count} pgTAP + ${assertions} shell assertions; 1/1/2 legacy rows preserved"

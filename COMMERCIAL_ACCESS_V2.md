@@ -60,13 +60,13 @@ The body and search path of `set_kiwify_webhook_token(text)` are preserved. Its 
 execution is removed; it remains backend-only and is not an Asaas dependency. No
 Vault secret is read or moved.
 
-The deployed Kiwify writer is not versioned in this repository. Plain legacy inserts
-are covered by compatibility tests, but an external writer using
-`ON CONFLICT (user_id,product_id)` must be updated before a production migration,
-because that broad unique constraint is intentionally retired to preserve grant
-history. A future read-only production/Edge inventory must prove the writer's conflict
-contract. This is a production-promotion gate, not a blocker for local or Asaas
-Sandbox work.
+The Kiwify writer is now versioned in `supabase/functions/kiwify-webhook`. It detects
+the exact legacy or Commercial V2 contract. Only the legacy adapter retains
+`ON CONFLICT (user_id,product_id)`; V2 calls a server-only transactional processor
+idempotent by `(provider,environment,external_event_id)`. If the Commercial marker
+exists without the processor contract, the writer fails closed instead of attempting
+the retired conflict target. Production still requires a separate controlled gate and
+must deploy the dual writer before the schema migration.
 
 ## Functional contract
 
@@ -184,10 +184,11 @@ isolated Edge deployment, webhook URL registration, token-validation exercise,
 retry/reconciliation scheduling and end-to-end Pix/card tests.
 
 Remote promotion later requires `preflight_commercial_access_v2.sql`, a backup,
-explicit migration approval, proof/update of the deployed Kiwify writer conflict
-contract, authorization for every legacy owner grant, Sandbox acceptance and a
-separate production rollout plan. The required sequence is: Phase A migration while
-V82 policies remain active; Phase B grants; Phase C verification; Phase D enforcement;
+explicit migration approval, deployment/verification of the approved dual Kiwify
+writer, authorization for every legacy owner grant, Sandbox acceptance and a separate
+production rollout plan. Apply the Kiwify V2 processor contract immediately after the
+Commercial migration. The required sequence is then: Phase A infrastructure while V82
+policies remain active; Phase B grants; Phase C verification; Phase D enforcement;
 then deploy the gated frontend. Never activate enforcement and then attempt bootstrap.
 
 ## Real Asaas Sandbox preparation

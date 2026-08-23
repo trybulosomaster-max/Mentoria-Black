@@ -96,11 +96,11 @@ old-writer event normalization, Sandbox/production event isolation, replay rejec
 bootstrap-before-enforcement, expiry without deletion, policy rollback, migration
 partial failure/retry, drift refusal, and indexed/RLS execution plans.
 
-The deployed Kiwify webhook implementation is not versioned. The compatible legacy
-insert shape is tested, but production promotion must first prove that the writer does
-not depend on `ON CONFLICT (user_id,product_id)`, or deploy an approved writer update
-before retiring that unique constraint. This remains a production-only gate; it does
-not block an Asaas Sandbox integration.
+The Kiwify webhook is now versioned and dual-compatible. The legacy path alone retains
+`ON CONFLICT (user_id,product_id)`; the V2 path is a transactional server-only RPC.
+Clone and Beta tests cover the switch, replay, grant history and fail-closed partial
+transition. Production promotion still requires a fresh gate proving the approved
+writer bundle is deployed before retiring the legacy unique constraint.
 
 The Asaas Sandbox preparation adds an opaque order reference and a nullable billing
 period anchor to the still-unapplied candidate migration. Retry also verifies the

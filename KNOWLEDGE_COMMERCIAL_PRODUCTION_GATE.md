@@ -1,7 +1,8 @@
 # Mentoria Black — gate final Commercial Access + Knowledge Area
 
-Status: **NO-GO até reconciliar o writer Kiwify ativo com o schema V2**. Este documento não
-autoriza nem executa migration, importação, enforcement, merge ou deploy.
+Status: **bloqueador do writer Kiwify resolvido e homologado na Beta; repetir o gate
+final antes de qualquer promoção**. Este documento não autoriza nem executa migration,
+importação, enforcement, merge ou deploy.
 
 ## Identidade e pacote imutável
 
@@ -40,7 +41,7 @@ identificadores externos. Estado observado:
 | `products` | 1 produto legado | catálogo V2 com 3 produtos | evoluir in-place | preservar UUID/slug/row |
 | `access_grants` | 1 grant manual ativo | V2 reconciliado | enriquecer in-place | preservar histórico |
 | `payment_events` | 2 eventos Kiwify | V2 multiprovider | enriquecer in-place | preservar payload histórico |
-| Kiwify | 2 funções + Edge Function v4 ativa | histórico preservado na Beta | versionar writer V2 dual-compatible | **BLOCKER: conflict target removido** |
+| Kiwify | 2 funções + Edge Function v4 ativa | writer dual-compatible v7 homologado | deploy do writer antes do schema | gate de versão/hash |
 | Knowledge | objetos ausentes | 1/4/26/1469 | criar schema e importar | RLS antes do conteúdo |
 | Conteúdo | ausente | 67 sample / 1.402 knowledge | import server-side | hash/contagens exatos |
 | Enforcement APP | não instalado | estado `false` | manter desligado | fase separada |
@@ -60,11 +61,15 @@ Commercial/Knowledge estava registrada. Security Advisor de produção: zero ach
 - Produto, grant manual, dois eventos, payloads Kiwify e
   `set_kiwify_webhook_token(text)` são preservados. O `UNIQUE (user_id,product_id)`
   é substituído apenas após o preflight exato, permitindo histórico trial + paid.
-- A Edge Function remota `kiwify-webhook` v4 (source SHA-256
+- A Edge Function de produção `kiwify-webhook` v4 (source SHA-256
   `4e05db916526212b9b22bf9b2d44794e86d3008f9d23fb54f8a336b3c083c301`) faz
   `upsert` de grants com `onConflict: user_id,product_id`. Esse conflict target deixa
-  de existir na migration V2. Portanto, a migration **não pode ser promovida ainda**:
-  novos eventos aprovados/renovados falhariam ao conceder acesso.
+  de existir na migration V2. O novo writer detecta explicitamente legado ou V2,
+  preserva esse upsert somente no legado e usa RPC transacional/idempotente no V2.
+- A Beta executa o writer dual-compatible v7 (bundle SHA-256
+  `13cd08c6621b8893190fda2fccbefdb4958ef5be9eadbbf79b25802efdf4ff8e`). O contrato
+  SQL V2 fica em `20260823104202_install_kiwify_webhook_v2_contract.sql`; o período
+  entre Commercial e esse contrato é fail-closed, nunca fallback legado inseguro.
 - As seis tabelas server-only sem policy são deny-by-default; `anon` e
   `authenticated` não recebem writer direto. Classificação: **ACCEPTED**.
 - `start_my_app_trial()` é `SECURITY DEFINER`, sem argumentos, usa `auth.uid()`,
@@ -75,38 +80,39 @@ Commercial/Knowledge estava registrada. Security Advisor de produção: zero ach
 - Leaked Password Protection está habilitada na produção e o Advisor está limpo.
   O aviso equivalente da Beta é pré-existente e não integra este gate.
 
-## Correção obrigatória antes da ordem de promoção
+## Evidência de reconciliação do writer
 
-1. versionar uma Edge Function Kiwify dual-compatible na feature branch;
-2. no pre-state legado, manter o writer atual; no estado V2, usar uma operação
-   transacional/idempotente baseada em provider, environment e referência externa;
-3. testar aprovação, renovação, cancelamento, atraso, refund, chargeback, replay e
-   concorrência contra os dois schemas;
-4. implantar o writer dual-compatible antes da migration, confirmar a versão/hash e
-   só então abrir novo gate de promoção;
-5. não restaurar o `UNIQUE (user_id,product_id)`, pois isso quebraria o histórico
-   trial expirado + grant pago posterior.
+1. legado e V2 foram testados em clones descartáveis, com 1/1/2 rows históricas
+   preservadas, retry, falha parcial, drift e zero grant ativo duplicado;
+2. approval, renewal, late/grace, cancelamento, expiração, refund integral, refund
+   parcial, chargeback e replay passaram remotamente somente na Beta;
+3. dez eventos e três grants sintéticos foram verificados e removidos; nenhum payload
+   bruto V2 foi persistido e o token efêmero foi apagado;
+4. rollback de deploy para o bundle v4 foi exercitado na Beta e o writer dual foi
+   restaurado imediatamente;
+5. o `UNIQUE (user_id,product_id)` continua corretamente aposentado no V2.
 
 ## Ordem autorizável depois da correção
 
 1. confirmar backup físico e novo snapshot/preflight read-only;
 2. comparar SHAs, hashes e contagens deste manifesto;
-3. confirmar a Edge Function Kiwify dual-compatible ativa;
+3. implantar a Edge Function Kiwify dual-compatible e provar o caminho legado;
 4. aplicar somente a migration Commercial em transação;
-5. validar 1 produto/1 grant/2 eventos legados preservados, funções Kiwify e
+5. aplicar imediatamente `20260823104202_install_kiwify_webhook_v2_contract.sql`;
+6. validar 1 produto/1 grant/2 eventos legados preservados, funções Kiwify e
    `commercial_enforcement_state.enforced = false`;
-6. validar explicitamente cobertura APP dos proprietários legados autorizados, sem
+7. validar explicitamente cobertura APP dos proprietários legados autorizados, sem
    ativar enforcement;
-7. aplicar a migration Knowledge em transação;
-8. aplicar a extensão editorial em transação;
-9. validar RLS, grants, RPCs e Advisors antes do conteúdo;
-10. importar `parts-1-4-v2` server-side e idempotentemente;
-11. validar 1/4/26/1469, 67/1.402, canonical hash e source hashes;
-12. testar anon, APP, KNOWLEDGE, COMPLETE, revoked, FTS sem vazamento,
+8. aplicar a migration Knowledge em transação;
+9. aplicar a extensão editorial em transação;
+10. validar RLS, grants, RPCs e Advisors antes do conteúdo;
+11. importar `parts-1-4-v2` server-side e idempotentemente;
+12. validar 1/4/26/1469, 67/1.402, canonical hash e source hashes;
+13. testar anon, APP, KNOWLEDGE, COMPLETE, revoked, FTS sem vazamento,
     progress/bookmarks e cross-user;
-13. executar regressão financeira focal e teste de rollback seletivo;
-14. somente depois preparar/deployar o frontend em etapa separada;
-15. ativar enforcement financeiro apenas em autorização e janela próprias.
+14. executar regressão financeira focal e teste de rollback seletivo;
+15. somente depois preparar/deployar o frontend em etapa separada;
+16. ativar enforcement financeiro apenas em autorização e janela próprias.
 
 Parar imediatamente em checksum, schema, policy, função, contagem, hash, acesso,
 Advisor de segurança ou preservação Kiwify divergente. Não usar `db push` genérico,
@@ -139,9 +145,10 @@ aplicou Commercial → Knowledge → Editorial → conteúdo, preservou todas as
 payloads e chegou a 1/4/26/1469, 67/1.402. Retry completo, falha transacional, drift
 incompatível, rollback seletivo e reimport foram aprovados. RLS, FTS, progress,
 bookmarks, compatibilidade dos inserts Kiwify simples, Commercial Access e adapters
-Asaas sintéticos também passaram. O gate remoto adicional demonstrou que o writer
-implantado usa o conflict target legado e, por isso, prevalece como NO-GO. Nenhuma
-rede Asaas, produção escrita, merge ou deploy foi usado.
+Asaas sintéticos também passaram. A reconciliação posterior homologou o writer novo
+na Beta sem escrever na produção. O gate final deve agora ser repetido com o novo
+arquivo, checksum, função e ordem; nenhuma rede Asaas, produção escrita, merge ou
+deploy oficial foi usado.
 
 Backup observado: físico de `2026-08-22 06:13:54 UTC`, Restore disponível, retenção
 Pro de 7 dias. Nenhuma restauração foi executada.
