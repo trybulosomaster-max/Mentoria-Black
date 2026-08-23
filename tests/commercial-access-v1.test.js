@@ -49,7 +49,7 @@ await test('webhook authenticates, hashes and stores only safe metadata',async()
 });
 await test('frontend entitlement gate precedes every financial load',()=>{
  const html=fs.readFileSync(path.join(__dirname,'..','index.html'),'utf8'),start=html.indexOf('window.start=async function()'),gate=html.indexOf('const commercial=await resolveCommercialSession()',start),load=html.indexOf('await load()',start);
- ok(start>0&&gate>start&&load>gate);ok(html.includes('Seu período gratuito terminou.'));ok(html.includes('commercialGate'));ok(html.includes('Área de Conhecimento — acesso liberado'));
+ ok(start>0&&gate>start&&load>gate);ok(html.includes('Seu período gratuito terminou.'));ok(html.includes('commercialGate'));ok(html.includes('commercialKnowledgeRoot'));ok(html.includes('mountKnowledgeArea'));
 });
 await test('no administrative or Asaas secret is shipped in frontend assets',()=>{
  const sources=['index.html','commercial/access-contract.js','commercial/provider-contract.js','commercial/admin-contract.js'].map(file=>fs.readFileSync(path.join(__dirname,'..',file),'utf8')).join('\n');

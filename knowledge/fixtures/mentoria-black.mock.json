@@ -1,0 +1,69 @@
+{
+  "publication": {
+    "slug": "mentoria-black-mock",
+    "title": "Mentoria Black",
+    "subtitle": "Publicação de demonstração",
+    "description": "Conteúdo sintético para validar a Área de Conhecimento V1.",
+    "author": "Mentoria Black",
+    "cover_path": null,
+    "publication_type": "book",
+    "version": "mock-1",
+    "status": "published"
+  },
+  "parts": [
+    {
+      "position": 1,
+      "title": "PARTE 1 — MOCK",
+      "chapters": [
+        {
+          "slug": "introducao-mock",
+          "position": 1,
+          "title": "Introdução MOCK",
+          "subtitle": "Amostra sintética",
+          "excerpt": "Trecho de demonstração sem conteúdo comercial real.",
+          "access_level": "sample",
+          "estimated_read_minutes": 2,
+          "sections": [
+            {"position": 1, "section_type": "heading", "access_level": "sample", "content": {"text": "Introdução MOCK"}},
+            {"position": 2, "section_type": "paragraph", "access_level": "sample", "content": {"text": "Este texto é exclusivamente sintético e valida a experiência de leitura da amostra."}},
+            {"position": 3, "section_type": "highlight", "access_level": "sample", "content": {"text": "Amostra pública: nenhum conteúdo definitivo do livro está neste repositório."}}
+          ]
+        },
+        {
+          "slug": "capitulo-protegido-mock-1",
+          "position": 2,
+          "title": "Capítulo protegido MOCK",
+          "subtitle": "Disponível com KNOWLEDGE",
+          "excerpt": "Estrutura visível; corpo protegido pelo banco.",
+          "access_level": "knowledge",
+          "estimated_read_minutes": 3,
+          "sections": [
+            {"position": 1, "section_type": "heading", "access_level": "knowledge", "content": {"text": "Capítulo protegido MOCK"}},
+            {"position": 2, "section_type": "paragraph", "access_level": "knowledge", "content": {"text": "Conteúdo sintético protegido para teste de entitlement e RLS."}},
+            {"position": 3, "section_type": "exercise", "access_level": "knowledge", "content": {"prompt": "Exercício MOCK", "steps": ["Passo sintético um", "Passo sintético dois"]}}
+          ]
+        }
+      ]
+    },
+    {
+      "position": 2,
+      "title": "PARTE 2 — MOCK",
+      "chapters": [
+        {
+          "slug": "capitulo-protegido-mock-2",
+          "position": 1,
+          "title": "Capítulo protegido MOCK — Parte 2",
+          "subtitle": "Demonstração de múltiplas partes",
+          "excerpt": "Outro capítulo sintético protegido.",
+          "access_level": "knowledge",
+          "estimated_read_minutes": 2,
+          "sections": [
+            {"position": 1, "section_type": "quote", "access_level": "knowledge", "content": {"text": "Citação MOCK para validar o renderer estruturado."}},
+            {"position": 2, "section_type": "list", "access_level": "knowledge", "content": {"items": ["Item sintético A", "Item sintético B"]}},
+            {"position": 3, "section_type": "separator", "access_level": "knowledge", "content": {}}
+          ]
+        }
+      ]
+    }
+  ]
+}

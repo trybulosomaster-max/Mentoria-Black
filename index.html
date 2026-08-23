@@ -9,6 +9,7 @@
 <meta name="apple-mobile-web-app-title" content="Mentoria Black">
 <title>Mentoria Black — Gestão Financeira V82</title>
 <link rel="manifest" href="manifest.webmanifest">
+<link rel="stylesheet" href="knowledge/knowledge-area.css">
 <script src="js/production-environment.js"></script>
 <script src="js/production-runtime.js"></script>
 <script src="js/observability.js"></script>
@@ -25,6 +26,8 @@
 <script src="js/health-integration.js"></script>
 <script src="commercial/access-contract.js"></script>
 <script src="commercial/provider-contract.js"></script>
+<script src="knowledge/import-contract.js"></script>
+<script src="knowledge/knowledge-area.js"></script>
 <style>
 :root{--bg:#050505;--panel:#0d0d0d;--panel2:#111;--line:#2b2b2b;--text:#f5f5f5;--muted:#999;--gold:#c9a227;--gold2:#e4c55b;--danger:#d88b8b;--ok:#86bb91;--shadow:0 14px 45px #0008}
 *{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--text);font:14px Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}body{min-height:100vh}button,input,select,textarea{font:inherit}button{cursor:pointer}.hidden{display:none!important}
@@ -866,10 +869,14 @@ function bindFilters(){
  if(TAB==="reports")bindReportFilters();
 }
 function knowledge(){
- const granted=COMMERCIAL_STATE?.entitlements?.knowledge?.hasAccess;
- return pageHead("Área de Conhecimento","Conteúdo premium Mentoria Black")+`<div class="knowledge-shell"><section class="knowledge-sample"><h2>${granted?'Área de Conhecimento — acesso liberado':'Amostra gratuita'}</h2><p class="muted">${granted?'A estrutura está pronta para receber o livro, capítulos, progresso e materiais complementares.':'Uma amostra pública será disponibilizada aqui. O conteúdo completo exige o acesso KNOWLEDGE.'}</p>${granted?'':'<button class="btn gold" onclick="commercialCheckout(\'knowledge\')">Conhecer acesso completo</button>'}</section></div>`;
+ return `<div id="knowledgeRoot" class="knowledge-root" aria-live="polite"></div>`;
 }
-function render(){nav();$("view").innerHTML=TAB==="dashboard"?window.dashboard():TAB==="transactions"?window.transactions():TAB==="planning"?planning():TAB==="accounts"?accounts():TAB==="cards"?cards():TAB==="categories"?window.categories():TAB==="goals"?goals():TAB==="recurring"?recurring():TAB==="wealth"?wealth():TAB==="knowledge"?knowledge():reports();bindFilters();requestAnimationFrame(()=>window.drawCharts())}
+async function mountKnowledgeArea(target,entitlements=COMMERCIAL_STATE?.entitlements){
+ const root=typeof target==='string'?$(target):target;if(!root)return;
+ const app=window.MBKnowledgeArea.createKnowledgeArea({client:sb,entitlements:entitlements||{knowledge:{hasAccess:false}},checkout:offer=>window.commercialCheckout(offer),notify:toast});
+ await app.mount(root);
+}
+function render(){nav();$("view").innerHTML=TAB==="dashboard"?window.dashboard():TAB==="transactions"?window.transactions():TAB==="planning"?planning():TAB==="accounts"?accounts():TAB==="cards"?cards():TAB==="categories"?window.categories():TAB==="goals"?goals():TAB==="recurring"?recurring():TAB==="wealth"?wealth():TAB==="knowledge"?knowledge():reports();bindFilters();if(TAB==="knowledge")mountKnowledgeArea("knowledgeRoot").catch(error=>toast(error.message,true));requestAnimationFrame(()=>window.drawCharts())}
 function drawCharts(){
   Object.values(CHARTS).forEach(c=>{try{c.destroy()}catch{}});CHARTS={};
   const rows=expensesByCat();
@@ -1073,10 +1080,10 @@ if("serviceWorker" in navigator){
     return result;
   };
   function showCommercialGate(state){
-    const knowledge=state.entitlements.knowledge.hasAccess;
     const expired=state.experience==='trial_expired';
     $("auth").classList.add("hidden");$("app").classList.add("hidden");$("commercialGate").classList.remove("hidden");
-    $("commercialGateBody").innerHTML=`<h1>${expired?'Seu período gratuito terminou.':'Seu acesso está pronto para evoluir.'}</h1><p class="muted">Seus dados financeiros permanecem preservados. Assim que um acesso APP for confirmado, você continua com a mesma conta.</p><div class="commercial-grid"><div class="commercial-option"><h2>Plano Mensal</h2><p class="muted">Aplicativo financeiro completo.</p><button class="btn gold" onclick="commercialCheckout('monthly')">Assinar mensal</button></div><div class="commercial-option"><h2>Plano Anual</h2><p class="muted">Aplicativo financeiro completo.</p><button class="btn gold" onclick="commercialCheckout('annual')">Assinar anual</button></div><div class="commercial-option"><h2>Plano Completo</h2><p class="muted">APP + KNOWLEDGE em concessões independentes.</p><button class="btn gold" onclick="commercialCheckout('complete')">Conhecer plano completo</button></div></div><section class="knowledge-sample"><h2>${knowledge?'Área de Conhecimento — acesso liberado':'Amostra da Área de Conhecimento'}</h2><p class="muted">${knowledge?'Seu acesso KNOWLEDGE continua disponível independentemente do APP.':'O trial do APP não libera o conteúdo completo.'}</p>${knowledge?'':'<button class="btn" onclick="commercialCheckout(\'knowledge\')">Conhecer o livro</button>'}</section>`;
+    $("commercialGateBody").innerHTML=`<h1>${expired?'Seu período gratuito terminou.':'Seu acesso está pronto para evoluir.'}</h1><p class="muted">Seus dados financeiros permanecem preservados. Assim que um acesso APP for confirmado, você continua com a mesma conta.</p><div class="commercial-grid"><div class="commercial-option"><h2>Plano Mensal</h2><p class="muted">Aplicativo financeiro completo.</p><button class="btn gold" onclick="commercialCheckout('monthly')">Assinar mensal</button></div><div class="commercial-option"><h2>Plano Anual</h2><p class="muted">Aplicativo financeiro completo.</p><button class="btn gold" onclick="commercialCheckout('annual')">Assinar anual</button></div><div class="commercial-option"><h2>Plano Completo</h2><p class="muted">APP + KNOWLEDGE em concessões independentes.</p><button class="btn gold" onclick="commercialCheckout('complete')">Conhecer plano completo</button></div></div><div id="commercialKnowledgeRoot" class="knowledge-root"></div>`;
+    mountKnowledgeArea("commercialKnowledgeRoot",state.entitlements).catch(error=>toast(error.message,true));
     $("v18Loading")?.classList.add("hidden");
   }
   async function resolveCommercialSession(){
