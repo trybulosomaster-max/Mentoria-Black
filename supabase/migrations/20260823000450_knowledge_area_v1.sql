@@ -188,32 +188,62 @@ immutable
 security invoker
 set search_path = pg_catalog
 as $function$
+declare
+  v_column_count integer;
 begin
-  if p_section_type not in ('paragraph','heading','quote','highlight','list','table','exercise','warning','image','separator')
-     or jsonb_typeof(p_content) <> 'object'
+  if p_section_type not in (
+       'paragraph','heading','subheading','quote','highlight','list','table',
+       'exercise','exercise_black','checklist','chapter_checklist','rule_black',
+       'impact_phrase','separator','transition','callout','example','warning','image'
+     )
+     or jsonb_typeof(p_content)<>'object'
      or p_content ? 'html'
-     or pg_column_size(p_content) > 131072 then
+     or pg_column_size(p_content)>131072 then
     return false;
   end if;
 
-  if p_section_type in ('paragraph','heading','quote','highlight','warning') then
-    return jsonb_typeof(p_content->'text')='string' and length(btrim(p_content->>'text'))>0;
-  elsif p_section_type='list' then
+  if p_section_type in (
+    'paragraph','heading','subheading','quote','highlight','warning',
+    'rule_black','impact_phrase','transition','callout'
+  ) then
+    return jsonb_typeof(p_content->'text')='string'
+      and length(btrim(p_content->>'text'))>0;
+  elsif p_section_type in ('list','checklist','chapter_checklist') then
     return jsonb_typeof(p_content->'items')='array'
       and jsonb_array_length(p_content->'items')>0
-      and not exists(select 1 from jsonb_array_elements(p_content->'items') item where jsonb_typeof(item)<>'string');
+      and not exists(
+        select 1 from jsonb_array_elements(p_content->'items') item
+        where jsonb_typeof(item)<>'string' or length(btrim(item #>> '{}'))=0
+      );
   elsif p_section_type='table' then
-    return jsonb_typeof(p_content->'columns')='array'
-      and jsonb_typeof(p_content->'rows')='array'
-      and jsonb_array_length(p_content->'columns')>0
-      and not exists(select 1 from jsonb_array_elements(p_content->'columns') item where jsonb_typeof(item)<>'string')
-      and not exists(select 1 from jsonb_array_elements(p_content->'rows') row_value where jsonb_typeof(row_value)<>'array');
-  elsif p_section_type='exercise' then
+    if jsonb_typeof(p_content->'columns')<>'array'
+       or jsonb_typeof(p_content->'rows')<>'array'
+       or jsonb_array_length(p_content->'columns')=0
+       or exists(
+         select 1 from jsonb_array_elements(p_content->'columns') item
+         where jsonb_typeof(item)<>'string' or length(btrim(item #>> '{}'))=0
+       ) then
+      return false;
+    end if;
+    v_column_count=jsonb_array_length(p_content->'columns');
+    return not exists(
+      select 1 from jsonb_array_elements(p_content->'rows') row_value
+      where jsonb_typeof(row_value)<>'array'
+         or jsonb_array_length(row_value)<>v_column_count
+         or exists(
+           select 1 from jsonb_array_elements(row_value) cell
+           where jsonb_typeof(cell)<>'string'
+         )
+    );
+  elsif p_section_type in ('exercise','exercise_black','example') then
     return jsonb_typeof(p_content->'prompt')='string'
       and length(btrim(p_content->>'prompt'))>0
       and (not (p_content ? 'steps') or (
         jsonb_typeof(p_content->'steps')='array'
-        and not exists(select 1 from jsonb_array_elements(p_content->'steps') item where jsonb_typeof(item)<>'string')
+        and not exists(
+          select 1 from jsonb_array_elements(p_content->'steps') item
+          where jsonb_typeof(item)<>'string' or length(btrim(item #>> '{}'))=0
+        )
       ));
   elsif p_section_type='image' then
     return jsonb_typeof(p_content->'asset_path')='string'
@@ -238,8 +268,19 @@ as $function$
     and pg_column_size(p_metadata)<=16384
     and not exists(
       select 1 from jsonb_object_keys(p_metadata) key
-      where key not in ('variant','label','credit','layout','difficulty','locale')
+      where key not in (
+        'variant','label','credit','layout','difficulty','locale',
+        'component_type','source_scope','source_page','editorial_role','source_hash'
+      )
     )
+    and (not (p_metadata ? 'source_page') or (
+      jsonb_typeof(p_metadata->'source_page')='number'
+      and p_metadata->>'source_page' ~ '^[1-9][0-9]*$'
+    ))
+    and (not (p_metadata ? 'source_hash') or (
+      jsonb_typeof(p_metadata->'source_hash')='string'
+      and p_metadata->>'source_hash' ~ '^[0-9a-f]{64}$'
+    ))
 $function$;
 
 create or replace function public.knowledge_section_search_text_v1(p_section_type text,p_content jsonb)
@@ -250,13 +291,24 @@ security invoker
 set search_path = pg_catalog
 as $function$
   select case
-    when p_section_type in ('paragraph','heading','quote','highlight','warning') then coalesce(p_content->>'text','')
-    when p_section_type='list' then coalesce((select string_agg(value #>> '{}',' ') from jsonb_array_elements(p_content->'items')), '')
+    when p_section_type in (
+      'paragraph','heading','subheading','quote','highlight','warning',
+      'rule_black','impact_phrase','transition','callout'
+    ) then coalesce(p_content->>'text','')
+    when p_section_type in ('list','checklist','chapter_checklist') then
+      coalesce((select string_agg(value #>> '{}',' ') from jsonb_array_elements(p_content->'items')), '')
     when p_section_type='table' then concat_ws(' ',
       coalesce((select string_agg(value #>> '{}',' ') from jsonb_array_elements(p_content->'columns')), ''),
-      coalesce((select string_agg(cell #>> '{}',' ') from jsonb_array_elements(p_content->'rows') row_value cross join lateral jsonb_array_elements(row_value) cell), '')
+      coalesce((
+        select string_agg(cell #>> '{}',' ')
+        from jsonb_array_elements(p_content->'rows') row_value
+        cross join lateral jsonb_array_elements(row_value) cell
+      ), '')
     )
-    when p_section_type='exercise' then concat_ws(' ',p_content->>'prompt',coalesce((select string_agg(value #>> '{}',' ') from jsonb_array_elements(coalesce(p_content->'steps','[]'::jsonb))),''))
+    when p_section_type in ('exercise','exercise_black','example') then concat_ws(' ',
+      p_content->>'prompt',
+      coalesce((select string_agg(value #>> '{}',' ') from jsonb_array_elements(coalesce(p_content->'steps','[]'::jsonb))), '')
+    )
     when p_section_type='image' then concat_ws(' ',p_content->>'alt',p_content->>'caption')
     else ''
   end

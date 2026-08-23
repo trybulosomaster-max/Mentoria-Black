@@ -9,18 +9,22 @@ v82_one="$repo_root/supabase/migrations/20260820161846_add_v82_structured_financ
 v82_two="$repo_root/supabase/migrations/20260820195658_structure_recurring_financial_operations_v82.sql"
 v82_three="$repo_root/supabase/migrations/20260821205630_reconcile_v82_production_access_contract.sql"
 commercial="$repo_root/supabase/migrations/20260822212119_commercial_access_v1.sql"
+knowledge="$repo_root/supabase/migrations/20260823000450_knowledge_area_v1.sql"
+editorial="$repo_root/supabase/migrations/20260823012822_extend_knowledge_editorial_contract_v1.sql"
 commercial_tests="$repo_root/supabase/tests/commercial_access_v1_test.sql"
 remote_preflight="$repo_root/supabase/production/preflight_commercial_access_v2.sql"
+source_document="${MB_KNOWLEDGE_PARTS_1_4:-$repo_root/.local-content/mentoria-black-partes-1-a-4.canonical-v2.json}"
 suffix="${BASHPID:-$$}"
 upgrade_db="mb_kiwify_upgrade_${suffix}"
 partial_db="mb_kiwify_partial_${suffix}"
 drift_db="mb_kiwify_drift_${suffix}"
+full_gate_db="mb_knowledge_parts_1_4_production_gate_${suffix}"
 tmp_dir="$(mktemp -d "${TMPDIR:-/tmp}/mb-kiwify-upgrade.XXXXXX")"
 assertions=0
 
 cleanup(){
-  for database in "$upgrade_db" "$partial_db" "$drift_db"; do
-    case "$database" in mb_kiwify_*) docker exec "$db_container" dropdb -U postgres --if-exists "$database" >/dev/null 2>&1 || true;; esac
+  for database in "$upgrade_db" "$partial_db" "$drift_db" "$full_gate_db"; do
+    case "$database" in mb_kiwify_*|mb_knowledge_parts_1_4_production_gate_*) docker exec "$db_container" dropdb -U postgres --if-exists "$database" >/dev/null 2>&1 || true;; esac
   done
   case "$tmp_dir" in "${TMPDIR:-/tmp}"/mb-kiwify-upgrade.*) rm -rf "$tmp_dir";; esac
 }
@@ -28,6 +32,7 @@ trap cleanup EXIT
 
 docker inspect "$db_container" >/dev/null
 [[ "$(docker inspect "$db_container" --format '{{index .Config.Labels "com.supabase.cli.project"}}')" == "$project_id" ]]
+[[ -f "$source_document" ]]
 psql_db(){ local database="$1";shift;docker exec -i "$db_container" psql -U postgres -d "$database" -X -v ON_ERROR_STOP=1 "$@"; }
 apply_file(){ psql_db "$1" <"$2" >/dev/null; }
 assert_sql(){ local actual;actual="$(psql_db "$1" -Atqc "$2")";[[ "$actual" == "$3" ]]||{ echo "$4: expected '$3', got '$actual'" >&2;exit 1;};assertions=$((assertions+1)); }
@@ -79,20 +84,20 @@ insert into public.accounts(id,user_id,name) values('91100000-0000-4000-8000-000
 
 create table public.products(
  id uuid primary key default gen_random_uuid(),name text not null,slug text not null unique,
- description text,active boolean not null default true,created_at timestamptz default now(),updated_at timestamptz default now()
+ description text,active boolean not null default true,created_at timestamptz not null default now(),updated_at timestamptz not null default now()
 );
 create table public.access_grants(
  id uuid primary key default gen_random_uuid(),user_id uuid not null references auth.users(id),product_id uuid not null references public.products(id),
  status text not null default 'active',source text not null default 'manual',external_customer_id text,external_purchase_id text,
- started_at timestamptz not null default now(),expires_at timestamptz,revoked_at timestamptz,created_at timestamptz default now(),updated_at timestamptz default now(),
+ started_at timestamptz not null default now(),expires_at timestamptz,revoked_at timestamptz,created_at timestamptz not null default now(),updated_at timestamptz not null default now(),
  constraint access_grants_user_product_key unique(user_id,product_id),
  constraint access_grants_source_check check(source in('manual','kiwify')),
  constraint access_grants_status_check check(status in('active','suspended','revoked','expired'))
 );
 create table public.payment_events(
- id uuid primary key default gen_random_uuid(),provider text not null default 'kiwify',event_id text not null,event_type text not null,user_id uuid,
+ id uuid primary key default gen_random_uuid(),provider text not null default 'kiwify',event_id text not null,event_type text not null,user_id uuid references auth.users(id) on delete set null,
  external_customer_id text,external_purchase_id text,payload jsonb not null,processed boolean not null default false,
- processed_at timestamptz,created_at timestamptz default now(),
+ processed_at timestamptz,created_at timestamptz not null default now(),
  constraint payment_events_provider_check check(provider='kiwify'),
  constraint payment_events_provider_event_key unique(provider,event_id)
 );
@@ -118,7 +123,7 @@ grant execute on function public.set_kiwify_webhook_token(text) to service_role;
 
 insert into public.products(id,name,slug,description) values('94000000-0000-4000-8000-000000000004','Legacy Mentoria Black','mentoria-black','Synthetic legacy product');
 insert into public.access_grants(id,user_id,product_id,status,source,external_customer_id,external_purchase_id)
-values('95000000-0000-4000-8000-000000000005','91000000-0000-4000-8000-000000000001','94000000-0000-4000-8000-000000000004','active','kiwify','customer-synthetic','purchase-synthetic');
+values('95000000-0000-4000-8000-000000000005','91000000-0000-4000-8000-000000000001','94000000-0000-4000-8000-000000000004','active','manual','customer-synthetic','purchase-synthetic');
 insert into public.payment_events(id,event_id,event_type,user_id,external_customer_id,external_purchase_id,payload,processed,processed_at) values
  ('96000000-0000-4000-8000-000000000006','legacy-event-1','purchase_approved','91000000-0000-4000-8000-000000000001','customer-synthetic','purchase-synthetic',jsonb_build_object('fixture','legacy-one'),true,now()),
  ('97000000-0000-4000-8000-000000000007','legacy-event-2','subscription_renewed','91000000-0000-4000-8000-000000000001','customer-synthetic','purchase-synthetic',jsonb_build_object('fixture','legacy-two'),false,null);
@@ -126,6 +131,9 @@ SQL
 }
 
 create_kiwify_fixture "$upgrade_db"
+node "$repo_root/scripts/prepare-knowledge-import-sql.js" --input "$source_document" --output "$tmp_dir/knowledge-import.sql" >/dev/null
+[[ "$(node -e "const d=require(process.argv[1]);process.stdout.write(d.editorial_metadata.content_version)" "$source_document")" == "parts-1-4-v2" ]]
+[[ "$(node -e "const d=require(process.argv[1]);process.stdout.write(d.editorial_metadata.canonical_hash)" "$source_document")" == "9c9d90e12ea90f36ea85da291091ab9bb49b76590d9638c856f936dd41a670ad" ]]
 psql_db "$upgrade_db" <"$remote_preflight" >"$tmp_dir/remote-preflight.out"
 rg -q 'KIWIFY_LEGACY_GO' "$tmp_dir/remote-preflight.out";assertions=$((assertions+1))
 if rg -q '@example|customer-synthetic|purchase-synthetic|legacy-event' "$tmp_dir/remote-preflight.out";then
@@ -145,11 +153,48 @@ events_legacy_before="$(psql_db "$upgrade_db" -Atqc "select md5(string_agg(row_t
 kiwify_function_before="$(psql_db "$upgrade_db" -Atqc "select md5(pg_get_functiondef('public.set_kiwify_webhook_token(text)'::regprocedure))")"
 apply_file "$upgrade_db" "$commercial"
 
+docker exec "$db_container" dropdb -U postgres --if-exists "$full_gate_db" >/dev/null
+docker exec "$db_container" createdb -U postgres -T "$upgrade_db" "$full_gate_db"
+apply_file "$full_gate_db" "$knowledge"
+apply_file "$full_gate_db" "$editorial"
+apply_file "$full_gate_db" "$tmp_dir/knowledge-import.sql"
+assert_sql "$full_gate_db" "select concat_ws(',',(select count(*) from products),(select count(*) from access_grants),(select count(*) from payment_events),(select count(*) from knowledge_publications),(select count(*) from knowledge_parts),(select count(*) from knowledge_chapters),(select count(*) from knowledge_sections),(select count(*) from knowledge_sections where access_level='sample'),(select count(*) from knowledge_sections where access_level='knowledge'))" "3,1,2,1,4,26,1469,67,1402" "faithful production chain preserves Kiwify and imports canonical Knowledge"
+assert_sql "$full_gate_db" "select count(*) from knowledge_sections where coalesce(metadata->>'source_hash','')~'^[0-9a-f]{64}$'" "1469" "every imported section retains its source hash"
+assert_sql "$full_gate_db" "select count(*) from pg_policies where schemaname='public' and tablename like 'knowledge_%'" "13" "Knowledge RLS policy contract is complete"
+assert_sql "$full_gate_db" "select ((select enforced from commercial_enforcement_state where singleton)=false and (select count(*) from pg_policies where schemaname='public' and policyname='mb_v82_own_rows')=9)::text" "true" "financial enforcement remains disabled after the complete chain"
+assert_sql "$full_gate_db" "select (to_regprocedure('public.set_kiwify_webhook_token(text)') is not null and (select count(*) from payment_events where provider='kiwify' and environment='legacy' and payload is not null)=2)::text" "true" "Kiwify RPC and historical payloads survive the complete chain"
+apply_file "$full_gate_db" "$commercial"
+apply_file "$full_gate_db" "$knowledge"
+apply_file "$full_gate_db" "$editorial"
+apply_file "$full_gate_db" "$tmp_dir/knowledge-import.sql"
+assert_sql "$full_gate_db" "select concat_ws(',',(select count(*) from products),(select count(*) from access_grants),(select count(*) from payment_events),(select count(*) from knowledge_publications),(select count(*) from knowledge_parts),(select count(*) from knowledge_chapters),(select count(*) from knowledge_sections))" "3,1,2,1,4,26,1469" "complete package retry is idempotent"
+psql_db "$full_gate_db" >/dev/null <<'SQL'
+begin;
+do $rollback_gate$
+declare v_publication_id uuid;v_parts integer;v_chapters integer;v_sections integer;
+begin
+  select id into strict v_publication_id from public.knowledge_publications where slug='mentoria-black' and version='parts-1-4-v2';
+  select count(*) into v_parts from public.knowledge_parts where publication_id=v_publication_id;
+  select count(*) into v_chapters from public.knowledge_chapters where publication_id=v_publication_id;
+  select count(*) into v_sections from public.knowledge_sections section join public.knowledge_chapters chapter on chapter.id=section.chapter_id where chapter.publication_id=v_publication_id;
+  if v_parts<>4 or v_chapters<>26 or v_sections<>1469 then
+    raise exception 'selective rollback refuses content count drift' using errcode='P0001';
+  end if;
+  delete from public.knowledge_publications where id=v_publication_id;
+end
+$rollback_gate$;
+commit;
+SQL
+assert_sql "$full_gate_db" "select concat_ws(',',(select count(*) from products),(select count(*) from access_grants),(select count(*) from payment_events),(select count(*) from knowledge_publications),(select count(*) from knowledge_parts),(select count(*) from knowledge_chapters),(select count(*) from knowledge_sections))" "3,1,2,0,0,0,0" "selective Knowledge rollback preserves the reconciled commercial layer"
+apply_file "$full_gate_db" "$tmp_dir/knowledge-import.sql"
+assert_sql "$full_gate_db" "select concat_ws(',',(select count(*) from knowledge_publications),(select count(*) from knowledge_parts),(select count(*) from knowledge_chapters),(select count(*) from knowledge_sections))" "1,4,26,1469" "canonical Knowledge content reimports after selective rollback"
+
 assert_sql "$upgrade_db" "select count(*) from products" "3" "catalog keeps APP and adds KNOWLEDGE/COMPLETE"
 assert_sql "$upgrade_db" "select id::text||':'||code||':'||slug from products where id='94000000-0000-4000-8000-000000000004'" "94000000-0000-4000-8000-000000000004:APP:mentoria-black" "legacy product identity and slug are preserved"
 assert_sql "$upgrade_db" "select count(*) from access_grants" "1" "legacy grant count is preserved"
-assert_sql "$upgrade_db" "select id::text||':'||source||':'||access_type||':'||environment from access_grants" "95000000-0000-4000-8000-000000000005:kiwify:paid:legacy" "legacy grant is enriched in place"
+assert_sql "$upgrade_db" "select id::text||':'||source||':'||access_type||':'||environment from access_grants" "95000000-0000-4000-8000-000000000005:manual:manual:legacy" "production-equivalent manual grant is enriched in place"
 assert_sql "$upgrade_db" "select count(*) from payment_events" "2" "legacy event count is preserved"
+assert_sql "$upgrade_db" "select count(*) from information_schema.columns where table_schema='public' and ((table_name='products' and column_name in('created_at','updated_at')) or (table_name='access_grants' and column_name in('created_at','updated_at')) or (table_name='payment_events' and column_name='created_at')) and is_nullable='NO'" "5" "production timestamp NOT NULL contracts are preserved"
 assert_sql "$upgrade_db" "select md5(string_agg(id::text||payload::text,'|' order by id)) from payment_events" "$payload_before" "legacy raw payloads are byte-semantically preserved"
 assert_sql "$upgrade_db" "select md5(row_to_json(row_data)::text) from(select id,name,slug,description,active,created_at,updated_at from products where id='94000000-0000-4000-8000-000000000004') row_data" "$product_legacy_before" "all legacy product fields are preserved"
 assert_sql "$upgrade_db" "select md5(row_to_json(row_data)::text) from(select id,user_id,product_id,status,source,external_customer_id,external_purchase_id,started_at,expires_at,revoked_at,created_at,updated_at from access_grants where id='95000000-0000-4000-8000-000000000005') row_data" "$grant_legacy_before" "all legacy grant fields are preserved"

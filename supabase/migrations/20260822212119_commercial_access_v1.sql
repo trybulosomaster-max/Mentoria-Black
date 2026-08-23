@@ -90,15 +90,15 @@ begin
       select 1
       from (values
         ('products','name','text','NO'),('products','description','text','YES'),
-        ('products','created_at','timestamp with time zone','YES'),('products','updated_at','timestamp with time zone','YES'),
+        ('products','created_at','timestamp with time zone','NO'),('products','updated_at','timestamp with time zone','NO'),
         ('access_grants','id','uuid','NO'),('access_grants','expires_at','timestamp with time zone','YES'),
         ('access_grants','external_customer_id','text','YES'),('access_grants','external_purchase_id','text','YES'),
-        ('access_grants','revoked_at','timestamp with time zone','YES'),('access_grants','created_at','timestamp with time zone','YES'),
-        ('access_grants','updated_at','timestamp with time zone','YES'),
+        ('access_grants','revoked_at','timestamp with time zone','YES'),('access_grants','created_at','timestamp with time zone','NO'),
+        ('access_grants','updated_at','timestamp with time zone','NO'),
         ('payment_events','id','uuid','NO'),('payment_events','event_id','text','NO'),
         ('payment_events','event_type','text','NO'),('payment_events','user_id','uuid','YES'),
         ('payment_events','external_customer_id','text','YES'),('payment_events','external_purchase_id','text','YES'),
-        ('payment_events','processed_at','timestamp with time zone','YES'),('payment_events','created_at','timestamp with time zone','YES')
+        ('payment_events','processed_at','timestamp with time zone','YES'),('payment_events','created_at','timestamp with time zone','NO')
       ) as expected(table_name,column_name,data_type,is_nullable)
       left join information_schema.columns actual
         on actual.table_schema='public' and actual.table_name=expected.table_name and actual.column_name=expected.column_name
@@ -153,7 +153,7 @@ begin
     end if;
     if (select count(*) from pg_constraint where conrelid='public.products'::regclass)<>2
        or (select count(*) from pg_constraint where conrelid='public.access_grants'::regclass)<>6
-       or (select count(*) from pg_constraint where conrelid='public.payment_events'::regclass)<>3 then
+       or (select count(*) from pg_constraint where conrelid='public.payment_events'::regclass)<>4 then
       raise exception 'commercial access v2 Kiwify drift: unexpected legacy constraint' using errcode='P0001';
     end if;
     if not exists(
@@ -168,8 +168,15 @@ begin
            join pg_attribute a on a.attrelid=c.conrelid and a.attnum=key.attnum)=array['product_id']::name[]
       and (select array_agg(a.attname order by key.ordinality) from unnest(c.confkey) with ordinality key(attnum,ordinality)
            join pg_attribute a on a.attrelid=c.confrelid and a.attnum=key.attnum)=array['id']::name[]
+    ) or not exists(
+      select 1 from pg_constraint c where c.conrelid='public.payment_events'::regclass
+        and c.contype='f' and c.confrelid='auth.users'::regclass and c.confdeltype='n'
+      and (select array_agg(a.attname order by key.ordinality) from unnest(c.conkey) with ordinality key(attnum,ordinality)
+           join pg_attribute a on a.attrelid=c.conrelid and a.attnum=key.attnum)=array['user_id']::name[]
+      and (select array_agg(a.attname order by key.ordinality) from unnest(c.confkey) with ordinality key(attnum,ordinality)
+           join pg_attribute a on a.attrelid=c.confrelid and a.attnum=key.attnum)=array['id']::name[]
     ) then
-      raise exception 'commercial access v2 Kiwify drift: access_grants ownership FKs differ' using errcode='P0001';
+      raise exception 'commercial access v2 Kiwify drift: ownership FKs differ' using errcode='P0001';
     end if;
     if exists(
       select 1 from pg_constraint c

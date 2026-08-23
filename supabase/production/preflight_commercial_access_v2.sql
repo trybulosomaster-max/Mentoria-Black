@@ -34,19 +34,19 @@ begin
     from (values
       ('products','id','uuid','NO'),('products','name','text','NO'),('products','slug','text','NO'),
       ('products','description','text','YES'),('products','active','boolean','NO'),
-      ('products','created_at','timestamp with time zone','YES'),('products','updated_at','timestamp with time zone','YES'),
+      ('products','created_at','timestamp with time zone','NO'),('products','updated_at','timestamp with time zone','NO'),
       ('access_grants','id','uuid','NO'),('access_grants','user_id','uuid','NO'),('access_grants','product_id','uuid','NO'),
       ('access_grants','status','text','NO'),('access_grants','source','text','NO'),
       ('access_grants','external_customer_id','text','YES'),('access_grants','external_purchase_id','text','YES'),
       ('access_grants','started_at','timestamp with time zone','NO'),('access_grants','expires_at','timestamp with time zone','YES'),
-      ('access_grants','revoked_at','timestamp with time zone','YES'),('access_grants','created_at','timestamp with time zone','YES'),
-      ('access_grants','updated_at','timestamp with time zone','YES'),
+      ('access_grants','revoked_at','timestamp with time zone','YES'),('access_grants','created_at','timestamp with time zone','NO'),
+      ('access_grants','updated_at','timestamp with time zone','NO'),
       ('payment_events','id','uuid','NO'),('payment_events','provider','text','NO'),
       ('payment_events','event_id','text','NO'),('payment_events','event_type','text','NO'),
       ('payment_events','user_id','uuid','YES'),('payment_events','external_customer_id','text','YES'),
       ('payment_events','external_purchase_id','text','YES'),('payment_events','payload','jsonb','NO'),
       ('payment_events','processed','boolean','NO'),('payment_events','processed_at','timestamp with time zone','YES'),
-      ('payment_events','created_at','timestamp with time zone','YES')
+      ('payment_events','created_at','timestamp with time zone','NO')
     ) as expected(table_name,column_name,data_type,is_nullable)
     left join information_schema.columns actual
       on actual.table_schema='public' and actual.table_name=expected.table_name and actual.column_name=expected.column_name
@@ -101,7 +101,7 @@ begin
   end if;
   if (select count(*) from pg_constraint where conrelid='public.products'::regclass)<>2
      or (select count(*) from pg_constraint where conrelid='public.access_grants'::regclass)<>6
-     or (select count(*) from pg_constraint where conrelid='public.payment_events'::regclass)<>3 then
+     or (select count(*) from pg_constraint where conrelid='public.payment_events'::regclass)<>4 then
     raise exception 'COMMERCIAL_ACCESS_V2_NO_GO: unexpected legacy constraint' using errcode='P0001';
   end if;
   if not exists(select 1 from pg_constraint c where c.conrelid='public.access_grants'::regclass and c.contype='f' and c.confrelid='auth.users'::regclass
@@ -109,6 +109,9 @@ begin
        and (select array_agg(a.attname order by key.ordinality) from unnest(c.confkey) with ordinality key(attnum,ordinality) join pg_attribute a on a.attrelid=c.confrelid and a.attnum=key.attnum)=array['id']::name[])
      or not exists(select 1 from pg_constraint c where c.conrelid='public.access_grants'::regclass and c.contype='f' and c.confrelid='public.products'::regclass
        and (select array_agg(a.attname order by key.ordinality) from unnest(c.conkey) with ordinality key(attnum,ordinality) join pg_attribute a on a.attrelid=c.conrelid and a.attnum=key.attnum)=array['product_id']::name[]
+       and (select array_agg(a.attname order by key.ordinality) from unnest(c.confkey) with ordinality key(attnum,ordinality) join pg_attribute a on a.attrelid=c.confrelid and a.attnum=key.attnum)=array['id']::name[])
+     or not exists(select 1 from pg_constraint c where c.conrelid='public.payment_events'::regclass and c.contype='f' and c.confrelid='auth.users'::regclass and c.confdeltype='n'
+       and (select array_agg(a.attname order by key.ordinality) from unnest(c.conkey) with ordinality key(attnum,ordinality) join pg_attribute a on a.attrelid=c.conrelid and a.attnum=key.attnum)=array['user_id']::name[]
        and (select array_agg(a.attname order by key.ordinality) from unnest(c.confkey) with ordinality key(attnum,ordinality) join pg_attribute a on a.attrelid=c.confrelid and a.attnum=key.attnum)=array['id']::name[]) then
     raise exception 'COMMERCIAL_ACCESS_V2_NO_GO: ownership FK drift' using errcode='P0001';
   end if;
@@ -163,7 +166,7 @@ select jsonb_build_object(
   'rls_enabled',(select count(*) from pg_class where oid in('public.products'::regclass,'public.access_grants'::regclass,'public.payment_events'::regclass) and relrowsecurity),
   'valid_primary_unique_indexes',(select count(*) from pg_constraint c join pg_index i on i.indexrelid=c.conindid where c.conrelid in('public.products'::regclass,'public.access_grants'::regclass,'public.payment_events'::regclass) and c.contype in('p','u') and i.indisvalid and i.indisready),
   'legacy_check_constraints',(select count(*) from pg_constraint where conrelid in('public.access_grants'::regclass,'public.payment_events'::regclass) and contype='c' and convalidated),
-  'ownership_foreign_keys',(select count(*) from pg_constraint where conrelid='public.access_grants'::regclass and contype='f'),
+  'ownership_foreign_keys',(select count(*) from pg_constraint where conrelid in('public.access_grants'::regclass,'public.payment_events'::regclass) and contype='f'),
   'legacy_policies',(select count(*) from pg_policies where schemaname='public' and policyname in('products_select_active','access_grants_select_own','payment_events_no_client_access')),
   'legacy_functions',(select count(*) from pg_proc where oid in('public.has_active_access(text)'::regprocedure,'public.set_kiwify_webhook_token(text)'::regprocedure)),
   'client_table_write_privileges',(
