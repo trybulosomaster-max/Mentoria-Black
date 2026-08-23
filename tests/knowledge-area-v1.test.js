@@ -13,12 +13,15 @@ await test('structured import accepts only the synthetic publication contract',(
  equal(value.parts.length,2);equal(value.parts.flatMap(part=>part.chapters).length,3);equal(value.parts.flatMap(part=>part.chapters.flatMap(chapter=>chapter.sections)).length,9);
  assert.throws(()=>imports.validateKnowledgeDocument({...fixture,parts:[{...fixture.parts[0],chapters:[{...fixture.parts[0].chapters[0],sections:[{position:1,section_type:'paragraph',access_level:'sample',content:{html:'<script>bad()</script>'}}]}]}]}),/arbitrary HTML/);assertions++;
  assert.throws(()=>imports.validateKnowledgeDocument({...fixture,publication:{...fixture.publication,slug:'Unsafe Slug'}}),/invalid slug/);assertions++;
+ assert.throws(()=>imports.validateKnowledgeDocument({...fixture,editorial_metadata:{...fixture.editorial_metadata,source_hash:'invalid'}}),/expected SHA-256/);assertions++;
 });
 
 await test('section renderer escapes content and supports all approved types',()=>{
  const sections=[
-  ['paragraph',{text:'<script>bad()</script>'}],['heading',{text:'Direção'}],['quote',{text:'Sabedoria'}],['highlight',{text:'Disciplina'}],
-  ['list',{items:['A','B']}],['table',{columns:['A'],rows:[['B']]}],['exercise',{prompt:'Faça',steps:['Passo']}],['warning',{text:'Atenção'}],
+  ['paragraph',{text:'<script>bad()</script>'}],['heading',{text:'Direção'}],['subheading',{text:'Subtítulo'}],['quote',{text:'Sabedoria'}],['highlight',{text:'Disciplina'}],
+  ['list',{items:['A','B']}],['checklist',{items:['A']}],['chapter_checklist',{items:['A']}],['table',{columns:['A'],rows:[['B']]}],
+  ['exercise',{prompt:'Faça',steps:['Passo']}],['exercise_black',{prompt:'Faça'}],['example',{prompt:'Exemplo'}],['rule_black',{text:'Regra'}],
+  ['impact_phrase',{text:'Impacto'}],['transition',{text:'Transição'}],['callout',{text:'Nota'}],['warning',{text:'Atenção'}],
   ['image',{asset_path:'assets/mock.png',alt:'Mock'}],['separator',{}]
  ];
  sections.forEach(([section_type,content])=>ok(knowledge.renderSection({section_type,content}).length>0,section_type));
@@ -40,10 +43,11 @@ await test('table of contents exposes titles while locking protected bodies',()=
  state.entitlements.knowledge.hasAccess=true;equal(knowledge.chapterAllowed(state.chapters[1],state.entitlements),true);
 });
 
-await test('reader renders no protected body for a missing entitlement',()=>{
- const state={entitlements:{knowledge:{hasAccess:false}},parts:[{id:'z-part',position:1},{id:'a-part',position:2}],chapters:[{id:'c1',publication_id:'p1',part_id:'z-part',position:1,title:'Protegido',excerpt:'Apenas trecho',access_level:'knowledge'},{id:'c2',publication_id:'p1',part_id:'a-part',position:1,title:'Seguinte',access_level:'knowledge'}],sections:[{chapter_id:'c1',section_type:'paragraph',content:{text:'SECRET_BODY_SHOULD_NOT_RENDER'}}],progress:[],bookmarks:[]};
- const html=knowledge.renderReader(state,'c1');ok(html.includes('Este conteúdo faz parte'));ok(!html.includes('SECRET_BODY_SHOULD_NOT_RENDER'));
- state.entitlements.knowledge.hasAccess=true;const reader=knowledge.renderReader(state,'c1');ok(reader.includes('SECRET_BODY_SHOULD_NOT_RENDER'));ok(reader.includes('Marcar como concluído'));ok(reader.includes('data-id="c2"'));
+await test('reader renders a server-authorized sample without exposing protected body',()=>{
+ const state={entitlements:{knowledge:{hasAccess:false}},parts:[{id:'z-part',position:1},{id:'a-part',position:2}],chapters:[{id:'c1',publication_id:'p1',part_id:'z-part',position:1,title:'Protegido',excerpt:'Apenas trecho',access_level:'knowledge'},{id:'c2',publication_id:'p1',part_id:'a-part',position:1,title:'Seguinte',access_level:'knowledge'}],sections:[{chapter_id:'c1',section_type:'paragraph',access_level:'sample',content:{text:'SAMPLE_BODY'} }],progress:[],bookmarks:[]};
+ const html=knowledge.renderReader(state,'c1');ok(html.includes('Este conteúdo faz parte'));ok(html.includes('SAMPLE_BODY'));ok(!html.includes('Marcar como concluído'));
+ state.sections.push({chapter_id:'c1',section_type:'paragraph',access_level:'knowledge',content:{text:'PROTECTED_BODY'}});
+ state.entitlements.knowledge.hasAccess=true;const reader=knowledge.renderReader(state,'c1');ok(reader.includes('PROTECTED_BODY'));ok(reader.includes('Marcar como concluído'));ok(reader.includes('data-id="c2"'));
 });
 
 await test('repository uses protected section query and identity-free RPCs',async()=>{

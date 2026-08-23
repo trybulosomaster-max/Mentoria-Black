@@ -10,6 +10,13 @@
     "version": "mock-1",
     "status": "published"
   },
+  "editorial_metadata": {
+    "publication_version": "mock-1",
+    "content_version": "mock-1",
+    "source_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+    "converted_at": "2026-08-23T00:00:00.000Z",
+    "structure_version": "knowledge-structured-v1.1"
+  },
   "parts": [
     {
       "position": 1,

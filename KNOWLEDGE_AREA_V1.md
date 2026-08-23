@@ -28,10 +28,10 @@ Hierarquia: Biblioteca → Publicação → Parte → Capítulo → Seções. A 
 
 `knowledge_sections.content` é JSONB validado por tipo. Tipos permitidos:
 
-- `paragraph`, `heading`, `quote`, `highlight`, `warning` — campo `text`;
-- `list` — `items[]`;
+- `paragraph`, `heading`, `subheading`, `quote`, `highlight`, `warning`, `rule_black`, `impact_phrase`, `transition`, `callout` — campo `text`;
+- `list`, `checklist`, `chapter_checklist` — `items[]`;
 - `table` — `columns[]` e `rows[][]`;
-- `exercise` — `prompt` e `steps[]` opcional;
+- `exercise`, `exercise_black`, `example` — `prompt` e `steps[]` opcional;
 - `image` — caminho relativo seguro e texto alternativo;
 - `separator` — objeto vazio.
 
@@ -45,7 +45,7 @@ Níveis:
 - `sample`: degustação sem KNOWLEDGE;
 - `knowledge`: exige `has_active_access('KNOWLEDGE')`.
 
-As tabelas editoriais concedem somente `SELECT` a `anon`/`authenticated`. As policies devolvem os corpos `public`/`sample` ou o corpo integral após o entitlement. O predicado KNOWLEDGE é um subselect não correlacionado e pode ser resolvido uma vez por statement, em vez de executar por parágrafo.
+As tabelas editoriais concedem somente `SELECT` a `anon`/`authenticated`. As policies devolvem seções `public`/`sample` mesmo dentro de um capítulo protegido — necessário para aberturas editoriais — sem devolver as demais seções `knowledge`. O corpo integral exige entitlement. O predicado KNOWLEDGE é um subselect não correlacionado e pode ser resolvido uma vez por statement, em vez de executar por parágrafo.
 
 `knowledge_progress` e `knowledge_bookmarks` concedem CRUD somente a `authenticated`, com `auth.uid()` no `USING`/`WITH CHECK`. As RPCs `save_my_knowledge_progress_v1` e `set_my_knowledge_bookmark_v1` não recebem `user_id`. Busca usa `search_my_knowledge_v1`; como a função é `SECURITY INVOKER`, o índice GIN e a RLS filtram os resultados antes do snippet.
 
@@ -69,7 +69,7 @@ Matriz esperada:
 - APP/trial sem KNOWLEDGE: biblioteca e amostra, com CTA mockado;
 - sem grants: oferta e amostra.
 
-Um capítulo protegido não dispara consulta de `knowledge_sections` quando o estado local já informa ausência de KNOWLEDGE; independentemente disso, a RLS bloqueia uma chamada direta à API.
+Um capítulo protegido pode consultar suas seções para exibir uma abertura `sample`; a RLS devolve somente essa amostra e impede que qualquer seção `knowledge` chegue ao navegador. Sem amostra autorizada, o reader mostra diretamente o paywall.
 
 ## Progresso, favoritos e busca
 
@@ -99,11 +99,13 @@ Fluxo futuro recomendado:
 6. testar anon, APP-only, KNOWLEDGE e cross-user;
 7. apagar artefatos temporários após confirmação e registrar apenas checksum/contagens.
 
-O importador real ainda não executa writes: esta versão valida o documento, mas não contém nem publica o livro comercial.
+O conversor e o emissor SQL local estão documentados em `KNOWLEDGE_PARTS_1_4_INGESTION.md`. O emissor restringe a execução a clones descartáveis cujo nome siga o prefixo técnico aprovado; ele não contém nem publica o livro comercial.
 
 ## Migration e recuperação
 
 Migration local: `supabase/migrations/20260823000450_knowledge_area_v1.sql`.
+
+Extensão editorial local: `supabase/migrations/20260823012822_extend_knowledge_editorial_contract_v1.sql`.
 
 SHA-256 validado: `61a43c61b2c7f9044d8bae5439745a3447e1c6ebb8e8362164be2ed2525b0450`.
 

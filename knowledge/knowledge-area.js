@@ -4,7 +4,11 @@
   if(typeof module!=='undefined'&&module.exports)module.exports=api;
   root.MBKnowledgeArea=Object.freeze(api);
 })(typeof globalThis!=='undefined'?globalThis:this,function(){
-  const SECTION_TYPES=new Set(['paragraph','heading','quote','highlight','list','table','exercise','warning','image','separator']);
+  const SECTION_TYPES=new Set([
+    'paragraph','heading','subheading','quote','highlight','list','table',
+    'exercise','exercise_black','checklist','chapter_checklist','rule_black',
+    'impact_phrase','separator','transition','callout','example','warning','image'
+  ]);
   const safe=value=>String(value??'').replace(/[&<>'"]/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]));
   const hasKnowledge=entitlements=>Boolean(entitlements&&entitlements.knowledge&&entitlements.knowledge.hasAccess);
   const chapterAllowed=(chapter,entitlements)=>chapter.access_level!=='knowledge'||hasKnowledge(entitlements);
@@ -20,15 +24,24 @@
     switch(section.section_type){
       case 'paragraph':return `<p class="knowledge-paragraph">${safe(content.text)}</p>`;
       case 'heading':return `<h2 class="knowledge-section-heading">${safe(content.text)}</h2>`;
+      case 'subheading':return `<h3 class="knowledge-section-subheading">${safe(content.text)}</h3>`;
       case 'quote':return `<blockquote>${safe(content.text)}</blockquote>`;
       case 'highlight':return `<aside class="knowledge-highlight">${safe(content.text)}</aside>`;
+      case 'rule_black':return `<aside class="knowledge-rule-black"><strong>Regra Black</strong><p>${safe(content.text)}</p></aside>`;
+      case 'impact_phrase':return `<blockquote class="knowledge-impact-phrase">${safe(content.text)}</blockquote>`;
+      case 'transition':return `<aside class="knowledge-transition">${safe(content.text)}</aside>`;
+      case 'callout':return `<aside class="knowledge-callout">${safe(content.text)}</aside>`;
       case 'warning':return `<aside class="knowledge-warning"><strong>Atenção</strong><p>${safe(content.text)}</p></aside>`;
-      case 'list':return `<ul>${(Array.isArray(content.items)?content.items:[]).map(item=>`<li>${safe(item)}</li>`).join('')}</ul>`;
+      case 'list':
+      case 'checklist':
+      case 'chapter_checklist':return `<section class="knowledge-list ${safe(section.section_type)}">${section.section_type==='chapter_checklist'?'<strong>Checklist do capítulo</strong>':''}<ul>${(Array.isArray(content.items)?content.items:[]).map(item=>`<li>${safe(item)}</li>`).join('')}</ul></section>`;
       case 'table':{
         const columns=Array.isArray(content.columns)?content.columns:[],rows=Array.isArray(content.rows)?content.rows:[];
         return `<div class="knowledge-table-wrap"><table><thead><tr>${columns.map(item=>`<th>${safe(item)}</th>`).join('')}</tr></thead><tbody>${rows.map(row=>`<tr>${(Array.isArray(row)?row:[]).map(item=>`<td>${safe(item)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
       }
-      case 'exercise':return `<section class="knowledge-exercise"><strong>Exercício</strong><p>${safe(content.prompt)}</p>${Array.isArray(content.steps)?`<ol>${content.steps.map(item=>`<li>${safe(item)}</li>`).join('')}</ol>`:''}</section>`;
+      case 'exercise':
+      case 'exercise_black':
+      case 'example':return `<section class="knowledge-exercise ${safe(section.section_type)}"><strong>${section.section_type==='exercise_black'?'Exercício Black':section.section_type==='example'?'Exemplo prático':'Exercício'}</strong><p>${safe(content.prompt)}</p>${Array.isArray(content.steps)?`<ol>${content.steps.map(item=>`<li>${safe(item)}</li>`).join('')}</ol>`:''}</section>`;
       case 'image':{
         const path=safeAssetPath(content.asset_path);
         return path?`<figure><img src="${safe(path)}" alt="${safe(content.alt)}" loading="lazy">${content.caption?`<figcaption>${safe(content.caption)}</figcaption>`:''}</figure>`:'';
@@ -73,10 +86,14 @@
   function renderReader(state,chapterId){
     const chapter=state.chapters.find(item=>item.id===chapterId);
     if(!chapter)return renderLibrary(state);
-    if(!chapterAllowed(chapter,state.entitlements))return renderPaywall(chapter);
+    const allowed=chapterAllowed(chapter,state.entitlements);
+    const visibleSections=state.sections.filter(item=>item.chapter_id===chapter.id).sort(byPosition);
+    if(!allowed&&!visibleSections.length)return renderPaywall(chapter);
     const partPosition=id=>Number(state.parts.find(item=>item.id===id)?.position||0);
-    const sections=state.sections.filter(item=>item.chapter_id===chapter.id).sort(byPosition),chapterList=state.chapters.filter(item=>item.publication_id===chapter.publication_id).sort((a,b)=>partPosition(a.part_id)-partPosition(b.part_id)||byPosition(a,b)),index=chapterList.findIndex(item=>item.id===chapter.id),progress=progressFor(chapter.id,state.progress),bookmarked=state.bookmarks.some(item=>item.chapter_id===chapter.id&&item.section_id===null);
-    return `<div class="knowledge-reader"><nav class="knowledge-toolbar"><button class="btn" data-knowledge-action="open-publication" data-id="${safe(chapter.publication_id)}">← Sumário</button><button class="btn" data-knowledge-action="toggle-bookmark" data-id="${safe(chapter.id)}" data-enabled="${bookmarked?'false':'true'}">${bookmarked?'★ Favorito':'☆ Favoritar'}</button></nav><header><span class="knowledge-kicker">${chapter.access_level==='sample'?'Amostra':'Leitura'}</span><h1>${safe(chapter.title)}</h1>${chapter.subtitle?`<p>${safe(chapter.subtitle)}</p>`:''}<div class="knowledge-progress"><span style="width:${Number(progress?.progress_percent||0)}%"></span></div></header><article class="knowledge-reading-body">${sections.length?sections.map(renderSection).join(''):'<p>Este capítulo ainda não possui seções disponíveis.</p>'}</article><footer class="knowledge-reader-footer"><button class="btn" ${index<=0?'disabled':''} data-knowledge-action="open-chapter" data-id="${safe(chapterList[index-1]?.id||'')}">← Anterior</button><button class="btn gold" data-knowledge-action="complete" data-id="${safe(chapter.id)}">${progress?.completed_at?'Concluído':'Marcar como concluído'}</button><button class="btn" ${index<0||index>=chapterList.length-1?'disabled':''} data-knowledge-action="open-chapter" data-id="${safe(chapterList[index+1]?.id||'')}">Próximo →</button></footer></div>`;
+    const chapterList=state.chapters.filter(item=>item.publication_id===chapter.publication_id).sort((a,b)=>partPosition(a.part_id)-partPosition(b.part_id)||byPosition(a,b)),index=chapterList.findIndex(item=>item.id===chapter.id),progress=progressFor(chapter.id,state.progress),bookmarked=state.bookmarks.some(item=>item.chapter_id===chapter.id&&item.section_id===null);
+    const actions=allowed?`<button class="btn" data-knowledge-action="toggle-bookmark" data-id="${safe(chapter.id)}" data-enabled="${bookmarked?'false':'true'}">${bookmarked?'★ Favorito':'☆ Favoritar'}</button>`:'';
+    const footer=allowed?`<footer class="knowledge-reader-footer"><button class="btn" ${index<=0?'disabled':''} data-knowledge-action="open-chapter" data-id="${safe(chapterList[index-1]?.id||'')}">← Anterior</button><button class="btn gold" data-knowledge-action="complete" data-id="${safe(chapter.id)}">${progress?.completed_at?'Concluído':'Marcar como concluído'}</button><button class="btn" ${index<0||index>=chapterList.length-1?'disabled':''} data-knowledge-action="open-chapter" data-id="${safe(chapterList[index+1]?.id||'')}">Próximo →</button></footer>`:renderPaywall(chapter);
+    return `<div class="knowledge-reader"><nav class="knowledge-toolbar"><button class="btn" data-knowledge-action="open-publication" data-id="${safe(chapter.publication_id)}">← Sumário</button>${actions}</nav><header><span class="knowledge-kicker">${allowed&&chapter.access_level!=='sample'?'Leitura':'Amostra'}</span><h1>${safe(chapter.title)}</h1>${chapter.subtitle?`<p>${safe(chapter.subtitle)}</p>`:''}${allowed?`<div class="knowledge-progress"><span style="width:${Number(progress?.progress_percent||0)}%"></span></div>`:''}</header><article class="knowledge-reading-body">${visibleSections.map(renderSection).join('')}</article>${footer}</div>`;
   }
 
   function renderPaywall(chapter){
@@ -125,7 +142,7 @@
       const chapter=state.chapters.find(item=>item.id===id);
       if(!chapter)return;
       state.currentPublication=chapter.publication_id;state.currentChapter=id;
-      state.sections=chapterAllowed(chapter,state.entitlements)?await repository.sections(id):[];
+      state.sections=await repository.sections(id);
       show(renderReader(state,id));
       if(chapterAllowed(chapter,state.entitlements)&&state.sections.length){
         const last=state.sections[0];

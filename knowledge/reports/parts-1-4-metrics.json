@@ -1,0 +1,259 @@
+{
+  "publication": "Mentoria Black",
+  "source_pdf_sha256": "92e9b55f22dc6ae132ade8965242dc2d34e69a0b956339b22e1b4d5e2dc9f069",
+  "extracted_text_sha256": "2a1b8b776361c723f42c3c7f822b9e1961dbd66c33a6ad24d8f928805514d0bc",
+  "structured_sha256": "3b000845e0a1d7dd77f50925bebe0b340238142b834b4eb476896137dffb9900",
+  "publication_version": "1.0",
+  "content_version": "parts-1-4-v1",
+  "structure_version": "knowledge-structured-v1.1",
+  "converted_at": "2026-08-23T01:24:45.701Z",
+  "totals": {
+    "parts": 4,
+    "chapters": 26,
+    "sections": 1469,
+    "rules_black": 26,
+    "exercises": 28,
+    "exercises_black": 8,
+    "checklists": 26,
+    "impact_phrases": 26,
+    "tables": 8,
+    "conclusions": 3,
+    "transitions": 6,
+    "editorial_findings": 40
+  },
+  "section_types": {
+    "paragraph": 1123,
+    "subheading": 109,
+    "quote": 32,
+    "transition": 6,
+    "rule_black": 26,
+    "exercise_black": 8,
+    "chapter_checklist": 26,
+    "impact_phrase": 26,
+    "callout": 22,
+    "list": 45,
+    "table": 8,
+    "example": 18,
+    "exercise": 20
+  },
+  "access_levels": {
+    "sample": 67,
+    "knowledge": 1402
+  },
+  "component_types": {
+    "field_table": 8,
+    "system_black_6": 4,
+    "scenario_comparison": 3,
+    "final_exercise": 4,
+    "financial_evolution_path": 1,
+    "security_layers": 1
+  },
+  "parts": [
+    {
+      "position": 1,
+      "title": "Mentalidade e Comportamento Financeiro",
+      "chapters": [
+        {
+          "number": 1,
+          "title": "DINHEIRO É COMPORTAMENTO ANTES DE SER MATEMÁTICA",
+          "access_level": "sample",
+          "sections": 53,
+          "structured_sha256": "923fd44f3a45158f4fef313971036fbb3c18b611b6906ce4d26bae26afe238a9"
+        },
+        {
+          "number": 2,
+          "title": "CONHECIMENTO MUDA DECISÕES",
+          "access_level": "knowledge",
+          "sections": 38,
+          "structured_sha256": "b0e53a94890a648c4523dc5b0c5f9d94633ae982eb552402d143ebc407d5542f"
+        },
+        {
+          "number": 3,
+          "title": "GANHAR DINHEIRO NÃO É CONSTRUIR RIQUEZA",
+          "access_level": "knowledge",
+          "sections": 39,
+          "structured_sha256": "77ba34147f2c9b5a0c65fd1886a4619270f28f12dd1d891f0c520ba14856bdb2"
+        },
+        {
+          "number": 4,
+          "title": "SEU PADRÃO DE VIDA PODE VIRAR UMA ARMADILHA",
+          "access_level": "knowledge",
+          "sections": 32,
+          "structured_sha256": "5a0c7b093dcb8772399b8bfda12e470a82843ebb5786b3cea787f38b781e65b0"
+        },
+        {
+          "number": 5,
+          "title": "NÃO COMPRE UMA VIDA PARA IMPRESSIONAR QUEM NÃO PAGA SUAS CONTAS",
+          "access_level": "knowledge",
+          "sections": 34,
+          "structured_sha256": "5d105bdab10dd3eab9a87533fbae395acd59be3034e61c81647aaa62a21c89b5"
+        },
+        {
+          "number": 6,
+          "title": "O PREÇO NÃO É O ÚNICO CUSTO DE UMA DECISÃO",
+          "access_level": "knowledge",
+          "sections": 37,
+          "structured_sha256": "fb04358529b4ac93c7b4775dd77b5ea236c6313ef22fc44dd5e3c1b471decdff"
+        },
+        {
+          "number": 7,
+          "title": "DISCIPLINA HOJE, LIBERDADE AMANHÃ",
+          "access_level": "knowledge",
+          "sections": 36,
+          "structured_sha256": "e982e4a12cf577f7ab8e2ad7b3e6388e347496a8a7b37108a4cc40d97837e4a8"
+        },
+        {
+          "number": 8,
+          "title": "O VERDADEIRO LUXO É TER ESCOLHAS",
+          "access_level": "knowledge",
+          "sections": 51,
+          "structured_sha256": "5d1a6c18cfd2f3c26e9c5e4f028d3a04c0232fa5ae1100dc640aa059f5a08252"
+        }
+      ]
+    },
+    {
+      "position": 2,
+      "title": "Organização Financeira",
+      "chapters": [
+        {
+          "number": 9,
+          "title": "DESCUBRA PARA ONDE SEU DINHEIRO ESTÁ INDO",
+          "access_level": "knowledge",
+          "sections": 54,
+          "structured_sha256": "6121e6a586d582aedf308d6717798ad37924a27753ad7a9b598d7ecadd9572b1"
+        },
+        {
+          "number": 10,
+          "title": "CONHEÇA SEU CUSTO DE VIDA",
+          "access_level": "knowledge",
+          "sections": 37,
+          "structured_sha256": "d7188c4c31129915591e7ec01b539f740ff42ad57d88eeb574fc7bf481467142"
+        },
+        {
+          "number": 11,
+          "title": "O SISTEMA BLACK 6",
+          "access_level": "knowledge",
+          "sections": 91,
+          "structured_sha256": "60a809f70df3bc1816f87ce21900f9aeb869a4bb67cdabdaa34031a824820968"
+        },
+        {
+          "number": 12,
+          "title": "COMO MONTAR SEU ORÇAMENTO",
+          "access_level": "knowledge",
+          "sections": 30,
+          "structured_sha256": "0e8da060830d6f4a850d2c10b29f6e6f45c722325924070b941c5004dc0ebbd7"
+        },
+        {
+          "number": 13,
+          "title": "METAS FINANCEIRAS",
+          "access_level": "knowledge",
+          "sections": 29,
+          "structured_sha256": "ac78f2727900aef0a9d4d9de3ee86f3d0cbd1501b42d98023f12e632960e4bb7"
+        },
+        {
+          "number": 14,
+          "title": "COMO ACOMPANHAR SEU ORÇAMENTO",
+          "access_level": "knowledge",
+          "sections": 51,
+          "structured_sha256": "7713b9fb4339723e344453a96d5ba54affae9403792fecfd43934ab3b2e2c6ae"
+        }
+      ]
+    },
+    {
+      "position": 3,
+      "title": "Cartão de Crédito",
+      "chapters": [
+        {
+          "number": 15,
+          "title": "CARTÃO NÃO É RENDA",
+          "access_level": "knowledge",
+          "sections": 68,
+          "structured_sha256": "ac199d06a205e7249810ffa6a2e99f1f4f6711b7884e21496b6e1f0288b7f3df"
+        },
+        {
+          "number": 16,
+          "title": "MINHAS REGRAS PARA USAR CARTÃO",
+          "access_level": "knowledge",
+          "sections": 82,
+          "structured_sha256": "83d4d50c74fd89fceab58a7f3e660729b1ae39cf67444e85a3d7e971b4ee7a7e"
+        },
+        {
+          "number": 17,
+          "title": "PARCELAMENTO",
+          "access_level": "knowledge",
+          "sections": 59,
+          "structured_sha256": "d997b7a1772a5b98d1edf39758278ee2dfe783e6f46c61bef82f347c5bb730b3"
+        },
+        {
+          "number": 18,
+          "title": "LIMITE",
+          "access_level": "knowledge",
+          "sections": 47,
+          "structured_sha256": "22814ef04c856261f27dbafa3e4650f7e84b0a6c71a3d0c36655b78abc07c1a9"
+        },
+        {
+          "number": 19,
+          "title": "ORGANIZAÇÃO DAS FATURAS E O COLCHÃO DO CARTÃO",
+          "access_level": "knowledge",
+          "sections": 80,
+          "structured_sha256": "81ede94592f0d42ea84e8307ca9d55884639516250e6e2db1cdf4eddc2eafd7d"
+        },
+        {
+          "number": 20,
+          "title": "CARTÃO, PONTOS E BENEFÍCIOS",
+          "access_level": "knowledge",
+          "sections": 68,
+          "structured_sha256": "d372cc250989d45994b2806e7de6f0aba3b28e2429670001334882980454348f"
+        }
+      ]
+    },
+    {
+      "position": 4,
+      "title": "Reserva de Emergência e Segurança",
+      "chapters": [
+        {
+          "number": 21,
+          "title": "RESERVA DE EMERGÊNCIA: O DINHEIRO QUE PROTEGE O RESTANTE",
+          "access_level": "knowledge",
+          "sections": 66,
+          "structured_sha256": "0df0879fbe29e8797fe4a6775299534c5ab64a4cc57a26b8d0e3ddd57a061930"
+        },
+        {
+          "number": 22,
+          "title": "QUANTO PRECISO TER NA RESERVA?",
+          "access_level": "knowledge",
+          "sections": 70,
+          "structured_sha256": "b7ca99f593cd6d98417751c701f63d4513913f9335d8b60742d67742b73d3a01"
+        },
+        {
+          "number": 23,
+          "title": "ONDE DEIXAR A RESERVA DE EMERGÊNCIA",
+          "access_level": "knowledge",
+          "sections": 50,
+          "structured_sha256": "a9fbda69307a1a0a685d1f4031997e53c235259d93769e38d58f3aed11a44779"
+        },
+        {
+          "number": 24,
+          "title": "O QUE É — E O QUE NÃO É — UMA EMERGÊNCIA",
+          "access_level": "knowledge",
+          "sections": 68,
+          "structured_sha256": "6593ee78df0a3bddbda716a1225fe104e65660520d0de51c014bdac4a4caa33e"
+        },
+        {
+          "number": 25,
+          "title": "COMO CONSTRUIR SUA RESERVA SEM PARAR DE VIVER",
+          "access_level": "knowledge",
+          "sections": 81,
+          "structured_sha256": "c12248b084067e8a5458a9d3378250e310856eb4898de86dabd211c2c30fc514"
+        },
+        {
+          "number": 26,
+          "title": "QUANDO A EMERGÊNCIA ACONTECER",
+          "access_level": "knowledge",
+          "sections": 118,
+          "structured_sha256": "df6f912554f8cf8c87c1c1240a3dbdb26b67724057bde1e9b96c767330310498"
+        }
+      ]
+    }
+  ]
+}
