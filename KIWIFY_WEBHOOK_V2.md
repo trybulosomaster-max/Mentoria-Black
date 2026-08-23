@@ -1,7 +1,9 @@
 # Mentoria Black — Kiwify webhook dual-compatible
 
-Status: homologated only on Supabase Beta `amzgqfvyjaiaoohnbcfl`. Production remains
-on `kiwify-webhook` v4 and was read-only throughout this work.
+Status: the legacy-token reader fix is homologated only on Supabase Beta
+`amzgqfvyjaiaoohnbcfl`. Production remains on `kiwify-webhook` v4 and was not
+accessed or altered during this work. Repeating production Checkpoint 1 is blocked
+by the new-user issue recorded below.
 
 ## Compatibility contract
 
@@ -47,42 +49,63 @@ legacy `profiles` table is compatible; any other profile error fails the event.
 Ordinary users cannot call the processor, rotate/read the token or grant themselves
 access.
 
-The reader preserves v4's existing minimum of eight characters so deploying the dual
-writer cannot silently disable the current production webhook. A newly installed V2
-setter requires 32–255 characters. Production token rotation to that stronger range
+The entrypoint reader and the request authenticator share one explicit validator that
+preserves v4's existing minimum of eight characters, so deploying the dual writer
+cannot silently disable the current production webhook. A newly installed V2 setter
+requires 32–255 characters. Production token rotation to that stronger range
 is recommended as a separate, controlled Auth/Vault operation before or during the
-future production gate; this homologation did not read or change the token value.
+future production gate. This homologation did not read or change the production
+token; Beta used only ephemeral synthetic values that were removed immediately.
 
-## Evidence
+## Token-compatibility evidence
 
-- faithful legacy-to-V2 clone: 109 pgTAP + 88 shell assertions, preserving the exact
+- faithful legacy-to-V2 clone: 109 pgTAP + 89 shell assertions, preserving the exact
   1 product / 1 grant / 2 Kiwify event history;
-- Node request/contract suite: authentication, HMAC, routing, size/shape validation,
-  supported Admin API and non-leaking duplicate responses;
-- Beta remote: missing token rejected; approval, replay, renewal, partial refund,
-  late/grace, cancellation, expiration, full refund and chargeback passed;
-- remote V2 result: 10 events, 3 historical grants, zero active conflicts, zero raw
-  V2 payloads; all fixtures and the ephemeral test token were removed;
-- deploy rollback: production v4 bundle SHA-256
-  `4e05db916526212b9b22bf9b2d44794e86d3008f9d23fb54f8a336b3c083c301` was
-  temporarily deployed only to Beta, then the dual writer was restored and hardened
-  as Beta v7
-  with bundle SHA-256
-  `13cd08c6621b8893190fda2fccbefdb4958ef5be9eadbbf79b25802efdf4ff8e`.
+- actual-entrypoint Node test: legacy token (8 characters), strong V2 token, empty,
+  below-legacy-minimum, whitespace-only, header mismatch and authorized flow;
+- the V2 SQL setter rejects 31 characters and accepts 32 or more; its migration and
+  SHA remain unchanged;
+- Beta v14 accepted an ephemeral 15-character legacy-profile token and an ephemeral
+  43-character token written through the V2 setter; wrong header returned 401;
+- using an existing controlled Beta user, approval, duplicate retry, renewal,
+  cancellation, full refund and chargeback all returned 200 under `commercial_v2`;
+- remote evidence before cleanup: six unique events, one approved event under retry,
+  two historical grants, zero active conflicts and zero raw V2 payloads;
+- cleanup returned Beta to two Auth test users, zero Kiwify events, zero Kiwify grants
+  and no configured webhook token;
+- deploy rollback restored the previous dual bundle as Beta v12, with SHA-256
+  `13cd08c6621b8893190fda2fccbefdb4958ef5be9eadbbf79b25802efdf4ff8e`, then restored
+  the token-reader candidate as Beta v14, `ACTIVE`, with bundle SHA-256
+  `5428337e6898090a8b8f435a7941513d93ece2f654415c919f3c17bd2012c415`.
 
 Beta Advisor findings remained the previously accepted server-only RLS/function
 notices plus the pre-existing leaked-password warning. No new client grant or RLS
 finding was introduced by the Kiwify contract.
 
+## Production blocker discovered during re-homologation
+
+An additional approval probe for a purchaser without an existing Mentoria Black
+account failed before grant creation. The Auth log identifies the exact cause:
+the temporary password is built as two UUIDs plus a hyphen (73 bytes), while bcrypt
+accepts at most 72 bytes. Existing-user approval and every token-compatibility gate
+pass, but a new Kiwify purchaser would fail account creation.
+
+This task deliberately did not change that writer behavior because its authorization
+was limited to the token reader. Production Checkpoint 1 must not be repeated until a
+separate, reviewed change generates a cryptographically strong temporary password of
+at most 72 bytes, adds an actual-entrypoint new-user test, and is re-homologated on
+Beta. No synthetic user, grant, event or token from the failed probe remains.
+
 ## Future controlled production order
 
-1. confirm backup, production project ref, source hashes and current v4 hash;
-2. deploy the dual-compatible writer while production still has the legacy schema;
-3. send one controlled legacy event and prove idempotency;
-4. apply `20260822212119_commercial_access_v1.sql` transactionally;
-5. immediately apply `20260823104202_install_kiwify_webhook_v2_contract.sql`;
-6. retry/validate Kiwify in V2 and prove 1/1/2 historical rows unchanged;
-7. continue with Knowledge, Editorial, protected content and frontend gates.
+1. fix and re-homologate the bounded new-user password generation on Beta;
+2. repeat the production gate, backup, project-ref, source-hash and v4-hash checks;
+3. deploy the dual-compatible writer while production still has the legacy schema;
+4. send one controlled legacy event and prove idempotency;
+5. apply `20260822212119_commercial_access_v1.sql` transactionally;
+6. immediately apply `20260823104202_install_kiwify_webhook_v2_contract.sql`;
+7. retry/validate Kiwify in V2 and prove 1/1/2 historical rows unchanged;
+8. continue with Knowledge, Editorial, protected content and frontend gates.
 
 Between steps 4 and 5, the writer intentionally returns a retryable failure rather
 than using the removed legacy conflict target. Rollback before Commercial is the v4

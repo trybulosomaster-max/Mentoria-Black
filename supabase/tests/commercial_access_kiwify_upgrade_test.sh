@@ -369,6 +369,11 @@ returns void language plpgsql as $$begin update vault.secrets set secret=new_sec
 SQL
 apply_file "$absent_db" "$kiwify_contract"
 assert_sql "$absent_db" "select (to_regprocedure('public.get_kiwify_webhook_token()') is not null and to_regprocedure('public.set_kiwify_webhook_token(text)') is not null)::text" "true" "Beta-style installation creates the guarded Vault contract"
+if psql_db "$absent_db" -v ON_ERROR_STOP=1 -qc "set role service_role;select public.set_kiwify_webhook_token(repeat('w',31));reset role" 2>"$tmp_dir/weak-v2-token.err";then
+  echo "V2 setter accepted a token shorter than 32 characters" >&2
+  exit 1
+fi
+rg -q 'invalid webhook token' "$tmp_dir/weak-v2-token.err";assertions=$((assertions+1))
 assert_sql "$absent_db" "set role service_role;with configured as (select public.set_kiwify_webhook_token(repeat('s',32))) select length(public.get_kiwify_webhook_token()) from configured;reset role" "32" "Beta-style Vault token remains server-only and retrievable"
 assert_sql "$absent_db" "select (not has_function_privilege('authenticated','public.get_kiwify_webhook_token()','EXECUTE') and not has_function_privilege('authenticated','public.set_kiwify_webhook_token(text)','EXECUTE'))::text" "true" "clients cannot read or rotate the Kiwify token"
 apply_file "$absent_db" "$kiwify_contract"

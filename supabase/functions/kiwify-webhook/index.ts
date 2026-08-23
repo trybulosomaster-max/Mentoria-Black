@@ -1,5 +1,7 @@
 import {createClient} from '@supabase/supabase-js';
-import {buildLegacyGrantWrite,createKiwifyWebhookHandler} from '../_shared/kiwify-webhook.mjs';
+import {
+  buildLegacyGrantWrite,createKiwifyWebhookHandler,validateStoredKiwifyWebhookToken
+} from '../_shared/kiwify-webhook.mjs';
 
 const supabaseUrl=Deno.env.get('SUPABASE_URL')||'';
 
@@ -19,8 +21,8 @@ function knownMissing(error:unknown,codes:string[]){
 
 async function getToken(){
   const {data,error}=await admin.rpc('get_kiwify_webhook_token');
-  if(error||typeof data!=='string'||data.length<32)throw new Error('Kiwify token is unavailable');
-  return data;
+  if(error)throw new Error('Kiwify token is unavailable');
+  return validateStoredKiwifyWebhookToken(data);
 }
 
 async function detectContract(){

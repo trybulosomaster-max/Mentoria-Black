@@ -1,4 +1,16 @@
 export const KIWIFY_PAYLOAD_LIMIT_BYTES=256000;
+export const KIWIFY_LEGACY_TOKEN_MIN_LENGTH=8;
+export const KIWIFY_TOKEN_MAX_LENGTH=255;
+
+export function validateStoredKiwifyWebhookToken(value){
+  if(
+    typeof value!=='string'||value.length<KIWIFY_LEGACY_TOKEN_MIN_LENGTH||value.length>KIWIFY_TOKEN_MAX_LENGTH||
+    value.trim()!==value||/[\u0000-\u001f\u007f]/.test(value)
+  ){
+    throw new Error('Kiwify token is unavailable');
+  }
+  return value;
+}
 
 export const KIWIFY_EVENT_TYPES=Object.freeze({
   activate:Object.freeze(['compra_aprovada','order_approved','purchase_approved']),
@@ -188,7 +200,7 @@ async function authenticated(request,rawBody,payload,expectedToken){
   // Production v4 historically accepted an 8-character Vault token. Preserve
   // that reader contract until a separately authorized rotation; new setters
   // installed by V2 still require 32+ characters.
-  if(typeof expectedToken!=='string'||expectedToken.length<8||expectedToken.length>255)return false;
+  try{expectedToken=validateStoredKiwifyWebhookToken(expectedToken)}catch{return false}
   const signature=new URL(request.url).searchParams.get('signature')?.trim().toLowerCase()||null;
   if(signature){
     if(!/^[0-9a-f]{40}$/.test(signature))return false;
