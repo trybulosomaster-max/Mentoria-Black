@@ -31,6 +31,6 @@ function createAsaasSandboxCheckoutAdapter({invoke}={}){
   return Object.freeze({createAppMonthlyCheckout:create(OFFER_CODES.appMonthly),createAppAnnualCheckout:create(OFFER_CODES.appAnnual),createKnowledgeCheckout:create(OFFER_CODES.knowledge),createCompleteCheckout:create(OFFER_CODES.complete)});
 }
 function assertProviderAdapter(adapter){for(const method of ['createCustomer','createCheckout','createSubscription','fetchPayment'])if(typeof adapter?.[method]!=='function')throw new TypeError(`provider adapter missing ${method}`);return adapter}
-const api={PROVIDERS,BILLING_MODES,ASAAS_PAYMENT_METHODS,OFFER_CODES,requireSandbox,checkoutIntent,createMockCheckoutAdapter,createAsaasSandboxCheckoutAdapter,assertProviderAdapter};
-if(typeof module!=='undefined'&&module.exports)module.exports=api;
-if(typeof globalThis!=='undefined')globalThis.MBCommercialProvider=Object.freeze(api);
+const commercialProviderApi={PROVIDERS,BILLING_MODES,ASAAS_PAYMENT_METHODS,OFFER_CODES,requireSandbox,checkoutIntent,createMockCheckoutAdapter,createAsaasSandboxCheckoutAdapter,assertProviderAdapter};
+if(typeof module!=='undefined'&&module.exports)module.exports=commercialProviderApi;
+if(typeof globalThis!=='undefined')globalThis.MBCommercialProvider=Object.freeze(commercialProviderApi);

@@ -119,6 +119,6 @@ function validateKnowledgeDocument(input){
   });
 }
 
-const api={ACCESS_LEVELS,SECTION_TYPES,PUBLICATION_TYPES,METADATA_KEYS,validateKnowledgeDocument};
-if(typeof module!=='undefined'&&module.exports)module.exports=api;
-if(typeof globalThis!=='undefined')globalThis.MBKnowledgeImport=Object.freeze(api);
+const knowledgeImportApi={ACCESS_LEVELS,SECTION_TYPES,PUBLICATION_TYPES,METADATA_KEYS,validateKnowledgeDocument};
+if(typeof module!=='undefined'&&module.exports)module.exports=knowledgeImportApi;
+if(typeof globalThis!=='undefined')globalThis.MBKnowledgeImport=Object.freeze(knowledgeImportApi);

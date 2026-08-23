@@ -3,6 +3,7 @@ const assert=require('assert');
 const fs=require('fs');
 const os=require('os');
 const path=require('path');
+const vm=require('vm');
 const runtime=require('../js/beta-runtime');
 const observability=require('../js/beta-observability');
 const artifact=require('../scripts/prepare-beta-artifact');
@@ -49,11 +50,14 @@ await test('fetch monitorado registra apenas metadados seguros',async()=>{
 await test('artefato Beta remove configuração legada e injeta somente configuração isolada',()=>{
   const rootDir=path.resolve(__dirname,'..'),temp=fs.mkdtempSync(path.join(os.tmpdir(),'mb-beta-artifact-'));
   try{
-    const out=path.join(temp,'artifact');artifact.prepareArtifact({rootDir,pathOut:out,supabaseUrl:'https://isolated-beta.example.invalid',supabasePublishableKey:'sb_publishable_beta_test',authRedirectUrl:'https://beta.example.invalid'});
+    const out=path.join(temp,'artifact'),rootIndexBefore=fs.readFileSync(path.join(rootDir,'index.html'),'utf8');
+    const result=artifact.prepareArtifact({rootDir,pathOut:out,supabaseUrl:'https://isolated-beta.example.invalid',supabasePublishableKey:'sb_publishable_beta_test',authRedirectUrl:'https://beta.example.invalid'});
     const html=fs.readFileSync(path.join(out,'index.html'),'utf8'),env=fs.readFileSync(path.join(out,'js','beta-environment.js'),'utf8');
     ok(html.includes('const SUPABASE_URL="";'));ok(html.includes('const SUPABASE_ANON_KEY="";'));ok(!html.includes('createClient(SUPABASE_URL,SUPABASE_ANON_KEY)'));
     ok(env.includes('isolated-beta.example.invalid'));ok(env.includes('sb_publishable_beta_test'));ok(!env.includes('service_role'));
+    equal(result.validation.valid,true);equal(fs.readFileSync(path.join(rootDir,'index.html'),'utf8'),rootIndexBefore);
   }finally{fs.rmSync(temp,{recursive:true,force:true})}
+  equal(fs.existsSync(temp),false);
 });
 
 await test('gerador rejeita credencial privilegiada',()=>{
@@ -71,11 +75,52 @@ await test('cadeia de produção contém somente migrations elegíveis na ordem 
   try{const result=migrations.prepareMigrationChain({rootDir,pathOut:path.join(temp,'migrations')});equal(fs.readdirSync(result.output).length,3);for(const entry of entries)ok(!fs.readFileSync(path.join(result.output,path.basename(entry)),'utf8').match(/^\s*create\s+table\b/im))}finally{fs.rmSync(temp,{recursive:true,force:true})}
 });
 
-await test('index e PWA exibem identidade Beta',()=>{
-  const root=path.resolve(__dirname,'..'),html=fs.readFileSync(path.join(root,'index.html'),'utf8'),manifest=fs.readFileSync(path.join(root,'manifest.webmanifest'),'utf8'),sw=fs.readFileSync(path.join(root,'sw.js'),'utf8');
-  ok(html.includes('Mentoria Black — V82 BETA'));ok(html.includes('js/beta-runtime.js'));ok(html.includes('MBBetaRuntime.requireConfigured'));
-  ok(html.includes('const SUPABASE_URL="";'));ok(html.includes('const SUPABASE_ANON_KEY="";'));
-  ok(manifest.includes('V82 BETA'));ok(sw.includes('mentoria-black-v82-beta'));
+await test('validador rejeita a árvore de produção tratada como Beta',()=>{
+  throws(()=>artifact.validateBetaArtifact(path.resolve(__dirname,'..')),/invalid Beta artifact|incomplete Beta artifact/);
+});
+
+function withArtifact(run){
+  const rootDir=path.resolve(__dirname,'..'),temp=fs.mkdtempSync(path.join(os.tmpdir(),'mb-beta-validation-')),out=path.join(temp,'artifact');
+  try{
+    artifact.prepareArtifact({rootDir,pathOut:out,supabaseUrl:'https://isolated-beta.example.invalid',supabasePublishableKey:'sb_publishable_beta_test',authRedirectUrl:'https://beta.example.invalid'});
+    run(out);
+  }finally{fs.rmSync(temp,{recursive:true,force:true})}
+  equal(fs.existsSync(temp),false);
+}
+
+await test('artefato Beta correto satisfaz identidade, runtime, cache e fail-closed',()=>withArtifact(out=>{
+  const html=fs.readFileSync(path.join(out,'index.html'),'utf8'),manifest=fs.readFileSync(path.join(out,'manifest.webmanifest'),'utf8'),sw=fs.readFileSync(path.join(out,'sw.js'),'utf8');
+  equal(artifact.validateBetaArtifact(out).valid,true);
+  ok(html.includes('js/beta-runtime.js'));ok(html.includes('MBBetaRuntime.requireConfigured'));ok(manifest.includes('V82 BETA'));ok(sw.includes('mentoria-black-v82-beta'));
+  ok(!html.includes('production-runtime'));ok(!sw.includes('mentoria-black-v82-production'));
+}));
+
+await test('artefato Beta com runtime de produção é rejeitado',()=>withArtifact(out=>{
+  const file=path.join(out,'index.html');
+  fs.writeFileSync(file,fs.readFileSync(file,'utf8').replace('js/beta-runtime.js','js/production-runtime.js'));
+  throws(()=>artifact.validateBetaArtifact(out),/Beta runtime/);
+}));
+
+await test('artefato Beta com cache de produção é rejeitado',()=>withArtifact(out=>{
+  const file=path.join(out,'sw.js');
+  fs.writeFileSync(file,fs.readFileSync(file,'utf8').replace('mentoria-black-v82-beta','mentoria-black-v82-production'));
+  throws(()=>artifact.validateBetaArtifact(out),/Beta cache identity/);
+}));
+
+await test('artefato Beta incompleto é rejeitado',()=>withArtifact(out=>{
+  fs.rmSync(path.join(out,'js','beta-runtime.js'));
+  throws(()=>artifact.validateBetaArtifact(out),/incomplete Beta artifact/);
+}));
+
+await test('scripts clássicos ativos compilam juntos sem colisão de escopo global',()=>{
+  const root=path.resolve(__dirname,'..'),html=fs.readFileSync(path.join(root,'index.html'),'utf8'),sources=[];
+  for(const match of html.matchAll(/<script([^>]*)>([\s\S]*?)<\/script>/gi)){
+    const sourceMatch=match[1].match(/\bsrc="([^"]+)"/);
+    if(sourceMatch&&!/^https?:/i.test(sourceMatch[1]))sources.push(fs.readFileSync(path.join(root,sourceMatch[1]),'utf8'));
+    if(!sourceMatch&&match[2].trim())sources.push(match[2]);
+  }
+  ok(sources.length>10);
+  new vm.Script(sources.join('\n;\n'),{filename:'production-browser-bundle.js'});
 });
 
 console.log(`beta-preparation: ${tests} tests, ${assertions} assertions passed`);
