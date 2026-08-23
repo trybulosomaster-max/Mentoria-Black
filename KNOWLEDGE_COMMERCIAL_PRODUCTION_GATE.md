@@ -1,16 +1,18 @@
 # Mentoria Black — gate final Commercial Access + Knowledge Area
 
-Status: **gate final repetido e aprovado em modo estritamente read-only na produção**.
-Este documento congela o pacote candidato e a futura ordem controlada; não autoriza
-nem executa migration, importação, enforcement, merge ou deploy.
+Status: **NO-GO após a re-homologação do entrypoint Kiwify na Beta**.
+O gate read-only anterior foi superado pela evidência do entrypoint real: o reader de
+token legado foi corrigido, mas o fluxo de comprador novo ainda falha antes da
+promoção. Este documento não autoriza nem executa migration, importação, enforcement,
+merge ou deploy. A produção permaneceu inalterada.
 
 ## Identidade e pacote imutável
 
 - Produção Supabase: `mwjqfzbpjmwiscvtxvfc` (`sa-east-1`, saudável), somente leitura neste gate.
 - Beta homologada: `amzgqfvyjaiaoohnbcfl` (`sa-east-1`).
-- HEAD candidato final: `4058f7893b055be9d08d0645856837ddfb40b87f`.
-- Edge Function candidata: `kiwify-webhook` Beta v7, bundle SHA-256
-  `13cd08c6621b8893190fda2fccbefdb4958ef5be9eadbbf79b25802efdf4ff8e`.
+- HEAD funcional com a correção do reader: `512ddce4a472a0351e60c8fd5c1e4367e1b86618`.
+- Edge Function candidata: `kiwify-webhook` Beta v14, bundle SHA-256
+  `5428337e6898090a8b8f435a7941513d93ece2f654415c919f3c17bd2012c415`.
 - Edge Function atual de produção: `kiwify-webhook` v4, bundle/source SHA-256
   `4e05db916526212b9b22bf9b2d44794e86d3008f9d23fb54f8a336b3c083c301`.
 - Versão protegida do conteúdo: `parts-1-4-v2`.
@@ -55,7 +57,7 @@ identificadores externos. Estado observado:
 | `products` | 1 produto legado | catálogo V2 com 3 produtos | evoluir in-place | preservar UUID/slug/row |
 | `access_grants` | 1 grant manual ativo | V2 reconciliado | enriquecer in-place | preservar histórico |
 | `payment_events` | 2 eventos Kiwify | V2 multiprovider | enriquecer in-place | preservar payload histórico |
-| Kiwify | 2 funções + Edge Function v4 ativa | writer dual-compatible v7 homologado | deploy do writer antes do schema | gate de versão/hash |
+| Kiwify | 2 funções + Edge Function v4 ativa | writer dual-compatible v14; reader homologado, comprador novo bloqueado | corrigir e re-homologar antes de qualquer deploy | **BLOCKER** |
 | Knowledge | objetos ausentes | 1/4/26/1469 | criar schema e importar | RLS antes do conteúdo |
 | Conteúdo | ausente | 67 sample / 1.402 knowledge | import server-side | hash/contagens exatos |
 | Enforcement APP | não instalado | estado `false` | manter desligado | fase separada |
@@ -81,8 +83,8 @@ achados. A produção permaneceu read-only durante todo o gate.
   `upsert` de grants com `onConflict: user_id,product_id`. Esse conflict target deixa
   de existir na migration V2. O novo writer detecta explicitamente legado ou V2,
   preserva esse upsert somente no legado e usa RPC transacional/idempotente no V2.
-- A Beta executa o writer dual-compatible v7 (bundle SHA-256
-  `13cd08c6621b8893190fda2fccbefdb4958ef5be9eadbbf79b25802efdf4ff8e`). O contrato
+- A Beta executa o writer dual-compatible v14 (bundle SHA-256
+  `5428337e6898090a8b8f435a7941513d93ece2f654415c919f3c17bd2012c415`). O contrato
   SQL V2 fica em `20260823104202_install_kiwify_webhook_v2_contract.sql`; o período
   entre Commercial e esse contrato é fail-closed, nunca fallback legado inseguro.
 - As seis tabelas server-only sem policy são deny-by-default; `anon` e
@@ -130,6 +132,26 @@ do valor neste gate, getter/setter/processador somente para `service_role`, HMAC
 comparado em tempo constante e nenhum segredo no frontend ou Git. O reader dual
 aceita com segurança o mínimo legado da v4; a rotação futura para 32+ caracteres é
 hardening separado, não pré-condição oculta da migration.
+
+## Bloqueador encontrado no entrypoint real
+
+A re-homologação da compatibilidade de token provou na Beta que:
+
+- o reader aceita o contrato legado de 8 a 255 caracteres, sem aceitar vazio,
+  whitespace periférico ou caracteres de controle;
+- o setter V2 continua exigindo de 32 a 255 caracteres;
+- autenticação incorreta falha com `401`, ausência de configuração falha com `503`;
+- approval, retry idempotente, renewal, cancellation, refund e chargeback funcionam
+  para usuário sintético já existente, sem grants ativos conflitantes;
+- rollback para o bundle anterior foi exercitado e a candidata v14 foi restaurada;
+- tokens e fixtures efêmeros foram removidos ao final.
+
+O teste adicional do caminho de comprador novo falhou fechado no Auth com
+`bcrypt: password length exceeds 72 bytes`. O entrypoint monta a senha temporária com
+dois UUIDs e um separador, totalizando 73 bytes. Esse defeito é independente do reader
+e ficou fora da autorização estrita desta correção. Portanto, o bundle v14 não deve
+ser promovido até uma mudança limitada do gerador para no máximo 72 bytes, seguida de
+teste do entrypoint real e nova homologação na Beta.
 
 ## Ordem final para uma promoção futura e separadamente autorizada
 
@@ -202,7 +224,8 @@ merge ou deploy oficial foi usado neste gate.
 
 ## Decisão do gate
 
-- dual writer aprovado no legado e no V2;
+- reader dual de token aprovado no legado e no V2;
+- fluxo de comprador novo bloqueado pelo limite de 72 bytes do bcrypt;
 - produto, grant, dois eventos e payloads históricos preservados;
 - migrations e hashes congelados;
 - pacote Beta-only excluído;
@@ -211,4 +234,5 @@ merge ou deploy oficial foi usado neste gate.
 - rollback anterior/posterior à Commercial explicitamente separado;
 - enforcement financeiro permanece desligado.
 
-Resultado: **GO para uma promoção controlada futura, mediante autorização própria**.
+Resultado: **NO-GO para repetir o Checkpoint 1 de produção até corrigir e
+re-homologar o caminho de comprador novo**.
