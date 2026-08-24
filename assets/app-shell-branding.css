@@ -137,24 +137,31 @@ a:focus-visible {
 }
 
 .header {
-  padding: 8px 0 15px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 20px;
+  row-gap: 8px;
+  padding: 8px 0 12px;
   border-bottom-color: rgba(201, 162, 39, 0.23);
 }
 
 .header .app-brand {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 13px;
-  padding: 2px 0 6px;
+  justify-content: flex-start;
+  gap: 12px;
+  padding: 0;
   text-align: left;
+  grid-column: 1;
+  grid-row: 1;
 }
 
 .header .app-brand .crest {
-  width: 64px;
-  height: 64px;
-  flex: 0 0 64px;
-  filter: drop-shadow(0 8px 14px rgba(0, 0, 0, 0.4));
+  width: 56px;
+  height: 56px;
+  flex: 0 0 56px;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.28));
 }
 
 .app-brand .brand-copy {
@@ -165,9 +172,9 @@ a:focus-visible {
 
 .header .app-brand .title {
   color: var(--gold-hover);
-  font-size: 20px;
+  font-size: 19px;
   font-weight: 780;
-  letter-spacing: 0.09em;
+  letter-spacing: 0.06em;
   line-height: 1;
   text-align: left;
 }
@@ -183,6 +190,29 @@ a:focus-visible {
 .header .app-brand .sub::before,
 .header .app-brand .sub::after {
   display: none;
+}
+
+.header > .row {
+  grid-column: 2;
+  grid-row: 1;
+  justify-content: flex-end !important;
+  gap: 12px !important;
+  margin-top: 0 !important;
+}
+
+.header > .row .muted {
+  width: auto !important;
+  text-align: right !important;
+}
+
+.header > .row .actions {
+  justify-content: flex-end !important;
+}
+
+.header > #commercialStatus {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  margin: 0;
 }
 
 .header > .row .actions .btn {
@@ -228,13 +258,15 @@ a:focus-visible {
     display: flex;
     justify-content: flex-start;
     gap: 10px;
-    padding: 0 0 7px;
+    padding: 0;
+    grid-column: 1;
+    grid-row: 1;
   }
 
   .header .app-brand .crest {
-    width: 50px;
-    height: 50px;
-    flex-basis: 50px;
+    width: 46px;
+    height: 46px;
+    flex-basis: 46px;
   }
 
   .header .app-brand .title {
@@ -247,7 +279,20 @@ a:focus-visible {
   }
 
   .header > .row {
+    grid-column: 1;
+    grid-row: 3;
+    justify-content: flex-start !important;
     gap: 8px;
+  }
+
+  .header > .row .muted {
+    width: 100% !important;
+    text-align: left !important;
+  }
+
+  .header > #commercialStatus {
+    grid-column: 1;
+    grid-row: 2;
   }
 
   .header > .row .actions {
