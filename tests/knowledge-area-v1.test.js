@@ -43,6 +43,9 @@ await test('library is publication-driven and supports an empty state',()=>{
 await test('official production cover is deterministic',()=>{
  const html=knowledge.renderLibrary({publications:[{id:'cover',title:'Mentoria Black'}],chapters:[],progress:[]});
  ok(html.includes('data-cover="premium"'));ok(html.includes('assets/branding/mentoria-black-icon-512.png'));
+ ok(!html.includes('<figcaption>'));equal((html.match(/Mentoria Black/g)||[]).length,2);
+ const stylesheet=fs.readFileSync(path.join(__dirname,'../knowledge/knowledge-area-premium.css'),'utf8');
+ ok(stylesheet.includes('.knowledge-cover-official:before{display:none}'));ok(stylesheet.includes('background:transparent'));
 });
 
 await test('local visual preview isolates its cover switch from the production runtime',()=>{

@@ -20,7 +20,7 @@
   }
   function renderOfficialCover(publication){
     const mark='assets/branding/mentoria-black-icon-512.png';
-    return `<figure class="knowledge-cover knowledge-cover-official" data-cover="premium"><img src="${safe(mark)}" alt="Símbolo oficial Mentoria Black"><figcaption><span>Mentoria Black</span><small>Área de Conhecimento</small></figcaption></figure>`;
+    return `<figure class="knowledge-cover knowledge-cover-official" data-cover="premium"><img src="${safe(mark)}" alt="Símbolo oficial da Mentoria Black"></figure>`;
   }
   function renderSection(section){
     if(!SECTION_TYPES.has(section?.section_type))return '';
@@ -70,9 +70,9 @@
   function renderLibrary(state){
     const publications=state.publications||[],chapters=state.chapters||[],progress=state.progress||[];
     if(!publications.length)return `<section class="knowledge-empty"><h2>Biblioteca em preparação</h2><p>Nenhuma publicação está disponível no momento.</p></section>`;
-    return `<header class="knowledge-title"><span class="knowledge-kicker">Mentoria Black</span><h1>Área de Conhecimento</h1><p>Conhecimento para transformar organização em direção.</p></header><div class="knowledge-library">${publications.map(publication=>{
+    return `<header class="knowledge-title"><h1>Área de Conhecimento</h1><p>Conhecimento para transformar organização em direção.</p></header><div class="knowledge-library">${publications.map(publication=>{
       const percent=publicationProgress(publication.id,chapters,progress),started=percent>0;
-      return `<article class="knowledge-publication-card">${publication.cover_path?`<img class="knowledge-cover" src="${safe(safeAssetPath(publication.cover_path))}" alt="Capa de ${safe(publication.title)}">`:renderOfficialCover(publication)}<div class="knowledge-publication-copy"><span class="knowledge-kicker">${safe(publication.publication_type||'Publicação')}</span><h2>${safe(publication.title)}</h2>${publication.subtitle?`<p class="knowledge-subtitle">${safe(publication.subtitle)}</p>`:''}<p>${safe(publication.description||'')}</p><div class="knowledge-progress" aria-label="${percent}% concluído"><span style="width:${percent}%"></span></div><small>${percent}% concluído</small><div class="knowledge-actions"><button class="btn gold" data-knowledge-action="open-publication" data-id="${safe(publication.id)}">${started?'Continuar leitura':'Começar leitura'}</button></div></div></article>`;
+      return `<article class="knowledge-publication-card">${publication.cover_path?`<img class="knowledge-cover" src="${safe(safeAssetPath(publication.cover_path))}" alt="Capa de ${safe(publication.title)}">`:renderOfficialCover(publication)}<div class="knowledge-publication-copy"><h2>${safe(publication.title)}</h2>${publication.subtitle?`<p class="knowledge-subtitle">${safe(publication.subtitle)}</p>`:''}<p>${safe(publication.description||'')}</p><div class="knowledge-progress" aria-label="${percent}% concluído"><span style="width:${percent}%"></span></div><small>${percent}% concluído</small><div class="knowledge-actions"><button class="btn gold" data-knowledge-action="open-publication" data-id="${safe(publication.id)}">${started?'Continuar leitura':'Começar leitura'}</button></div></div></article>`;
     }).join('')}</div>`;
   }
 

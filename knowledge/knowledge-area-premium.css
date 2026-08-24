@@ -3,11 +3,22 @@
 .knowledge-toolbar .btn,
 .knowledge-reader-footer .btn{min-height:44px}
 
-.knowledge-cover-official[data-cover="book"] figcaption span,
-.knowledge-cover-official[data-cover="book"] figcaption small{font-size:0}
-.knowledge-cover-official[data-cover="book"] figcaption span:after{content:"MENTORIA BLACK";font-size:12px}
-.knowledge-cover-official[data-cover="book"] figcaption small:after{content:"Conhecimento. Estratégia. Liberdade.";font-size:8px}
+.knowledge-cover-official{
+  aspect-ratio:1;
+  overflow:visible;
+  border:0;
+  border-radius:0;
+  background:transparent;
+  box-shadow:none;
+}
+.knowledge-cover-official:before{display:none}
+.knowledge-cover-official>img{
+  width:100%;
+  filter:drop-shadow(0 18px 24px #000a);
+}
+.knowledge-publication-card .knowledge-publication-copy>h2{margin-top:0}
 
 @media(max-width:700px){
+  .knowledge-cover-official{width:min(172px,48vw)}
   .knowledge-chapter-row .btn{min-height:44px}
 }
