@@ -61,32 +61,22 @@
 .v18-loading{position:fixed;inset:0;background:#050505;display:grid;place-items:center;z-index:9999}.v18-loading-box{text-align:center;color:#bbb}.v18-spinner{width:28px;height:28px;border:2px solid #333;border-top-color:var(--gold);border-radius:50%;animation:v18spin .7s linear infinite;margin:0 auto 12px}@keyframes v18spin{to{transform:rotate(360deg)}}.btn:disabled{opacity:.55;cursor:not-allowed}
 .commercial-gate{min-height:100vh;display:grid;place-items:center;padding:22px}.commercial-card{width:min(760px,100%);background:linear-gradient(145deg,#12100a,#0b0b0b);border:1px solid #5b4a1f;border-radius:20px;padding:28px;box-shadow:var(--shadow)}.commercial-card h1{font:700 32px Georgia,serif;margin:0 0 8px}.commercial-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:22px 0}.commercial-option{background:#0b0b0b;border:1px solid #393021;border-radius:12px;padding:14px}.commercial-status{color:var(--gold2);font-size:12px;text-align:center;margin:5px 0 9px}.knowledge-shell{max-width:900px;margin:auto}.knowledge-sample{border:1px solid #4b4026;background:#131008;border-radius:14px;padding:18px}@media(max-width:650px){.commercial-grid{grid-template-columns:1fr}.commercial-card{padding:20px}.commercial-card h1{font-size:26px}}
 </style>
+<link rel="stylesheet" href="assets/app-shell-branding.css">
 </head>
 <body>
 <div id="v18Loading" class="v18-loading"><div class="v18-loading-box"><div class="v18-spinner"></div><div>Carregando Mentoria Black…</div></div></div>
 <section id="auth" class="auth">
  <div class="auth-card">
-  <div class="brand-full">
-   <svg class="crest" viewBox="0 0 220 220" aria-label="Mentoria Black">
-      <g fill="none" stroke="#d9ad37" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round">
-       <circle cx="110" cy="119" r="61"/>
-       <path d="M55 119c-25 8-34 27-19 41 8 7 17 7 25 1"/>
-       <path d="M165 119c25 8 34 27 19 41-8 7-17 7-25 1"/>
-       <path d="M63 153c-24 8-28 24-13 31m120-31c24 8 28 24 13 31"/>
-       <path d="M72 58l-13-19 23 8 4-25 15 21 9-30 9 30 15-21 4 25 23-8-13 19"/>
-       <path d="M76 66h68"/>
-      </g>
-      <path d="M91 63h38l-4-31-15 14-15-14z" fill="#d9ad37"/>
-      <text x="110" y="135" text-anchor="middle" fill="#d9ad37" font-family="Georgia,serif" font-size="51" font-weight="600">MB</text>
-    </svg>
+  <div class="brand-full auth-brand">
+   <img class="crest brand-mark" src="assets/branding/mentoria-black-icon-512.png" width="512" height="512" alt="Símbolo oficial da Mentoria Black" decoding="async" fetchpriority="high">
    <div class="title">MENTORIA BLACK</div><div class="sub">GESTÃO FINANCEIRA</div>
   </div>
   <p class="muted">Controle de receitas, despesas, cartões, planejamento, metas e patrimônio.</p>
   <form id="loginForm">
-   <div class="field"><label>E-mail</label><input id="loginEmail" type="email" autocomplete="email" required></div>
-   <div class="field"><label>Senha</label><input id="loginPassword" type="password" autocomplete="current-password" minlength="6" required></div>
-   <button class="btn primary" style="width:100%">Entrar</button>
-   <div class="row" style="justify-content:center;margin-top:8px"><button class="btn" type="button" id="signup">Criar conta</button><button class="btn" type="button" id="resetPass">Esqueci minha senha</button></div>
+   <div class="field"><label for="loginEmail">E-mail</label><input id="loginEmail" type="email" autocomplete="email" required></div>
+   <div class="field"><label for="loginPassword">Senha</label><input id="loginPassword" type="password" autocomplete="current-password" minlength="6" required></div>
+   <button class="btn primary auth-submit">Entrar</button>
+   <div class="row auth-links"><button class="btn" type="button" id="signup">Criar conta</button><button class="btn" type="button" id="resetPass">Esqueci minha senha</button></div>
    <div id="authMsg" class="msg"></div>
   </form>
  </div>
@@ -95,11 +85,9 @@
 <section id="app" class="hidden">
  <div class="wrap">
   <header class="header">
-   <div class="brand-full">
-    <svg class="crest" viewBox="0 0 180 180" aria-label="MB">
-     <g fill="none" stroke="#d9ad37" stroke-width="3"><circle cx="90" cy="98" r="52"/><path d="M38 102c-22 10-25 28-8 37m112-37c22 10 25 28 8 37M48 137c-18 7-21 17-10 24m104-24c18 7 21 17 10 24"/><path d="M51 57l-10-15 20 7 4-20 12 17 13-24 13 24 12-17 4 20 20-7-10 15"/><path d="M57 61h66"/></g><path d="M72 55h36l-3-23-15 12-15-12z" fill="#d9ad37"/><text x="90" y="113" text-anchor="middle" fill="#d9ad37" font-family="Georgia,serif" font-size="45">MB</text>
-    </svg>
-    <div class="title">MENTORIA BLACK</div><div class="sub">GESTÃO FINANCEIRA</div>
+   <div class="brand-full app-brand">
+    <img class="crest brand-mark" src="assets/branding/mentoria-black-icon-512.png" width="512" height="512" alt="Símbolo oficial da Mentoria Black" decoding="async">
+    <div class="brand-copy"><div class="title">MENTORIA BLACK</div><div class="sub">GESTÃO FINANCEIRA</div></div>
    </div>
    <div id="commercialStatus" class="commercial-status hidden"></div>
    <div class="row" style="justify-content:space-between;margin-top:10px"><span class="muted small" id="userEmail"></span><div class="actions"><button class="btn" id="refresh">Atualizar</button><button class="btn" id="print">PDF / Imprimir</button><button class="btn" id="logout">Sair</button></div></div>
