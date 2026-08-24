@@ -8,17 +8,74 @@
 }
 
 .auth {
+  --login-gold: #A77F2A;
+  --login-gold-soft: #B9964A;
+  --login-gold-hover: #C3A35A;
+  --login-gold-dark: #6F551D;
+  --login-line: rgba(167, 127, 42, 0.4);
+  --login-parallax-x: 0px;
+  --login-parallax-y: 0px;
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
   background:
-    radial-gradient(circle at 50% 18%, rgba(176, 138, 46, 0.09), transparent 31rem),
-    linear-gradient(180deg, #080806 0%, #050505 72%);
+    radial-gradient(circle at 50% 20%, rgba(185, 150, 74, 0.075), transparent 30rem),
+    linear-gradient(145deg, #070705 0%, #030303 62%, #090805 100%);
+}
+
+.auth::before,
+.auth::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+}
+
+.auth::before {
+  z-index: -2;
+  width: min(82vmin, 860px);
+  aspect-ratio: 1;
+  top: calc(50% + var(--login-parallax-y));
+  left: calc(50% + var(--login-parallax-x));
+  border: 1px solid rgba(185, 150, 74, 0.14);
+  border-radius: 50%;
+  opacity: 0.74;
+  transform: translate(-50%, -50%);
+  background:
+    radial-gradient(circle, transparent 0 12%, rgba(185, 150, 74, 0.13) 12.2% 12.5%, transparent 12.8% 29%, rgba(185, 150, 74, 0.11) 29.2% 29.45%, transparent 29.7% 47%, rgba(185, 150, 74, 0.09) 47.2% 47.4%, transparent 47.7%),
+    linear-gradient(90deg, transparent 49.8%, rgba(185, 150, 74, 0.17) 50%, transparent 50.2%),
+    linear-gradient(0deg, transparent 49.8%, rgba(185, 150, 74, 0.17) 50%, transparent 50.2%),
+    repeating-conic-gradient(from -1deg, rgba(185, 150, 74, 0.18) 0deg 0.7deg, transparent 0.9deg 15deg);
+  box-shadow: 0 0 85px rgba(167, 127, 42, 0.055), inset 0 0 45px rgba(167, 127, 42, 0.035);
+}
+
+.auth::after {
+  z-index: -1;
+  inset: 0;
+  background:
+    radial-gradient(ellipse at center, transparent 0 27%, rgba(0, 0, 0, 0.12) 63%, rgba(0, 0, 0, 0.6) 100%),
+    linear-gradient(90deg, rgba(0, 0, 0, 0.42), transparent 24% 76%, rgba(0, 0, 0, 0.42));
+}
+
+body.login-style-motion .auth::before {
+  animation: login-compass-calibration 16s cubic-bezier(0.45, 0.03, 0.2, 1) infinite;
+}
+
+@keyframes login-compass-calibration {
+  0%, 100% { transform: translate(-50%, -50%) rotate(0deg); }
+  25% { transform: translate(-50%, -50%) rotate(4deg); }
+  45% { transform: translate(-50%, -50%) rotate(1deg); }
+  65% { transform: translate(-50%, -50%) rotate(-3deg); }
+  82% { transform: translate(-50%, -50%) rotate(-1deg); }
 }
 
 .auth-card {
   width: min(440px, 100%);
   padding: 34px 34px 30px;
-  border-color: var(--brand-line);
-  background: linear-gradient(155deg, rgba(18, 17, 13, 0.98), rgba(8, 8, 8, 0.99) 58%);
-  box-shadow: 0 24px 72px rgba(0, 0, 0, 0.58), inset 0 1px 0 rgba(255, 255, 255, 0.035);
+  border-color: var(--login-line);
+  background: linear-gradient(145deg, rgba(22, 21, 18, 0.78), rgba(8, 8, 8, 0.86) 62%);
+  -webkit-backdrop-filter: blur(16px) saturate(88%);
+  backdrop-filter: blur(16px) saturate(88%);
+  box-shadow: 0 24px 72px rgba(0, 0, 0, 0.56), inset 0 1px 0 rgba(255, 255, 255, 0.055), inset 0 0 0 1px rgba(185, 150, 74, 0.025);
 }
 
 .brand-mark {
@@ -42,7 +99,7 @@
 }
 
 .auth-brand .title {
-  color: var(--gold-hover);
+  color: var(--login-gold-soft);
   font-size: 28px;
   font-weight: 750;
   letter-spacing: 0.105em;
@@ -59,7 +116,7 @@
 .auth-brand .sub::before,
 .auth-brand .sub::after {
   width: 46px;
-  background: var(--gold-dark);
+  background: var(--login-gold-dark);
 }
 
 .auth-card > .muted {
@@ -91,8 +148,8 @@
 }
 
 .auth-card input:focus-visible {
-  border-color: var(--gold-hover);
-  box-shadow: 0 0 0 3px rgba(199, 166, 70, 0.16);
+  border-color: var(--login-gold-hover);
+  box-shadow: 0 0 0 3px rgba(195, 163, 90, 0.16);
 }
 
 .remember-email {
@@ -112,7 +169,7 @@
   min-width: 18px;
   min-height: 18px;
   margin: 0;
-  accent-color: var(--gold);
+  accent-color: var(--login-gold);
 }
 
 .remember-email:focus-within {
@@ -124,12 +181,14 @@
   min-height: 48px;
   margin-top: 3px;
   border-radius: 12px;
+  border-color: var(--login-gold);
+  background: var(--login-gold);
   transition: background 160ms ease, border-color 160ms ease, transform 160ms ease;
 }
 
 .auth-submit:hover {
-  border-color: var(--gold-hover);
-  background: var(--gold-hover);
+  border-color: var(--login-gold-hover);
+  background: var(--login-gold-hover);
   color: #080808;
 }
 
@@ -150,8 +209,8 @@
 }
 
 .auth-links .btn:hover {
-  border-color: var(--brand-line);
-  color: var(--gold-hover);
+  border-color: var(--login-line);
+  color: var(--login-gold-hover);
 }
 
 .btn:focus-visible,
@@ -260,6 +319,11 @@ a:focus-visible {
     border-radius: 18px;
   }
 
+  .auth::before {
+    width: 132vmax;
+    opacity: 0.52;
+  }
+
   .auth-card .auth-brand .crest {
     width: 118px;
     height: 118px;
@@ -343,6 +407,10 @@ a:focus-visible {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  body.login-style-motion .auth::before {
+    animation: none;
+  }
+
   .auth-card input,
   .auth-submit {
     transition: none;

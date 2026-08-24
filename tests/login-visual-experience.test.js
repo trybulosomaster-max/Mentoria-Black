@@ -1,0 +1,32 @@
+'use strict';
+const assert=require('assert'),fs=require('fs'),path=require('path');
+const visual=require('../js/login-visual-experience.js');
+let assertions=0;
+const ok=(value,message)=>{assertions++;assert.ok(value,message)};
+const equal=(actual,expected,message)=>{assertions++;assert.strictEqual(actual,expected,message)};
+const root=path.join(__dirname,'..');
+const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
+const css=fs.readFileSync(path.join(root,'assets','app-shell-branding.css'),'utf8');
+const preview=fs.readFileSync(path.join(root,'app-shell.preview.local.html'),'utf8');
+
+equal(visual.requestedStyle('?loginStyle=motion'),'motion','motion is explicitly selectable');
+equal(visual.requestedStyle('?loginStyle=static'),'static','static is explicitly selectable');
+equal(visual.requestedStyle('?loginStyle=unknown'),'static','invalid styles fail closed to static');
+equal(visual.resolvedStyle('?loginStyle=motion',true),'static','reduced motion always resolves to the static experience');
+equal(visual.resolvedStyle('?loginStyle=motion',false),'motion','motion remains available when reduced motion is not requested');
+ok(html.includes('js/login-visual-experience.js'),'production login loads the isolated visual-only experience');
+ok(css.includes('--login-gold: #A77F2A'),'login uses the approved aged-gold primary token');
+ok(css.includes('--login-gold-soft: #B9964A'),'login uses the approved aged-gold soft token');
+ok(css.includes('--login-gold-hover: #C3A35A'),'login uses the approved aged-gold hover token');
+ok(css.includes('--login-gold-dark: #6F551D'),'login uses the approved aged-gold dark token');
+ok(css.includes('backdrop-filter: blur(16px) saturate(88%)'),'login card uses restrained glassmorphism');
+ok(css.includes('login-compass-calibration 16s'),'motion uses the approved slow sixteen-second calibration cycle');
+ok(css.includes('rotate(4deg)')&&css.includes('rotate(-3deg)'),'compass makes bounded route corrections instead of a full rotation');
+ok(css.includes('body.login-style-motion .auth::before'),'motion is scoped to the login background only');
+ok(css.includes('@media (prefers-reduced-motion: reduce)')&&css.includes('animation: none'),'reduced-motion users receive a static background');
+ok(!/DeviceOrientation|deviceorientation/i.test(fs.readFileSync(path.join(root,'js','login-visual-experience.js'),'utf8')),'no motion sensor permission or device orientation is used');
+ok(preview.includes('loginStyle=static')&&preview.includes('loginStyle=motion'),'preview exposes comparable static and motion URLs');
+ok(preview.includes('login-style-${style}'),'preview isolates the selected login presentation');
+ok(!/fetch\(|createClient|signInWithPassword|rpc\(/.test(fs.readFileSync(path.join(root,'js','login-visual-experience.js'),'utf8')),'visual selector cannot perform remote or auth operations');
+
+console.log(`login-visual-experience: ${assertions} assertions passed`);
