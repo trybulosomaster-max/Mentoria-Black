@@ -13,6 +13,7 @@
 <link rel="stylesheet" href="knowledge/knowledge-area-premium.css">
 <script src="js/production-environment.js"></script>
 <script src="js/production-runtime.js"></script>
+<script src="js/login-preferences.js"></script>
 <script src="js/observability.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.9/dist/chart.umd.min.js"></script>
@@ -75,6 +76,7 @@
   <form id="loginForm">
    <div class="field"><label for="loginEmail">E-mail</label><input id="loginEmail" type="email" autocomplete="email" required></div>
    <div class="field"><label for="loginPassword">Senha</label><input id="loginPassword" type="password" autocomplete="current-password" minlength="6" required></div>
+   <label class="remember-email"><input id="rememberEmail" type="checkbox"> <span>Lembrar meu e-mail</span></label>
    <button class="btn primary auth-submit">Entrar</button>
    <div class="row auth-links"><button class="btn" type="button" id="signup">Criar conta</button><button class="btn" type="button" id="resetPass">Esqueci minha senha</button></div>
    <div id="authMsg" class="msg"></div>
@@ -1148,11 +1150,18 @@ if("serviceWorker" in navigator){
   };
 
   // The original handlers are replaced so the V17 startup path is always used.
+  const rememberEmailInput=$("rememberEmail");
+  window.MBLoginPreferences?.restore($("loginEmail"),rememberEmailInput);
+  rememberEmailInput?.addEventListener("change",()=>{
+    if(!rememberEmailInput.checked)window.MBLoginPreferences?.clear();
+  });
   $("loginForm").onsubmit=async e=>{
     e.preventDefault();
     $("authMsg").textContent="Entrando...";
-    const {data,error}=await sb.auth.signInWithPassword({email:$("loginEmail").value.trim(),password:$("loginPassword").value});
+    const email=$("loginEmail").value.trim();
+    const {data,error}=await sb.auth.signInWithPassword({email,password:$("loginPassword").value});
     if(error){$("authMsg").textContent=error.message;$("authMsg").className="msg err";return}
+    window.MBLoginPreferences?.persist(email,Boolean(rememberEmailInput?.checked));
     USER=data.user;
     await window.start();
   };

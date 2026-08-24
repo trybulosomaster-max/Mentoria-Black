@@ -18,15 +18,19 @@ equal((html.match(/<div class="title">MENTORIA BLACK<\/div><div class="sub">GEST
 ok(html.includes('alt="Símbolo oficial da Mentoria Black"'),'official symbol has meaningful alternative text');
 ok(html.includes('<label for="loginEmail">E-mail</label>'),'email label is programmatically associated');
 ok(html.includes('<label for="loginPassword">Senha</label>'),'password label is programmatically associated');
+ok(html.includes('<label class="remember-email">'),'remember-email preference has an explicit label');
+ok(html.includes('id="rememberEmail" type="checkbox"'),'remember-email preference preserves a dedicated checkbox contract');
+ok(html.includes('autocomplete="email"'),'email autocomplete remains enabled');
+ok(html.includes('autocomplete="current-password"'),'password-manager autocomplete remains enabled');
 ok(html.includes('id="loginForm"'),'login contract is preserved');
 ok(html.includes('id="signup"'),'account creation contract is preserved');
 ok(html.includes('id="resetPass"'),'password recovery contract is preserved');
 ok(html.includes('id="logout"'),'logout contract is preserved');
 ok(html.includes('commercial/access-contract.js'),'commercial access runtime is preserved');
 ok(html.includes('knowledge/knowledge-area.js'),'Knowledge runtime is preserved');
-ok(css.includes('--gold: #C9A227'),'approved institutional gold is fixed');
-ok(css.includes('--gold-hover: #E4C55B'),'approved hover gold is fixed');
-ok(css.includes('--gold-dark: #8F741F'),'approved dark gold is fixed');
+ok(css.includes('--gold: #B08A2E'),'austere institutional gold is fixed');
+ok(css.includes('--gold-hover: #C7A646'),'austere hover gold is fixed');
+ok(css.includes('--gold-dark: #7A6122'),'austere dark gold is fixed');
 ok(css.includes('.brand-mark')&&css.includes('object-fit: contain'),'official mark remains proportional');
 ok(css.includes('border: 0')&&css.includes('background: transparent'),'no artificial frame surrounds the symbol');
 ok(css.includes('grid-template-columns: minmax(0, 1fr) auto'),'desktop header uses a left brand and right actions grid');
@@ -43,6 +47,7 @@ ok(!css.includes('display: none')||css.includes('.sub::before'),'CSS does not hi
 ok(preview.includes('Preview local · sem Supabase'),'preview explicitly remains disconnected from Supabase');
 ok(!/production-runtime|supabase|access-contract|knowledge-area\.js/.test(preview.replace('sem Supabase','')),'preview loads no production or backend runtime');
 ok(preview.includes('?view=login')&&preview.includes('?view=app'),'preview exposes login and authenticated shell views');
+ok(preview.includes('Lembrar meu e-mail'),'preview exposes the approved remember-email visual');
 ok(preview.includes('Conhecimento'),'preview keeps the homologated Knowledge navigation entry');
 ok(!/fetch\(|createClient|signInWithPassword|rpc\(/.test(preview),'preview cannot perform remote operations');
 

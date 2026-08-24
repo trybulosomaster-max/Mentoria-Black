@@ -1,14 +1,15 @@
 :root {
-  --gold: #C9A227;
-  --gold-hover: #E4C55B;
-  --gold-dark: #8F741F;
+  --gold: #B08A2E;
+  --gold2: #C7A646;
+  --gold-hover: #C7A646;
+  --gold-dark: #7A6122;
   --brand-surface: #0a0a09;
-  --brand-line: rgba(201, 162, 39, 0.32);
+  --brand-line: rgba(176, 138, 46, 0.32);
 }
 
 .auth {
   background:
-    radial-gradient(circle at 50% 18%, rgba(201, 162, 39, 0.09), transparent 31rem),
+    radial-gradient(circle at 50% 18%, rgba(176, 138, 46, 0.09), transparent 31rem),
     linear-gradient(180deg, #080806 0%, #050505 72%);
 }
 
@@ -91,7 +92,31 @@
 
 .auth-card input:focus-visible {
   border-color: var(--gold-hover);
-  box-shadow: 0 0 0 3px rgba(228, 197, 91, 0.16);
+  box-shadow: 0 0 0 3px rgba(199, 166, 70, 0.16);
+}
+
+.remember-email {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 44px;
+  margin: -2px 0 6px;
+  color: #c9c5ba;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1.25;
+}
+
+.remember-email input {
+  width: 18px;
+  min-width: 18px;
+  min-height: 18px;
+  margin: 0;
+  accent-color: var(--gold);
+}
+
+.remember-email:focus-within {
+  color: #f1eee5;
 }
 
 .auth-submit {
@@ -143,7 +168,7 @@ a:focus-visible {
   column-gap: 20px;
   row-gap: 8px;
   padding: 8px 0 12px;
-  border-bottom-color: rgba(201, 162, 39, 0.23);
+  border-bottom-color: rgba(176, 138, 46, 0.23);
 }
 
 .header .app-brand {
