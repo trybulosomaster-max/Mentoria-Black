@@ -119,6 +119,8 @@
 @media (max-width: 600px) {
   .meridian-theme-artboard::after { background: linear-gradient(180deg, rgba(2, 3, 3, .01) 0%, rgba(2, 3, 3, .04) 35%, rgba(2, 3, 3, .30) 100%); }
   .auth.meridian-day-night-login { min-height: calc(100dvh + 114px); overflow-x: hidden; overflow-y: auto; scroll-padding-bottom: calc(72px + env(safe-area-inset-bottom)); }
+  /* The document, rather than this min-height element, owns the final Safari scroll. Keep a real trailing grid row after the existing layout clearance for the dynamic browser toolbar. */
+  .auth.meridian-day-night-login::after { content: ""; display: block; grid-column: 1; grid-row: 2; height: 112px; min-height: 112px; pointer-events: none; }
   .meridian-theme-artboard { bottom: auto; height: calc(100dvh + 60px); }
   .meridian-login-layout { min-height: calc(100dvh + 114px); align-items: end; padding: calc(18px + env(safe-area-inset-top)) 12px calc(72px + env(safe-area-inset-bottom)); }
   .meridian-theme-image-day { top: -14%; height: 114%; object-position: center center; }

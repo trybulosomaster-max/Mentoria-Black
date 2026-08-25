@@ -224,6 +224,7 @@ ok(css.includes('font-weight: 400')&&css.includes('letter-spacing: .27em')&&css.
 ok(!index.includes('data-brand-font')&&!preview.includes('brandfont'),'temporary current/reference typography switching is fully removed');
 ok(css.includes('padding: calc(18px + env(safe-area-inset-top)) 12px calc(72px + env(safe-area-inset-bottom))'),'mobile layout reserves 72px plus the Safari safe area below Create account');
 ok(css.includes('scroll-padding-bottom: calc(72px + env(safe-area-inset-bottom))'),'mobile scroll keeps the final account action above Safari controls');
+ok(css.includes('.auth.meridian-day-night-login::after')&&css.includes('grid-row: 2')&&css.includes('height: 112px'),'mobile adds a real in-flow end spacer after the card for the document scroll container');
 ok(css.includes('overflow-x: hidden')&&css.includes('overflow-y: auto'),'mobile allows natural vertical scrolling while preventing horizontal overflow');
 ok(css.includes('.meridian-theme-artboard { bottom: auto; height: calc(100dvh + 60px); }'),'approved mobile hero framing remains independent from the added bottom clearance');
 ok(css.includes('@media (prefers-reduced-motion: reduce)'),'reduced-motion disables the crossfade');
