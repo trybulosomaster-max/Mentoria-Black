@@ -11,8 +11,10 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="stylesheet" href="knowledge/knowledge-area.css">
 <link rel="stylesheet" href="knowledge/knowledge-area-premium.css">
+<link rel="stylesheet" href="assets/meridian-black-day-night-login.css">
 <script src="js/production-environment.js"></script>
 <script src="js/production-runtime.js"></script>
+<script src="js/meridian-day-night-login.js"></script>
 <script src="js/observability.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.9/dist/chart.umd.min.js"></script>
@@ -64,33 +66,41 @@
 </head>
 <body>
 <div id="v18Loading" class="v18-loading"><div class="v18-loading-box"><div class="v18-spinner"></div><div>Carregando Mentoria Black…</div></div></div>
-<section id="auth" class="auth">
- <div class="auth-card">
-  <div class="brand-full">
-   <svg class="crest" viewBox="0 0 220 220" aria-label="Mentoria Black">
-      <g fill="none" stroke="#d9ad37" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round">
-       <circle cx="110" cy="119" r="61"/>
-       <path d="M55 119c-25 8-34 27-19 41 8 7 17 7 25 1"/>
-       <path d="M165 119c25 8 34 27 19 41-8 7-17 7-25 1"/>
-       <path d="M63 153c-24 8-28 24-13 31m120-31c24 8 28 24 13 31"/>
-       <path d="M72 58l-13-19 23 8 4-25 15 21 9-30 9 30 15-21 4 25 23-8-13 19"/>
-       <path d="M76 66h68"/>
-      </g>
-      <path d="M91 63h38l-4-31-15 14-15-14z" fill="#d9ad37"/>
-      <text x="110" y="135" text-anchor="middle" fill="#d9ad37" font-family="Georgia,serif" font-size="51" font-weight="600">MB</text>
-    </svg>
-   <div class="title">MENTORIA BLACK</div><div class="sub">GESTÃO FINANCEIRA</div>
-  </div>
-  <p class="muted">Controle de receitas, despesas, cartões, planejamento, metas e patrimônio.</p>
-  <form id="loginForm">
-   <div class="field"><label>E-mail</label><input id="loginEmail" type="email" autocomplete="email" required></div>
-   <div class="field"><label>Senha</label><input id="loginPassword" type="password" autocomplete="current-password" minlength="6" required></div>
-   <button class="btn primary" style="width:100%">Entrar</button>
-   <div class="row" style="justify-content:center;margin-top:8px"><button class="btn" type="button" id="signup">Criar conta</button><button class="btn" type="button" id="resetPass">Esqueci minha senha</button></div>
-   <div id="authMsg" class="msg"></div>
+<section id="auth" class="auth meridian-day-night-login" aria-label="Meridian Black Financial Management" data-theme="night" data-orientation="desktop"
+ data-day-desktop-src="assets/login/meridian-black-day-desktop.jpg" data-day-mobile-src="assets/login/meridian-black-day-mobile.jpg"
+ data-night-desktop-src="assets/login/meridian-black-night-desktop.jpg" data-night-mobile-src="assets/login/meridian-black-night-mobile.jpg">
+ <div class="meridian-theme-artboard">
+  <img class="meridian-theme-image meridian-theme-image-day" data-meridian-theme-image="day" alt="" decoding="async">
+  <img class="meridian-theme-image meridian-theme-image-night" data-meridian-theme-image="night" alt="" decoding="async">
+  <form id="loginForm" class="meridian-day-night-form">
+   <div class="meridian-field-shell meridian-email-shell">
+    <label class="meridian-sr-only" for="loginEmail">E-mail</label>
+    <input class="meridian-field-input" id="loginEmail" type="email" autocomplete="email" aria-label="E-mail" required>
+   </div>
+   <div class="meridian-field-shell meridian-password-shell">
+    <label class="meridian-sr-only" for="loginPassword">Senha</label>
+    <input class="meridian-field-input meridian-password-input" id="loginPassword" type="password" autocomplete="current-password" aria-label="Senha" minlength="6" required>
+   </div>
+   <button class="meridian-password-toggle" id="togglePassword" type="button" aria-label="Mostrar senha" aria-pressed="false" title="Mostrar senha"></button>
+   <label class="meridian-remember-email"><input id="rememberEmail" type="checkbox"> <span>Lembrar meu e-mail</span></label>
+   <button class="meridian-transparent-action meridian-submit" type="submit" aria-label="Entrar"></button>
+   <button class="meridian-transparent-action meridian-reset" type="button" id="resetPass" aria-label="Esqueceu sua senha?"></button>
+   <button class="meridian-transparent-action meridian-signup" type="button" id="signup" aria-label="Criar conta"></button>
+   <div id="authMsg" class="msg meridian-auth-message" role="status" aria-live="polite"></div>
   </form>
  </div>
 </section>
+<script>
+window.MBMeridianLoginController=window.MBMeridianDayNightLogin.initialize({
+ root:document.getElementById("auth"),
+ dayImage:document.querySelector('[data-meridian-theme-image="day"]'),
+ nightImage:document.querySelector('[data-meridian-theme-image="night"]'),
+ assets:{
+  day:{desktop:document.getElementById("auth").dataset.dayDesktopSrc,mobile:document.getElementById("auth").dataset.dayMobileSrc},
+  night:{desktop:document.getElementById("auth").dataset.nightDesktopSrc,mobile:document.getElementById("auth").dataset.nightMobileSrc}
+ }
+});
+</script>
 
 <section id="app" class="hidden">
  <div class="wrap">
@@ -1154,7 +1164,7 @@ if("serviceWorker" in navigator){
       $("auth").classList.remove("hidden");
       $("app").classList.add("hidden");
       $("authMsg").textContent="Erro ao carregar seus dados: "+e.message;
-      $("authMsg").className="msg err";
+      $("authMsg").className="msg meridian-auth-message err";
       console.error(e);
     }
   };
@@ -1163,8 +1173,11 @@ if("serviceWorker" in navigator){
   $("loginForm").onsubmit=async e=>{
     e.preventDefault();
     $("authMsg").textContent="Entrando...";
-    const {data,error}=await sb.auth.signInWithPassword({email:$("loginEmail").value.trim(),password:$("loginPassword").value});
-    if(error){$("authMsg").textContent=error.message;$("authMsg").className="msg err";return}
+    $("authMsg").className="msg meridian-auth-message";
+    const email=$("loginEmail").value.trim();
+    const {data,error}=await sb.auth.signInWithPassword({email,password:$("loginPassword").value});
+    if(error){$("authMsg").textContent=error.message;$("authMsg").className="msg meridian-auth-message err";return}
+    window.MBMeridianLoginController?.recordSuccessfulLogin(email);
     USER=data.user;
     await window.start();
   };
@@ -1190,7 +1203,7 @@ if("serviceWorker" in navigator){
       console.error("V18 bootstrap",e);
       $("v18Loading")?.classList.add("hidden");
       $("authMsg").textContent="Não foi possível carregar o sistema. "+e.message;
-      $("authMsg").className="msg err";
+      $("authMsg").className="msg meridian-auth-message err";
     }
   })();
 

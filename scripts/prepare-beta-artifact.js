@@ -33,7 +33,8 @@ function betaServiceWorkerSource(source){
 
 function localAssets(source){
   const assets=new Set();
-  for(const match of source.matchAll(/(?:src|href)="([^"]+)"/g)){
+  const assetReference=/(?:src|href|data-(?:day|night)-(?:desktop|mobile)-src)="([^"]+)"/g;
+  for(const match of source.matchAll(assetReference)){
     const asset=match[1];
     if(!asset||/^(?:https?:|data:|#)/i.test(asset)||asset==='manifest.webmanifest')continue;
     if(asset.includes('..')||path.isAbsolute(asset))throw new Error(`unsafe local asset reference: ${asset}`);

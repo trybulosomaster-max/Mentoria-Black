@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="color-scheme" content="dark">
+  <title>Meridian Black — Preview local dia/noite</title>
+  <link rel="stylesheet" href="assets/meridian-black-day-night-login.css">
+  <script src="js/meridian-day-night-login.js"></script>
+  <style>
+    html,body{width:100%;min-height:100%;margin:0;background:#020202}
+    body{font-family:Arial,sans-serif}
+  </style>
+</head>
+<body>
+<section id="auth" class="auth meridian-day-night-login" aria-label="Meridian Black Financial Management" data-theme="night" data-orientation="desktop"
+ data-day-desktop-src="assets/login/meridian-black-day-desktop.jpg" data-day-mobile-src="assets/login/meridian-black-day-mobile.jpg"
+ data-night-desktop-src="assets/login/meridian-black-night-desktop.jpg" data-night-mobile-src="assets/login/meridian-black-night-mobile.jpg">
+ <div class="meridian-theme-artboard">
+  <img class="meridian-theme-image meridian-theme-image-day" data-meridian-theme-image="day" alt="" decoding="async">
+  <img class="meridian-theme-image meridian-theme-image-night" data-meridian-theme-image="night" alt="" decoding="async">
+  <form id="loginForm" class="meridian-day-night-form">
+   <div class="meridian-field-shell meridian-email-shell">
+    <label class="meridian-sr-only" for="loginEmail">E-mail</label>
+    <input class="meridian-field-input" id="loginEmail" type="email" autocomplete="email" aria-label="E-mail" required>
+   </div>
+   <div class="meridian-field-shell meridian-password-shell">
+    <label class="meridian-sr-only" for="loginPassword">Senha</label>
+    <input class="meridian-field-input meridian-password-input" id="loginPassword" type="password" autocomplete="current-password" aria-label="Senha" minlength="6" required>
+   </div>
+   <button class="meridian-password-toggle" id="togglePassword" type="button" aria-label="Mostrar senha" aria-pressed="false" title="Mostrar senha"></button>
+   <label class="meridian-remember-email"><input id="rememberEmail" type="checkbox"> <span>Lembrar meu e-mail</span></label>
+   <button class="meridian-transparent-action meridian-submit" type="submit" aria-label="Entrar"></button>
+   <button class="meridian-transparent-action meridian-reset" type="button" id="resetPass" aria-label="Esqueceu sua senha?"></button>
+   <button class="meridian-transparent-action meridian-signup" type="button" id="signup" aria-label="Criar conta"></button>
+   <div id="authMsg" class="meridian-auth-message" role="status" aria-live="polite"></div>
+  </form>
+ </div>
+</section>
+<script>
+(() => {
+  const requested=new URLSearchParams(window.location.search).get("theme");
+  const forcedTheme=requested==="day"||requested==="night"?requested:undefined;
+  const root=document.getElementById("auth");
+  const controller=window.MBMeridianDayNightLogin.initialize({
+    root,
+    dayImage:document.querySelector('[data-meridian-theme-image="day"]'),
+    nightImage:document.querySelector('[data-meridian-theme-image="night"]'),
+    forcedTheme,
+    assets:{
+      day:{desktop:root.dataset.dayDesktopSrc,mobile:root.dataset.dayMobileSrc},
+      night:{desktop:root.dataset.nightDesktopSrc,mobile:root.dataset.nightMobileSrc}
+    }
+  });
+  const message=document.getElementById("authMsg");
+  document.getElementById("loginForm").addEventListener("submit",event=>{
+    event.preventDefault();
+    controller.recordSuccessfulLogin(document.getElementById("loginEmail").value);
+    message.textContent="Preview local: interação validada sem autenticação real.";
+    message.className="meridian-auth-message ok";
+  });
+  document.getElementById("resetPass").addEventListener("click",()=>{
+    message.textContent="Preview local: recuperação preservada na aplicação.";
+    message.className="meridian-auth-message";
+  });
+  document.getElementById("signup").addEventListener("click",()=>{
+    message.textContent="Preview local: criação de conta preservada na aplicação.";
+    message.className="meridian-auth-message";
+  });
+})();
+</script>
+</body>
+</html>
