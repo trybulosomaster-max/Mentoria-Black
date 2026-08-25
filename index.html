@@ -67,25 +67,43 @@
 <body>
 <div id="v18Loading" class="v18-loading"><div class="v18-loading-box"><div class="v18-spinner"></div><div>Carregando Mentoria Black…</div></div></div>
 <section id="auth" class="auth meridian-day-night-login" aria-label="Meridian Black Financial Management" data-theme="night" data-orientation="desktop"
- data-day-desktop-src="assets/login/meridian-black-day-desktop.jpg" data-day-mobile-src="assets/login/meridian-black-day-mobile.jpg"
- data-night-desktop-src="assets/login/meridian-black-night-desktop.jpg" data-night-mobile-src="assets/login/meridian-black-night-mobile.jpg">
+ data-day-desktop-src="assets/login/meridian-day-desktop.png" data-day-mobile-src="assets/login/meridian-day-mobile.png"
+ data-night-desktop-src="assets/login/meridian-night-desktop.png" data-night-mobile-src="assets/login/meridian-night-mobile.png">
  <div class="meridian-theme-artboard">
   <img class="meridian-theme-image meridian-theme-image-day" data-meridian-theme-image="day" alt="" decoding="async">
   <img class="meridian-theme-image meridian-theme-image-night" data-meridian-theme-image="night" alt="" decoding="async">
+ </div>
+ <div class="meridian-login-layout">
   <form id="loginForm" class="meridian-day-night-form">
-   <div class="meridian-field-shell meridian-email-shell">
-    <label class="meridian-sr-only" for="loginEmail">E-mail</label>
-    <input class="meridian-field-input" id="loginEmail" type="email" autocomplete="email" aria-label="E-mail" required>
+   <header class="meridian-brand">
+    <div class="meridian-brand-name">MERIDIAN BLACK</div>
+    <span class="meridian-brand-subtitle">FINANCIAL MANAGEMENT</span>
+   </header>
+   <div class="meridian-welcome">
+    <h1>Bem-vindo de volta</h1>
+    <p>Acesse sua conta para continuar</p>
    </div>
-   <div class="meridian-field-shell meridian-password-shell">
-    <label class="meridian-sr-only" for="loginPassword">Senha</label>
-    <input class="meridian-field-input meridian-password-input" id="loginPassword" type="password" autocomplete="current-password" aria-label="Senha" minlength="6" required>
+   <div class="meridian-field-shell">
+    <label class="meridian-field-label" for="loginEmail">E-mail</label>
+    <div class="meridian-input-frame">
+     <svg class="meridian-input-icon" aria-hidden="true" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M3 6.5h18v11H3zM3 7l9 6 9-6"/></svg>
+     <input class="meridian-field-input" id="loginEmail" type="email" autocomplete="email" placeholder="Digite seu e-mail" required>
+    </div>
    </div>
-   <button class="meridian-password-toggle" id="togglePassword" type="button" aria-label="Mostrar senha" aria-pressed="false" title="Mostrar senha"></button>
-   <label class="meridian-remember-email"><input id="rememberEmail" type="checkbox"> <span>Lembrar meu e-mail</span></label>
-   <button class="meridian-transparent-action meridian-submit" type="submit" aria-label="Entrar"></button>
-   <button class="meridian-transparent-action meridian-reset" type="button" id="resetPass" aria-label="Esqueceu sua senha?"></button>
-   <button class="meridian-transparent-action meridian-signup" type="button" id="signup" aria-label="Criar conta"></button>
+   <div class="meridian-field-shell">
+    <label class="meridian-field-label" for="loginPassword">Senha</label>
+    <div class="meridian-input-frame">
+     <svg class="meridian-input-icon" aria-hidden="true" viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="1.7"/><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.7" d="M8 10V7a4 4 0 0 1 8 0v3M12 14v2"/></svg>
+     <input class="meridian-field-input meridian-password-input" id="loginPassword" type="password" autocomplete="current-password" placeholder="Digite sua senha" minlength="6" required>
+     <button class="meridian-password-toggle" id="togglePassword" type="button" aria-label="Mostrar senha" aria-pressed="false" title="Mostrar senha"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M2.5 12s3.4-6 9.5-6 9.5 6 9.5 6-3.4 6-9.5 6-9.5-6-9.5-6Z"/><circle cx="12" cy="12" r="2.6"/></svg></button>
+    </div>
+   </div>
+   <div class="meridian-login-options">
+    <label class="meridian-remember-email"><input id="rememberEmail" type="checkbox"> <span>Lembrar meu e-mail</span></label>
+    <button class="meridian-transparent-action meridian-reset" type="button" id="resetPass">Esqueceu sua senha?</button>
+   </div>
+   <button class="meridian-submit" type="submit">Entrar</button>
+   <p class="meridian-signup-line">Não tem uma conta?<button class="meridian-transparent-action meridian-signup" type="button" id="signup">Criar conta</button></p>
    <div id="authMsg" class="msg meridian-auth-message" role="status" aria-live="polite"></div>
   </form>
  </div>

@@ -34,11 +34,11 @@ equal(login.millisecondsUntilNextBoundary(localDate(17,59)),60000,'17:59 schedul
 equal(login.orientationForWidth(390),'mobile','390px uses the approved vertical asset');
 equal(login.orientationForWidth(600),'mobile','600px remains mobile at the breakpoint');
 equal(login.orientationForWidth(601),'desktop','601px selects the wide asset');
-const assets={day:{mobile:'day-mobile.jpg',desktop:'day-desktop.jpg'},night:{mobile:'night-mobile.jpg',desktop:'night-desktop.jpg'}};
+const assets={day:{mobile:'day-mobile.png',desktop:'day-desktop.png'},night:{mobile:'night-mobile.png',desktop:'night-desktop.png'}};
 assertions++;
-assert.deepStrictEqual(login.selectAssets(assets,390),{orientation:'mobile',day:'day-mobile.jpg',night:'night-mobile.jpg'},'mobile loads only the day/night mobile pair');
+assert.deepStrictEqual(login.selectAssets(assets,390),{orientation:'mobile',day:'day-mobile.png',night:'night-mobile.png'},'mobile loads only the day/night mobile pair');
 assertions++;
-assert.deepStrictEqual(login.selectAssets(assets,1440),{orientation:'desktop',day:'day-desktop.jpg',night:'night-desktop.jpg'},'desktop loads only the day/night desktop pair');
+assert.deepStrictEqual(login.selectAssets(assets,1440),{orientation:'desktop',day:'day-desktop.png',night:'night-desktop.png'},'desktop loads only the day/night desktop pair');
 
 function themeHarness(initialNow,width){
   const dayImage=new Target(),nightImage=new Target(),root=new Target(),doc=new Target(),win=new Target();
@@ -60,8 +60,8 @@ function themeHarness(initialNow,width){
 const runtime=themeHarness(localDate(6,0),390);
 equal(runtime.root.dataset.theme,'day','runtime uses local time and ignores a query-string theme');
 equal(runtime.root.dataset.orientation,'mobile','runtime publishes the selected orientation');
-equal(runtime.dayImage.src,'day-mobile.jpg','runtime loads the mobile day asset');
-equal(runtime.nightImage.src,'night-mobile.jpg','runtime loads the mobile night asset for crossfade/fallback');
+equal(runtime.dayImage.src,'day-mobile.png','runtime loads the mobile day asset');
+equal(runtime.nightImage.src,'night-mobile.png','runtime loads the mobile night asset for crossfade/fallback');
 equal(runtime.timers.length,1,'runtime keeps one efficient boundary timer');
 equal(runtime.timers[0].delay,12*60*60*1000,'06:00 schedules directly to 18:00');
 
@@ -85,8 +85,8 @@ equal(runtime.root.dataset.theme,'night','window focus recalculates the theme');
 runtime.win.innerWidth=1440;
 runtime.win.dispatch('resize');
 equal(runtime.root.dataset.orientation,'desktop','resize changes asset orientation');
-equal(runtime.dayImage.src,'day-desktop.jpg','resize replaces mobile day with desktop day');
-equal(runtime.nightImage.src,'night-desktop.jpg','resize replaces mobile night with desktop night');
+equal(runtime.dayImage.src,'day-desktop.png','resize replaces mobile day with desktop day');
+equal(runtime.nightImage.src,'night-desktop.png','resize replaces mobile night with desktop night');
 
 runtime.root.dataset.theme='day';
 runtime.setNow(localDate(12,0));
@@ -179,10 +179,10 @@ const index=fs.readFileSync(path.join(root,'index.html'),'utf8');
 const preview=fs.readFileSync(path.join(root,'meridian-black-day-night-login.preview.local.html'),'utf8');
 const css=fs.readFileSync(path.join(root,'assets/meridian-black-day-night-login.css'),'utf8');
 const assetHashes={
-  'assets/login/meridian-black-night-desktop.jpg':'c66c36676c37b66c4998337fb1815d4b92df0502229f677119418511e1a5fc31',
-  'assets/login/meridian-black-day-desktop.jpg':'92aa2683511996dc6c96d213dfe510aee9f5849a60ffeff6f337dd5d705975c3',
-  'assets/login/meridian-black-night-mobile.jpg':'9b8828aa347e8fd5f9025015744f39d4329938da9ea6ee12396c5c0a3b962473',
-  'assets/login/meridian-black-day-mobile.jpg':'82d82f4f7a43e8c187a82caee5175423ec46ed19723000d4958b0d3d32ba65dc'
+  'assets/login/meridian-day-desktop.png':'899bff4231deeabe0cb96fc8d20423cba7d40fc4f56c36675489657f15fb96a4',
+  'assets/login/meridian-day-mobile.png':'f1da5499ea1606e897e1aa5c6f76b67165879cbd0130654e434b1ee8b1fd9f60',
+  'assets/login/meridian-night-desktop.png':'4a493788fa9c02eb166fac2a1ef21cb5880d15c772acd4af28ca707ca59d6175',
+  'assets/login/meridian-night-mobile.png':'213959ec99b9b8fc27e1ca78b8eab15281e5703efdc58458eb7a2a85821d773a'
 };
 for(const [asset,expectedHash] of Object.entries(assetHashes)){
   const bytes=fs.readFileSync(path.join(root,asset));
@@ -203,8 +203,13 @@ ok(preview.includes('new URLSearchParams(window.location.search).get("theme")'),
 ok(preview.includes('requested==="day"||requested==="night"'),'preview rejects unsupported forced-theme values');
 ok(!/supabase|service[_-]?role|access[_-]?token|refresh[_-]?token/i.test(preview),'preview performs no real authentication and embeds no privileged credential');
 ok(css.includes('@media (max-width: 600px)'),'approved vertical artwork is limited to mobile widths');
+ok(css.includes('object-fit: cover'),'heroes fill every viewport without distorting their source pixels');
+ok(css.includes('rgba(5, 6, 5, .50)')&&css.includes('backdrop-filter: blur(15px)'),'login is a real translucent glass surface, not a baked card');
+ok(index.includes('MERIDIAN BLACK')&&index.includes('FINANCIAL MANAGEMENT'),'real semantic Meridian branding is layered over the clean hero');
+ok(index.includes('Bem-vindo de volta')&&index.includes('Acesse sua conta para continuar'),'real welcome copy is available to assistive technology');
+ok(index.includes('class="meridian-login-options"'),'remember-email and recovery controls share the secondary row');
 ok(css.includes('@media (prefers-reduced-motion: reduce)'),'reduced-motion disables the crossfade');
 ok(css.includes('min-width: 44px')&&css.includes('min-height: 44px'),'password eye has a 44px minimum touch target');
-ok(!/filter\s*:|rotate\s*\(|parallax|canvas|webgl/i.test(css),'artwork receives no filter, rotation, parallax, canvas, or WebGL treatment');
+ok(!/^\s*filter\s*:|rotate\s*\(|parallax|canvas|webgl/im.test(css),'artwork receives no destructive filter, rotation, parallax, canvas, or WebGL treatment');
 
 console.log(`meridian-day-night-login: ${assertions} assertions passed`);

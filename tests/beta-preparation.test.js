@@ -56,10 +56,10 @@ await test('artefato Beta remove configuração legada e injeta somente configur
     ok(html.includes('const SUPABASE_URL="";'));ok(html.includes('const SUPABASE_ANON_KEY="";'));ok(!html.includes('createClient(SUPABASE_URL,SUPABASE_ANON_KEY)'));
     ok(env.includes('isolated-beta.example.invalid'));ok(env.includes('sb_publishable_beta_test'));ok(!env.includes('service_role'));
     for(const asset of [
-      'assets/login/meridian-black-day-desktop.jpg',
-      'assets/login/meridian-black-day-mobile.jpg',
-      'assets/login/meridian-black-night-desktop.jpg',
-      'assets/login/meridian-black-night-mobile.jpg'
+      'assets/login/meridian-day-desktop.png',
+      'assets/login/meridian-day-mobile.png',
+      'assets/login/meridian-night-desktop.png',
+      'assets/login/meridian-night-mobile.png'
     ]){
       ok(result.files.includes(asset),`artefato declara ${asset}`);
       ok(fs.existsSync(path.join(out,asset)),`artefato copia ${asset}`);
