@@ -118,9 +118,9 @@
 
 @media (max-width: 600px) {
   .meridian-theme-artboard::after { background: linear-gradient(180deg, rgba(2, 3, 3, .01) 0%, rgba(2, 3, 3, .04) 35%, rgba(2, 3, 3, .30) 100%); }
-  .auth.meridian-day-night-login { min-height: calc(100dvh + 90px); overflow-x: hidden; overflow-y: auto; }
+  .auth.meridian-day-night-login { min-height: calc(100dvh + 114px); overflow-x: hidden; overflow-y: auto; scroll-padding-bottom: calc(72px + env(safe-area-inset-bottom)); }
   .meridian-theme-artboard { bottom: auto; height: calc(100dvh + 60px); }
-  .meridian-login-layout { min-height: calc(100dvh + 90px); align-items: end; padding: calc(18px + env(safe-area-inset-top)) 12px calc(48px + env(safe-area-inset-bottom)); }
+  .meridian-login-layout { min-height: calc(100dvh + 114px); align-items: end; padding: calc(18px + env(safe-area-inset-top)) 12px calc(72px + env(safe-area-inset-bottom)); }
   .meridian-theme-image-day { top: -14%; height: 114%; object-position: center center; }
   .meridian-theme-image-night { top: -20%; height: 120%; object-position: center center; }
   .meridian-day-night-form { width: min(100%, 448px); padding: 24px 21px 22px; border-radius: 19px; background: linear-gradient(145deg, rgba(5, 6, 5, .46), rgba(3, 4, 4, .50)); }

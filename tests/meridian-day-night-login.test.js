@@ -210,7 +210,7 @@ ok(!/supabase|service[_-]?role|access[_-]?token|refresh[_-]?token/i.test(preview
 ok(css.includes('@media (max-width: 600px)'),'approved vertical artwork is limited to mobile widths');
 ok(css.includes('object-fit: cover'),'heroes fill every viewport without distorting their source pixels');
 ok(css.includes('rgba(5, 6, 5, .50)')&&css.includes('backdrop-filter: blur(15px)'),'login is a real translucent glass surface, not a baked card');
-ok(css.includes('min-height: calc(100dvh + 90px)'),'mobile adds scroll clearance instead of sacrificing the compass or touch targets');
+ok(css.includes('min-height: calc(100dvh + 114px)'),'mobile adds sufficient scroll clearance without sacrificing the compass or touch targets');
 ok(css.includes('.meridian-theme-image-day { top: -14%; height: 114%'),'day mobile moves the entire compass above the glass card');
 ok(css.includes('.meridian-theme-image-night { top: -20%; height: 120%'),'night mobile removes excess sky and prioritizes the compass');
 ok(css.includes('rgba(5, 6, 5, .46)')&&css.includes('rgba(3, 4, 4, .50)'),'mobile glass is intentionally more transparent while preserving contrast');
@@ -222,7 +222,8 @@ ok(css.includes('font-family: "Meridian Syncopate"')&&css.includes('font-weight:
 ok(css.includes('letter-spacing: .125em')&&css.includes('text-indent: .125em'),'official mobile wordmark retains the approved tracking');
 ok(css.includes('font-weight: 400')&&css.includes('letter-spacing: .27em')&&css.includes('letter-spacing: .24em'),'Financial Management remains visually subordinate on desktop and mobile');
 ok(!index.includes('data-brand-font')&&!preview.includes('brandfont'),'temporary current/reference typography switching is fully removed');
-ok(css.includes('padding: calc(18px + env(safe-area-inset-top)) 12px calc(48px + env(safe-area-inset-bottom))'),'mobile layout reserves explicit Safari safe-area clearance below Create account');
+ok(css.includes('padding: calc(18px + env(safe-area-inset-top)) 12px calc(72px + env(safe-area-inset-bottom))'),'mobile layout reserves 72px plus the Safari safe area below Create account');
+ok(css.includes('scroll-padding-bottom: calc(72px + env(safe-area-inset-bottom))'),'mobile scroll keeps the final account action above Safari controls');
 ok(css.includes('overflow-x: hidden')&&css.includes('overflow-y: auto'),'mobile allows natural vertical scrolling while preventing horizontal overflow');
 ok(css.includes('.meridian-theme-artboard { bottom: auto; height: calc(100dvh + 60px); }'),'approved mobile hero framing remains independent from the added bottom clearance');
 ok(css.includes('@media (prefers-reduced-motion: reduce)'),'reduced-motion disables the crossfade');
