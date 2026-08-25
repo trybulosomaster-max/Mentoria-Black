@@ -211,7 +211,7 @@ ok(css.includes('@media (max-width: 600px)'),'approved vertical artwork is limit
 ok(css.includes('object-fit: cover'),'heroes fill every viewport without distorting their source pixels');
 ok(css.includes('rgba(5, 6, 5, .50)')&&css.includes('backdrop-filter: blur(15px)'),'login is a real translucent glass surface, not a baked card');
 ok(css.includes('min-height: calc(100dvh + 114px)'),'mobile adds sufficient scroll clearance without sacrificing the compass or touch targets');
-ok(css.includes('.meridian-theme-image-day { top: -14%; height: 114%'),'day mobile moves the entire compass above the glass card');
+ok(css.includes('.meridian-theme-image-day { top: -18%; height: 118%'),'day mobile aligns the full compass with the approved Night framing above the glass card');
 ok(css.includes('.meridian-theme-image-night { top: -20%; height: 120%'),'night mobile removes excess sky and prioritizes the compass');
 ok(css.includes('rgba(5, 6, 5, .46)')&&css.includes('rgba(3, 4, 4, .50)'),'mobile glass is intentionally more transparent while preserving contrast');
 ok(index.includes('MERIDIAN BLACK')&&index.includes('FINANCIAL MANAGEMENT'),'real semantic Meridian branding is layered over the clean hero');

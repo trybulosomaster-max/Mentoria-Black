@@ -123,7 +123,7 @@
   .auth.meridian-day-night-login::after { content: ""; display: block; grid-column: 1; grid-row: 2; height: 112px; min-height: 112px; pointer-events: none; }
   .meridian-theme-artboard { bottom: auto; height: calc(100dvh + 60px); }
   .meridian-login-layout { min-height: calc(100dvh + 114px); align-items: end; padding: calc(18px + env(safe-area-inset-top)) 12px calc(72px + env(safe-area-inset-bottom)); }
-  .meridian-theme-image-day { top: -14%; height: 114%; object-position: center center; }
+  .meridian-theme-image-day { top: -18%; height: 118%; object-position: center center; }
   .meridian-theme-image-night { top: -20%; height: 120%; object-position: center center; }
   .meridian-day-night-form { width: min(100%, 448px); padding: 24px 21px 22px; border-radius: 19px; background: linear-gradient(145deg, rgba(5, 6, 5, .46), rgba(3, 4, 4, .50)); }
   .meridian-brand { margin-bottom: 20px; }
