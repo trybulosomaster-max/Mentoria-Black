@@ -109,8 +109,11 @@
 
 @media (max-width: 600px) {
   .meridian-theme-artboard::after { background: linear-gradient(180deg, rgba(2, 3, 3, .01) 0%, rgba(2, 3, 3, .04) 35%, rgba(2, 3, 3, .30) 100%); }
-  .meridian-login-layout { align-items: end; padding: 18px 12px calc(18px + env(safe-area-inset-bottom)); }
-  .meridian-day-night-form { width: min(100%, 448px); padding: 24px 21px 22px; border-radius: 19px; background: linear-gradient(145deg, rgba(5, 6, 5, .48), rgba(3, 4, 4, .58)); }
+  .auth.meridian-day-night-login { min-height: calc(100dvh + 60px); }
+  .meridian-login-layout { min-height: calc(100dvh + 60px); align-items: end; padding: calc(18px + env(safe-area-inset-top)) 12px calc(18px + env(safe-area-inset-bottom)); }
+  .meridian-theme-image-day { top: -14%; height: 114%; object-position: center center; }
+  .meridian-theme-image-night { top: -20%; height: 120%; object-position: center center; }
+  .meridian-day-night-form { width: min(100%, 448px); padding: 24px 21px 22px; border-radius: 19px; background: linear-gradient(145deg, rgba(5, 6, 5, .46), rgba(3, 4, 4, .50)); }
   .meridian-brand { margin-bottom: 20px; }
   .meridian-brand-name { font-size: clamp(19px, 6.2vw, 25px); letter-spacing: .16em; text-indent: .16em; }
   .meridian-brand-subtitle { font-size: 8px; letter-spacing: .23em; text-indent: .23em; }
