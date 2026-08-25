@@ -129,9 +129,26 @@ function projectionBounds(rule, options) {
   };
 }
 
+function cursorBounds(rule, options) {
+  const horizonStart = requiredDate(options?.horizonStart ?? options?.now,'horizonStart');
+  const horizonEnd = options?.horizonEnd ? requiredDate(options.horizonEnd,'horizonEnd') : '';
+  if (horizonEnd && horizonStart > horizonEnd) throw new RangeError('horizonStart must not be after horizonEnd');
+
+  const deadline = options?.deadline ? requiredDate(options.deadline,'deadline') : '';
+  const endDate = rule?.end_date ? requiredDate(rule.end_date,'end_date') : '';
+  const effectiveFrom = rule?.effective_from ? requiredDate(rule.effective_from,'effective_from') : '';
+  const cancelledAt = rule?.cancelled_at ? addDays(requiredDate(rule.cancelled_at,'cancelled_at'),-1) : '';
+  const pausedAt = rule?.paused_at ? addDays(requiredDate(rule.paused_at,'paused_at'),-1) : '';
+  return {
+    start: laterDate(horizonStart,effectiveFrom),
+    end: earlierDate(horizonEnd,deadline,endDate,cancelledAt,pausedAt)
+  };
+}
+
 function materializedSeriesId(row) {
-  const structured = row?.recurring_series_id ?? row?.recurringSeriesId ?? row?.source_rule_id;
-  if (structured !== undefined && structured !== null && String(structured).trim()) return String(structured);
+  const structured = [row?.recurring_series_id,row?.recurringSeriesId,row?.source_rule_id]
+    .find(value=>value !== undefined && value !== null && String(value).trim());
+  if (structured !== undefined) return String(structured);
   const note = String(row?.note ?? '');
   return (note.match(/Recorrência automática\s*•\s*([^\s•]+)/i) || [])[1] || '';
 }
@@ -227,6 +244,82 @@ function projectRecurringOccurrences(rule, options = {}) {
   return reconcileOccurrences(options.materializedOccurrences ?? [],projected);
 }
 
+function createRecurringOccurrenceCursor(rule, options = {}) {
+  if (!rule || typeof rule !== 'object' || Array.isArray(rule)) throw new TypeError('rule must be an object');
+  if (rule.active === false) {
+    return Object.freeze({
+      recurringSeriesId:null,
+      next:()=>null,
+      get truncated(){return false},
+      get exhausted(){return true}
+    });
+  }
+
+  const recurringSeriesId = ruleSeriesId(rule);
+  const frequency = String(rule.frequency ?? 'monthly').trim().toLowerCase();
+  if (!FREQUENCIES.has(frequency)) throw new TypeError(`unsupported frequency: ${frequency}`);
+  const interval = Number(rule.interval ?? 1);
+  if (!Number.isInteger(interval) || interval < 1) throw new RangeError('interval must be a positive integer');
+  const amount = positiveAmount(rule.amount);
+  const effect = goalEffect(rule.goal_effect);
+  const anchor = requiredDate(rule.next_date ?? rule.start_date,'next_date or start_date');
+  const bounds = cursorBounds(rule,options);
+  const maxOccurrences = Number(options.maxOccurrences ?? 10000);
+  if (!Number.isInteger(maxOccurrences) || maxOccurrences < 1) throw new RangeError('maxOccurrences must be a positive integer');
+  const maxIterations = Number(options.maxIterations ?? Math.max(10000,maxOccurrences*10));
+  if (!Number.isInteger(maxIterations) || maxIterations < 1) throw new RangeError('maxIterations must be a positive integer');
+
+  const materializedKeys = new Set((options.materializedOccurrences ?? []).map(materializedOccurrenceKey).filter(Boolean));
+  let index = 0, produced = 0, finished = Boolean(bounds.end && (anchor > bounds.end || bounds.start > bounds.end)), truncated = false;
+
+  function next() {
+    while (!finished) {
+      if (index >= maxIterations) {
+        truncated = true;
+        finished = true;
+        return null;
+      }
+      const date = occurrenceDate(anchor,frequency,interval,index);
+      index += 1;
+      if (bounds.end && date > bounds.end) {
+        finished = true;
+        return null;
+      }
+      if (date < bounds.start) continue;
+
+      const item = Object.freeze({
+        kind:'projected_virtual',
+        recurringSeriesId,
+        occurrenceDate:date,
+        amount,
+        sourceAccountId:rule.source_account_id ?? null,
+        destinationAccountId:rule.destination_account_id ?? null,
+        assetId:rule.asset_id ?? null,
+        goalId:rule.goal_id ?? null,
+        goalEffect:effect,
+        sourceRuleId:String(rule.id ?? recurringSeriesId),
+        key:occurrenceKey(recurringSeriesId,date)
+      });
+      if (materializedKeys.has(item.key)) continue;
+      if (produced >= maxOccurrences) {
+        truncated = true;
+        finished = true;
+        return null;
+      }
+      produced += 1;
+      return item;
+    }
+    return null;
+  }
+
+  return Object.freeze({
+    recurringSeriesId,
+    next,
+    get truncated(){return truncated},
+    get exhausted(){return finished&&!truncated}
+  });
+}
+
 function signedGoalAmount(item) {
   const amount = positiveAmount(item?.amount,'materialized amount');
   return goalEffect(item?.goal_effect ?? item?.goalEffect) === 'withdrawal' ? -amount : amount;
@@ -271,6 +364,7 @@ function projectRecurringForGoal(rule, goal, materialized = [], options = {}) {
 
 return Object.freeze({
   projectRecurringOccurrences,
+  createRecurringOccurrenceCursor,
   reconcileOccurrences,
   reconcileOccurrenceSets,
   materializedOccurrenceKey,

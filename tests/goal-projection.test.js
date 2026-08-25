@@ -28,6 +28,11 @@ test('Meta com materializado futuro não promove valor a realizado',()=>{
   equal(result.realized,0);equal(result.scheduledMaterialized,150);equal(result.projectedCoverage,150);
 });
 
+test('materializado posterior ao prazo entra na conclusão, não na cobertura do prazo',()=>{
+  const result=project({...baseGoal,target:200},[tx({status:'pending',transaction_date:'2027-01-01',amount:200})],[]);
+  equal(result.scheduledMaterialized,0);equal(result.projectedCoverage,0);equal(result.estimatedCompletionDate,'2027-01-01');equal(result.onTrack,false);
+});
+
 test('Meta com uma recorrência projeta até deadline',()=>{
   const result=project(baseGoal,[],[rule()]);
   equal(result.projectedOccurrences.length,11);equal(result.projectedVirtual,1100);equal(result.projectedOccurrences.at(-1).occurrenceDate,'2026-12-01');
@@ -69,9 +74,24 @@ test('Meta já concluída usa now como conclusão',()=>{
   equal(result.estimatedCompletionDate,NOW);equal(result.remainingReal,0);equal(result.onTrack,true);
 });
 
-test('Meta que não será atingida não inventa conclusão',()=>{
+test('Recorrência indefinida mantém previsão depois do prazo',()=>{
   const result=project({...baseGoal,target:5000},[],[rule({amount:10})]);
-  equal(result.estimatedCompletionDate,null);equal(result.onTrack,false);ok(result.remainingUnplanned>0);
+  equal(result.estimatedCompletionDate,'2067-09-01');equal(result.onTrack,false);ok(result.remainingUnplanned>0);
+});
+
+test('Meta sem recorrência nem programados não inventa conclusão',()=>{
+  const result=project({...baseGoal,target:5000},[],[]);
+  equal(result.estimatedCompletionDate,null);equal(result.onTrack,false);
+});
+
+test('Recorrência terminada antes do objetivo não inventa conclusão',()=>{
+  const result=project({...baseGoal,target:5000},[],[rule({amount:100,end_date:'2026-04-01'})]);
+  equal(result.estimatedCompletionDate,null);equal(result.projectedVirtual,300);equal(result.onTrack,false);
+});
+
+test('guard de conclusão não retorna data parcial como se fosse completa',()=>{
+  const result=project({...baseGoal,target:5000},[],[rule({amount:10})],{completionMaxOccurrences:2});
+  equal(result.estimatedCompletionDate,null);ok(result.warnings.includes('completion_projection_truncated:rule'));
 });
 
 test('Meta atingida antes do prazo calcula primeira ocorrência suficiente',()=>{
@@ -79,6 +99,48 @@ test('Meta atingida antes do prazo calcula primeira ocorrência suficiente',()=>
   equal(result.estimatedCompletionDate,'2026-03-01');equal(result.onTrack,true);
   const compact=project({...baseGoal,target:250,current:50},[],[rule({amount:100})],{projectionMode:'until_target'});
   equal(compact.projectedOccurrences.length,2);equal(compact.projectedCoverage,250);
+});
+
+test('Casamento separa cobertura no prazo de conclusão no ritmo atual',()=>{
+  const materialized=Array.from({length:11},(_,index)=>{
+    const occurrence=new Date(Date.UTC(2026,9+index,1)).toISOString().slice(0,10);
+    return tx({id:`wedding-${index+1}`,status:'pending',transaction_date:occurrence,amount:400,recurring_series_id:'wedding-monthly',recurring_occurrence_date:occurrence});
+  });
+  const result=projectGoal(
+    {id:'goal',name:'Casamento',target:50000,current:0,deadline:'2031-10-01'},
+    materialized,
+    [rule({id:'wedding-monthly',amount:400,next_date:'2026-10-01'})],
+    {now:'2026-08-25'}
+  );
+  equal(result.realized,0);equal(result.scheduledMaterialized,4400);equal(result.projectedVirtual,20000);
+  equal(result.projectedCoverage,24400);equal(result.remainingReal,50000);equal(result.remainingUnplanned,25600);
+  equal(result.projectedOccurrences.length,50);equal(result.projectedOccurrences[0].occurrenceDate,'2027-09-01');equal(result.projectedOccurrences.at(-1).occurrenceDate,'2031-10-01');
+  equal(result.estimatedCompletionDate,'2037-02-01');equal(result.onTrack,false);
+});
+
+test('Recorrência futura respeita a primeira ocorrência',()=>{
+  const result=project({...baseGoal,target:200,deadline:'2027-12-31'},[],[rule({amount:100,next_date:'2027-06-15'})]);
+  equal(result.estimatedCompletionDate,'2027-07-15');equal(result.projectedOccurrences[0].occurrenceDate,'2027-06-15');
+});
+
+test('Movimentos opostos na mesma data são avaliados pelo valor líquido',()=>{
+  const result=project({...baseGoal,target:100},[],[
+    rule({id:'a-contribution',amount:100,next_date:'2026-02-01'}),
+    rule({id:'z-withdrawal',amount:100,goal_effect:'withdrawal',next_date:'2026-02-01'})
+  ]);
+  equal(result.estimatedCompletionDate,null);equal(result.projectedCoverage,0);
+});
+
+test('materialização cancelada funciona como tombstone sem gerar cobertura',()=>{
+  const cancelled=tx({status:'cancelled',transaction_date:'2026-02-01',recurring_series_id:'rule',recurring_occurrence_date:'2026-02-01'});
+  const result=project({...baseGoal,target:100,deadline:'2026-02-01'},[cancelled],[rule()]);
+  equal(result.scheduledMaterialized,0);equal(result.projectedOccurrences.length,0);equal(result.projectedVirtual,0);
+  equal(result.estimatedCompletionDate,'2026-03-01');equal(result.onTrack,false);
+});
+
+test('programado sem data válida é auditado e excluído',()=>{
+  const result=project(baseGoal,[tx({status:'pending',transaction_date:'invalid'})],[]);
+  equal(result.scheduledMaterialized,0);equal(result.estimatedCompletionDate,null);ok(result.warnings.includes('invalid_financial_date:tx'));
 });
 
 for(const [years,label] of [[5,'5 anos'],[10,'10 anos'],[20,'20 anos'],[30,'além de 20 anos']]){

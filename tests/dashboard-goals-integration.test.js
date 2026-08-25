@@ -28,7 +28,7 @@ function renderDashboard(goals,transactions=[],rules=[]){
     DATA:{goals,transactions,recurring:rules},Date:FixedDate,console,
     esc:value=>String(value),money:value=>`$${Number(value)}`,pct:value=>`${Number(value)}%`,
     MBGoalsV82:goalsV82,
-    MBGoals:{budget:()=>({budgetForGoals:0,requiredForActiveGoals:0,goalBudgetGap:0,goalBudgetStatus:'sufficient'})}
+    monthlyPlan:()=>({goals:0})
   };
   context.window=context;
   vm.createContext(context);
@@ -46,10 +46,10 @@ test('Dashboard usa os mesmos números do view model da página Metas',()=>{
   const metric=canonical(goal,rows,[recurring()]);
   const output=renderDashboard([goal],rows,[recurring()]);
   ok(output.includes(`Realizado: $${metric.realizedTotal} / $${metric.target}`));
-  ok(output.includes(`Cobertura prevista: $${metric.projectedCovered}`));
+  ok(output.includes(`Cobertura prevista até o prazo: $${metric.projectedCovered}`));
   ok(output.includes(`Programado: $${metric.programmed}`));
-  ok(output.includes(`Projetado: $${metric.projected}`));
-  ok(output.includes(`Falta: $${metric.remainingReal}`));
+  ok(output.includes(`Projeção adicional: $${metric.projected}`));
+  ok(output.includes(`Falta realizar: $${metric.remainingReal}`));
 });
 
 test('Meta 2046 aparece com cobertura além da materialização',()=>{
@@ -59,7 +59,7 @@ test('Meta 2046 aparece com cobertura além da materialização',()=>{
   const metric=canonical(goal,materialized,rules);
   const output=renderDashboard([goal],materialized,rules);
   equal(metric.programmed,6000);equal(metric.projected,120000);equal(metric.projectedCovered,127000);
-  ok(output.includes('Meta 2046'));ok(output.includes('Cobertura prevista: $127000'));ok(output.includes('Projetado: $120000'));
+  ok(output.includes('Meta 2046'));ok(output.includes('Cobertura prevista até o prazo: $127000'));ok(output.includes('Projeção adicional: $120000'));
 });
 
 test('Meta posterior a 2046 também usa horizonte real',()=>{
@@ -68,7 +68,7 @@ test('Meta posterior a 2046 também usa horizonte real',()=>{
   const metric=canonical(goal,[],rules);
   const output=renderDashboard([goal],[],rules);
   equal(metric.projectedOccurrences.at(-1).occurrenceDate,'2056-12-01');equal(metric.projected,186000);
-  ok(output.includes('Meta 2056'));ok(output.includes('Cobertura prevista: $186000'));
+  ok(output.includes('Meta 2056'));ok(output.includes('Cobertura prevista até o prazo: $186000'));
 });
 
 test('materializado substitui virtual equivalente no Dashboard',()=>{
@@ -76,7 +76,7 @@ test('materializado substitui virtual equivalente no Dashboard',()=>{
   const metric=canonical(baseGoal,[row],[recurring()]);
   const output=renderDashboard([baseGoal],[row],[recurring()]);
   equal(metric.programmed,175);equal(metric.projected,1000);
-  ok(output.includes('Programado: $175'));ok(output.includes('Projetado: $1000'));
+  ok(output.includes('Programado: $175'));ok(output.includes('Projeção adicional: $1000'));
 });
 
 test('withdrawal reduz realizado e cobertura igualmente',()=>{
@@ -86,7 +86,7 @@ test('withdrawal reduz realizado e cobertura igualmente',()=>{
   const metric=canonical(goal,rows,rules);
   const output=renderDashboard([goal],rows,rules);
   equal(metric.realizedTotal,650);equal(metric.projected,-110);equal(metric.projectedCovered,540);
-  ok(output.includes('Realizado: $650'));ok(output.includes('Projetado: $-110'));ok(output.includes('Cobertura prevista: $540'));
+  ok(output.includes('Realizado: $650'));ok(output.includes('Projeção adicional: $-110'));ok(output.includes('Cobertura prevista até o prazo: $540'));
 });
 
 test('Meta concluída permanece na indicação de alcançadas',()=>{
@@ -101,7 +101,7 @@ test('Meta sem deadline não inventa projeção',()=>{
   const metric=canonical(goal,[],[]);
   const output=renderDashboard([goal],[],[]);
   equal(metric.projected,0);equal(metric.projectedCovered,100);
-  ok(output.includes('Cobertura prevista: $100'));ok(output.includes('sem prazo'));
+  ok(output.includes('Cobertura prevista até o prazo: $100'));ok(output.includes('sem prazo'));
 });
 
 test('Meta sem recorrência usa somente realizado e programado',()=>{
@@ -109,7 +109,7 @@ test('Meta sem recorrência usa somente realizado e programado',()=>{
   const metric=canonical(baseGoal,rows,[]);
   const output=renderDashboard([baseGoal],rows,[]);
   equal(metric.projected,0);equal(metric.programmed,250);equal(metric.projectedCovered,250);
-  ok(output.includes('Projetado: $0'));ok(output.includes('Programado: $250'));
+  ok(output.includes('Projeção adicional: $0'));ok(output.includes('Programado: $250'));
 });
 
 test('múltiplas recorrências permanecem separadas e somadas uma vez',()=>{
@@ -117,7 +117,19 @@ test('múltiplas recorrências permanecem separadas e somadas uma vez',()=>{
   const metric=canonical(baseGoal,[],rules);
   const output=renderDashboard([baseGoal],[],rules);
   equal(metric.projectedOccurrences.length,22);equal(new Set(metric.projectedOccurrences.map(item=>item.key)).size,22);equal(metric.projected,1650);
-  ok(output.includes('Projetado: $1650'));
+  ok(output.includes('Projeção adicional: $1650'));
+});
+
+test('Dashboard mostra conclusão de Casamento após o prazo sem alterar cobertura',()=>{
+  const goal={...baseGoal,name:'Casamento',target:50000,current:0,deadline:'2031-10-01'};
+  const materialized=Array.from({length:11},(_,index)=>{
+    const occurrence=new Date(Date.UTC(2026,9+index,1)).toISOString().slice(0,10);
+    return transaction({id:`wedding-${index+1}`,status:'pending',transaction_date:occurrence,amount:400,recurring_series_id:'wedding-monthly',recurring_occurrence_date:occurrence});
+  });
+  const rules=[recurring({id:'wedding-monthly',amount:400,next_date:'2026-10-01'})];
+  const metric=canonical(goal,materialized,rules),output=renderDashboard([goal],materialized,rules);
+  equal(metric.programmed,4400);equal(metric.projected,20000);equal(metric.projectedCovered,24400);equal(metric.estimatedCompletionDate,'2037-02-01');equal(metric.status,'behind');
+  ok(output.includes('Cobertura prevista até o prazo: $24400'));ok(output.includes('Projeção adicional: $20000'));ok(output.includes('Conclusão após o prazo'));ok(output.includes('previsão: fev. de 2037'));
 });
 
 test('navegação Ver todas as metas conserva handler existente',()=>{
@@ -125,11 +137,12 @@ test('navegação Ver todas as metas conserva handler existente',()=>{
   ok(output.includes('Ver todas as metas'));ok(output.includes("onclick=\"TAB='goals';render()\""));
 });
 
-test('Dashboard não recorre mais a MBGoals.all para métricas',()=>{
+test('Dashboard usa fonte canônica também no orçamento de Metas',()=>{
   const source=html.slice(functionStart,functionEnd);
   ok(source.includes('MBGoalsV82.projectGoalsForView'));
   ok(!source.includes('MBGoals.all()'));
-  ok(source.includes('MBGoals.budget()'));
+  ok(!source.includes('MBGoals.budget()'));
+  ok(source.includes('MBGoalsV82.goalBudgetViewModel'));
 });
 
 console.log(`dashboard-goals-integration: ${testCount} tests, ${assertionCount} assertions passed`);

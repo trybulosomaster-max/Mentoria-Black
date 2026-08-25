@@ -35,7 +35,7 @@ test('legado desconhecido não altera realizado',()=>{
 test('Casamento 2031 separa realizado, programado e virtual',()=>{
   const result=view('Casamento');
   equal(result.realized,1100);equal(result.programmed,6600);equal(result.projected,27500);equal(result.projectedCovered,35200);equal(result.remainingReal,48900);equal(result.remainingUnplanned,14800);
-  equal(result.estimatedCompletionDate,null);equal(result.onTrack,false);equal(result.projectedOccurrences.length,50);equal(result.projectedOccurrences[0].occurrenceDate,'2027-09-01');equal(result.projectedOccurrences.at(-1).occurrenceDate,'2031-10-01');
+  equal(result.estimatedCompletionDate,'2034-01-01');equal(result.onTrack,false);equal(result.status,'behind');equal(result.projectedOccurrences.length,50);equal(result.projectedOccurrences[0].occurrenceDate,'2027-09-01');equal(result.projectedOccurrences.at(-1).occurrenceDate,'2031-10-01');
 });
 
 test('Casamento não duplica as doze materializações',()=>{

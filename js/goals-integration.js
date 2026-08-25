@@ -59,6 +59,8 @@ function goalViewModel(goal, transactions, recurringRules, options = {}) {
     horizonEnd,
     maxOccurrences:options.maxOccurrences,
     maxIterations:options.maxIterations,
+    completionMaxOccurrences:options.completionMaxOccurrences,
+    completionMaxIterations:options.completionMaxIterations,
     projectionMode:'full'
   });
   const realizedTotal = metric.baseManual + metric.realized;
@@ -81,6 +83,17 @@ function goalViewModel(goal, transactions, recurringRules, options = {}) {
   });
 }
 
+function goalBudgetViewModel(metrics, budgetForGoals = 0) {
+  if (!Array.isArray(metrics)) throw new TypeError('metrics must be an array');
+  const budget = Number.isFinite(Number(budgetForGoals)) ? Number(budgetForGoals) : 0;
+  const requiredForActiveGoals = metrics
+    .filter(metric=>!metric?.isCompleted)
+    .reduce((sum,metric)=>sum+(Number.isFinite(Number(metric?.monthlyNeeded))&&Number(metric.monthlyNeeded)>0?Number(metric.monthlyNeeded):0),0);
+  const goalBudgetGap = budget-requiredForActiveGoals;
+  const goalBudgetStatus = requiredForActiveGoals<=0?'sufficient':budget<=0?'no_budget':goalBudgetGap>=0?'sufficient':'insufficient';
+  return Object.freeze({budgetForGoals:budget,requiredForActiveGoals,goalBudgetGap,goalBudgetStatus});
+}
+
 function projectGoalsForView(goals, transactions, recurringRules, options = {}) {
   if (!Array.isArray(goals) || !Array.isArray(transactions) || !Array.isArray(recurringRules)) {
     throw new TypeError('goals, transactions and recurringRules must be arrays');
@@ -88,5 +101,5 @@ function projectGoalsForView(goals, transactions, recurringRules, options = {}) 
   return goals.map(goal=>goalViewModel(goal,transactions,recurringRules,options));
 }
 
-return Object.freeze({goalViewModel,projectGoalsForView});
+return Object.freeze({goalViewModel,projectGoalsForView,goalBudgetViewModel});
 });

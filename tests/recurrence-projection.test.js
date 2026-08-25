@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const {
   projectRecurringOccurrences,
+  createRecurringOccurrenceCursor,
   reconcileOccurrences,
   reconcileOccurrenceSets,
   projectRecurringForGoal
@@ -126,6 +127,12 @@ test('ID estrutural prevalece sobre note legado conflitante',()=>{
   deepEqual(reconcileOccurrenceSets(materialized,projected).projected.map(item=>item.key),['legacy|2026-01-01']);
 });
 
+test('ID estrutural vazio não bloqueia alias válido da recorrência',()=>{
+  const projected=project({id:'alias-series'},{horizonEnd:'2026-02-01'});
+  const materialized=[{recurring_series_id:'',recurringSeriesId:'alias-series',recurring_occurrence_date:'2026-01-01'}];
+  deepEqual(reconcileOccurrenceSets(materialized,projected).projected.map(item=>item.occurrenceDate),['2026-02-01']);
+});
+
 test('duplicata materializada é isolada e não somada duas vezes',()=>{
   const rule={id:'dup-series',amount:100,frequency:'monthly',next_date:'2026-01-01',goal_effect:'contribution'};
   const goal={id:'goal',current:0,target:1000,deadline:'2026-03-01'};
@@ -215,6 +222,35 @@ test('Meta pode interromper projeção ao atingir target',()=>{
   );
   equal(result.projected.length,2);
   equal(result.projectedCoverage,250);
+});
+
+test('cursor continua recorrência indefinida sem criar lote materializado',()=>{
+  const cursor=createRecurringOccurrenceCursor(
+    {id:'cursor-rule',amount:400,frequency:'monthly',next_date:'2026-10-01',goal_effect:'contribution'},
+    {horizonStart:'2031-11-01'}
+  );
+  equal(cursor.next().occurrenceDate,'2031-11-01');
+  equal(cursor.next().occurrenceDate,'2031-12-01');
+  equal(cursor.truncated,false);
+});
+
+test('cursor respeita término natural e materializações',()=>{
+  const cursor=createRecurringOccurrenceCursor(
+    {id:'cursor-rule',amount:100,frequency:'monthly',next_date:'2026-01-01',end_date:'2026-04-01',goal_effect:'contribution'},
+    {horizonStart:'2026-01-01',materializedOccurrences:[{recurring_series_id:'cursor-rule',recurring_occurrence_date:'2026-02-01'}]}
+  );
+  equal(cursor.next().occurrenceDate,'2026-01-01');
+  equal(cursor.next().occurrenceDate,'2026-03-01');
+  equal(cursor.next().occurrenceDate,'2026-04-01');
+  equal(cursor.next(),null);equal(cursor.exhausted,true);
+});
+
+test('cursor sinaliza guard sem inventar exaustão financeira',()=>{
+  const cursor=createRecurringOccurrenceCursor(
+    {id:'cursor-rule',amount:1,frequency:'monthly',next_date:'2026-01-01',goal_effect:'contribution'},
+    {horizonStart:'2026-01-01',maxOccurrences:2}
+  );
+  ok(cursor.next());ok(cursor.next());equal(cursor.next(),null);equal(cursor.truncated,true);equal(cursor.exhausted,false);
 });
 
 test('projeção e reconciliação não alteram entradas',()=>{

@@ -2,7 +2,7 @@ const assert=require('assert');
 const fs=require('fs');
 const path=require('path');
 const vm=require('vm');
-const {goalViewModel,projectGoalsForView}=require('../js/goals-integration');
+const {goalViewModel,projectGoalsForView,goalBudgetViewModel}=require('../js/goals-integration');
 
 let testCount=0,assertionCount=0;
 function equal(actual,expected,message){assertionCount+=1;assert.strictEqual(actual,expected,message)}
@@ -105,9 +105,37 @@ test('Meta concluída usa somente cobertura efetivada para conclusão',()=>{
   equal(result.isCompleted,true);equal(result.status,'completed');equal(result.estimatedCompletionDate,NOW);equal(result.remainingReal,0);
 });
 
-test('Meta sem cobertura suficiente mantém falta não planejada',()=>{
+test('Meta sem cobertura no prazo mantém previsão posterior',()=>{
   const result=view(goal({target:5000}),[],[rule({amount:10})]);
-  equal(result.isCompleted,false);equal(result.status,'no_forecast');equal(result.projected,110);equal(result.remainingUnplanned,4890);
+  equal(result.isCompleted,false);equal(result.status,'behind');equal(result.projected,110);equal(result.remainingUnplanned,4890);equal(result.estimatedCompletionDate,'2067-09-01');
+});
+
+test('Meta sem fluxo futuro suficiente permanece sem previsão',()=>{
+  const result=view(goal({target:5000}),[],[rule({amount:100,end_date:'2026-04-01'})]);
+  equal(result.status,'no_forecast');equal(result.estimatedCompletionDate,null);equal(result.projected,300);
+});
+
+test('Casamento fecha métricas e previsão posterior ao prazo',()=>{
+  const materialized=Array.from({length:11},(_,index)=>{
+    const occurrence=new Date(Date.UTC(2026,9+index,1)).toISOString().slice(0,10);
+    return tx({id:`wedding-${index+1}`,status:'pending',transaction_date:occurrence,amount:400,recurring_series_id:'wedding-monthly',recurring_occurrence_date:occurrence});
+  });
+  const result=goalViewModel(
+    goal({name:'Casamento',target:50000,current:0,deadline:'2031-10-01'}),
+    materialized,
+    [rule({id:'wedding-monthly',amount:400,next_date:'2026-10-01'})],
+    {now:'2026-08-25'}
+  );
+  equal(result.realizedTotal,0);equal(result.programmed,4400);equal(result.projected,20000);equal(result.projectedCovered,24400);
+  equal(result.progressProjectedPct,48.8);equal(result.remainingReal,50000);equal(result.remainingUnplanned,25600);
+  ok(Math.abs(result.monthlyNeeded-819.672131147541)<1e-9);equal(result.estimatedCompletionDate,'2037-02-01');equal(result.status,'behind');equal(result.onTrack,false);
+});
+
+test('orçamento agregado usa a mesma necessidade mensal dos cards',()=>{
+  const metrics=[view(goal({id:'a',current:100,target:1100})),view(goal({id:'b',current:0,target:2200}))];
+  const budget=goalBudgetViewModel(metrics,250);
+  equal(budget.requiredForActiveGoals,metrics[0].monthlyNeeded+metrics[1].monthlyNeeded);
+  equal(budget.goalBudgetGap,250-budget.requiredForActiveGoals);equal(budget.goalBudgetStatus,'insufficient');
 });
 
 test('Meta sem deadline funciona sem inventar horizonte virtual',()=>{
