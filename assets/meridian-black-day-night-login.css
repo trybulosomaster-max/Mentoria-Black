@@ -1,4 +1,13 @@
 /* Meridian Black login: the hero is original artwork; all controls are real HTML. */
+/* Syncopate Regular is bundled locally under Apache-2.0; see assets/fonts/syncopate/LICENSE.txt. */
+@font-face {
+  font-family: "Meridian Syncopate";
+  src: url("fonts/syncopate/Syncopate-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 .auth.meridian-day-night-login {
   --meridian-gold: #b08a2e;
   --meridian-gold-hover: #c7a646;
@@ -68,6 +77,8 @@
 .meridian-brand { margin-bottom: 26px; text-align: center; }
 .meridian-brand-name { color: rgba(190, 154, 75, .94); font-family: Avenir Next, Avenir, Inter, Helvetica Neue, Arial, sans-serif; font-size: clamp(21px, 2.2vw, 29px); font-weight: 500; letter-spacing: .17em; line-height: 1.05; text-indent: .17em; text-shadow: none; }
 .meridian-brand-subtitle { display: block; margin-top: 8px; color: rgba(211, 188, 132, .68); font-family: Avenir Next, Avenir, Inter, Helvetica Neue, Arial, sans-serif; font-size: 9px; font-weight: 400; letter-spacing: .26em; line-height: 1.2; text-indent: .26em; }
+.meridian-day-night-login[data-brand-font="reference"] .meridian-brand-name { color: rgba(190, 154, 75, .90); font-family: "Meridian Syncopate", Avenir Next, Avenir, Inter, Helvetica Neue, Arial, sans-serif; font-weight: 400; letter-spacing: .135em; text-indent: .135em; }
+.meridian-day-night-login[data-brand-font="reference"] .meridian-brand-subtitle { color: rgba(211, 188, 132, .64); font-family: Avenir Next, Avenir, Inter, Helvetica Neue, Arial, sans-serif; font-weight: 400; letter-spacing: .27em; text-indent: .27em; }
 .meridian-welcome { margin: 0 0 23px; text-align: center; }
 .meridian-welcome h1 { margin: 0 0 7px; color: #fffaf0; font: 600 clamp(21px, 2vw, 27px)/1.18 Avenir Next, Avenir, Helvetica Neue, Arial, sans-serif; }
 .meridian-welcome p { margin: 0; color: rgba(255, 247, 232, .78); font-size: 14px; line-height: 1.4; }
@@ -117,6 +128,8 @@
   .meridian-brand { margin-bottom: 20px; }
   .meridian-brand-name { font-size: clamp(19px, 6.2vw, 25px); letter-spacing: .16em; text-indent: .16em; }
   .meridian-brand-subtitle { font-size: 8px; letter-spacing: .23em; text-indent: .23em; }
+  .meridian-day-night-login[data-brand-font="reference"] .meridian-brand-name { letter-spacing: .125em; text-indent: .125em; }
+  .meridian-day-night-login[data-brand-font="reference"] .meridian-brand-subtitle { letter-spacing: .24em; text-indent: .24em; }
   .meridian-welcome { margin-bottom: 19px; }
   .meridian-welcome h1 { font-size: 22px; }
   .meridian-welcome p { font-size: 13px; }

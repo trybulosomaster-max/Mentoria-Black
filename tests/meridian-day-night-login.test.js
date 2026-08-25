@@ -191,6 +191,11 @@ for(const [asset,expectedHash] of Object.entries(assetHashes)){
 }
 const collected=betaArtifact.localAssets(index);
 for(const asset of Object.keys(assetHashes))ok(collected.includes(asset),`Beta artifact collector includes ${asset}`);
+const syncopateFont='assets/fonts/syncopate/Syncopate-Regular.ttf';
+equal(crypto.createHash('sha256').update(fs.readFileSync(path.join(root,syncopateFont))).digest('hex'),'fcbb10798b80c981afabaa1055bde2ee29b283069b44cdfc68457e903a056ac1','Syncopate Regular remains the reviewed local source asset');
+ok(fs.readFileSync(path.join(root,'assets/fonts/syncopate/LICENSE.txt'),'utf8').includes('Apache License'),'local Syncopate distribution retains its Apache-2.0 license');
+ok(index.includes(`href="${syncopateFont}"`),'production HTML preloads the local wordmark font without a network dependency');
+ok(collected.includes(syncopateFont),'Beta artifact collector includes the local wordmark font');
 ok(index.includes('id="loginEmail" type="email" autocomplete="email"'),'production email keeps semantic autocomplete');
 ok(index.includes('id="loginPassword" type="password" autocomplete="current-password"'),'production password is initially hidden and keeps native autocomplete');
 ok(index.includes('id="togglePassword" type="button" aria-label="Mostrar senha"'),'eye is a non-submit accessible control');
@@ -212,8 +217,10 @@ ok(css.includes('rgba(5, 6, 5, .46)')&&css.includes('rgba(3, 4, 4, .50)'),'mobil
 ok(index.includes('MERIDIAN BLACK')&&index.includes('FINANCIAL MANAGEMENT'),'real semantic Meridian branding is layered over the clean hero');
 ok(index.includes('Bem-vindo de volta')&&index.includes('Acesse sua conta para continuar'),'real welcome copy is available to assistive technology');
 ok(index.includes('class="meridian-login-options"'),'remember-email and recovery controls share the secondary row');
-ok(css.includes('font-weight: 500')&&css.includes('letter-spacing: .17em'),'Meridian wordmark keeps its approved lighter, geometric visual weight');
+ok(css.includes('@font-face')&&css.includes('font-family: "Meridian Syncopate"'),'reference wordmark uses a bundled local geometric typeface');
+ok(css.includes('[data-brand-font="reference"] .meridian-brand-name')&&css.includes('font-weight: 400')&&css.includes('letter-spacing: .135em'),'reference wordmark is lighter and widely tracked without rasterizing text');
 ok(css.includes('font-weight: 400')&&css.includes('letter-spacing: .26em'),'Financial Management remains visually subordinate to the wordmark');
+ok(preview.includes('get("brandfont")')&&preview.includes('requestedBrand==="current"?"current":"reference"'),'only the preview offers an explicit current/reference wordmark comparison');
 ok(css.includes('@media (prefers-reduced-motion: reduce)'),'reduced-motion disables the crossfade');
 ok(css.includes('min-width: 44px')&&css.includes('min-height: 44px'),'password eye has a 44px minimum touch target');
 ok(!/^\s*filter\s*:|rotate\s*\(|parallax|canvas|webgl/im.test(css),'artwork receives no destructive filter, rotation, parallax, canvas, or WebGL treatment');

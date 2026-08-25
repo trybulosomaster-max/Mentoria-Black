@@ -6,11 +6,12 @@
   <meta name="color-scheme" content="dark">
   <title>Meridian Black — Preview local dia/noite</title>
   <link rel="stylesheet" href="assets/meridian-black-day-night-login.css">
+  <link rel="preload" href="assets/fonts/syncopate/Syncopate-Regular.ttf" as="font" type="font/ttf" crossorigin>
   <script src="js/meridian-day-night-login.js"></script>
   <style>html,body{width:100%;min-height:100%;margin:0;background:#030303}body{font-family:Avenir Next,Avenir,Arial,sans-serif}</style>
 </head>
 <body>
-<section id="auth" class="auth meridian-day-night-login" aria-label="Meridian Black Financial Management" data-theme="night" data-orientation="desktop"
+<section id="auth" class="auth meridian-day-night-login" aria-label="Meridian Black Financial Management" data-theme="night" data-orientation="desktop" data-brand-font="reference"
  data-day-desktop-src="assets/login/meridian-day-desktop.png" data-day-mobile-src="assets/login/meridian-day-mobile.png"
  data-night-desktop-src="assets/login/meridian-night-desktop.png" data-night-mobile-src="assets/login/meridian-night-mobile.png">
  <div class="meridian-theme-artboard">
@@ -40,7 +41,9 @@
 (() => {
   const requested=new URLSearchParams(window.location.search).get("theme");
   const forcedTheme=requested==="day"||requested==="night"?requested:undefined;
+  const requestedBrand=new URLSearchParams(window.location.search).get("brandfont");
   const root=document.getElementById("auth");
+  root.dataset.brandFont=requestedBrand==="current"?"current":"reference";
   const controller=window.MBMeridianDayNightLogin.initialize({root,dayImage:document.querySelector('[data-meridian-theme-image="day"]'),nightImage:document.querySelector('[data-meridian-theme-image="night"]'),forcedTheme,assets:{day:{desktop:root.dataset.dayDesktopSrc,mobile:root.dataset.dayMobileSrc},night:{desktop:root.dataset.nightDesktopSrc,mobile:root.dataset.nightMobileSrc}}});
   const message=document.getElementById("authMsg");
   document.getElementById("loginForm").addEventListener("submit",event=>{event.preventDefault();controller.recordSuccessfulLogin(document.getElementById("loginEmail").value);message.textContent="Preview local: interação validada sem autenticação real.";message.className="meridian-auth-message ok"});
