@@ -1,7 +1,7 @@
 # Syncopate Regular
 
 `Syncopate-Regular.ttf` is the local, unmodified Syncopate Regular source used
-only for the Meridian Black wordmark comparison.
+for the official Meridian Black wordmark.
 
 - Source: [google/fonts — apache/syncopate](https://github.com/google/fonts/tree/main/apache/syncopate)
 - Version file: `Syncopate-Regular.ttf`
