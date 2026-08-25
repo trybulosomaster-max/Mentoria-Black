@@ -66,8 +66,8 @@
 }
 
 .meridian-brand { margin-bottom: 26px; text-align: center; }
-.meridian-brand-name { color: var(--meridian-gold-soft); font-family: Avenir Next, Avenir, Montserrat, Arial, sans-serif; font-size: clamp(21px, 2.2vw, 29px); font-weight: 700; letter-spacing: .19em; line-height: 1.05; text-indent: .19em; }
-.meridian-brand-subtitle { display: block; margin-top: 8px; color: rgba(232, 212, 165, .82); font-family: Avenir Next, Avenir, Montserrat, Arial, sans-serif; font-size: 9px; font-weight: 600; letter-spacing: .27em; line-height: 1.2; text-indent: .27em; }
+.meridian-brand-name { color: rgba(190, 154, 75, .94); font-family: Avenir Next, Avenir, Inter, Helvetica Neue, Arial, sans-serif; font-size: clamp(21px, 2.2vw, 29px); font-weight: 500; letter-spacing: .17em; line-height: 1.05; text-indent: .17em; text-shadow: none; }
+.meridian-brand-subtitle { display: block; margin-top: 8px; color: rgba(211, 188, 132, .68); font-family: Avenir Next, Avenir, Inter, Helvetica Neue, Arial, sans-serif; font-size: 9px; font-weight: 400; letter-spacing: .26em; line-height: 1.2; text-indent: .26em; }
 .meridian-welcome { margin: 0 0 23px; text-align: center; }
 .meridian-welcome h1 { margin: 0 0 7px; color: #fffaf0; font: 600 clamp(21px, 2vw, 27px)/1.18 Avenir Next, Avenir, Helvetica Neue, Arial, sans-serif; }
 .meridian-welcome p { margin: 0; color: rgba(255, 247, 232, .78); font-size: 14px; line-height: 1.4; }

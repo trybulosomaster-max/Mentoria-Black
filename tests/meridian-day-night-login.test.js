@@ -208,6 +208,8 @@ ok(css.includes('rgba(5, 6, 5, .50)')&&css.includes('backdrop-filter: blur(15px)
 ok(index.includes('MERIDIAN BLACK')&&index.includes('FINANCIAL MANAGEMENT'),'real semantic Meridian branding is layered over the clean hero');
 ok(index.includes('Bem-vindo de volta')&&index.includes('Acesse sua conta para continuar'),'real welcome copy is available to assistive technology');
 ok(index.includes('class="meridian-login-options"'),'remember-email and recovery controls share the secondary row');
+ok(css.includes('font-weight: 500')&&css.includes('letter-spacing: .17em'),'Meridian wordmark keeps its approved lighter, geometric visual weight');
+ok(css.includes('font-weight: 400')&&css.includes('letter-spacing: .26em'),'Financial Management remains visually subordinate to the wordmark');
 ok(css.includes('@media (prefers-reduced-motion: reduce)'),'reduced-motion disables the crossfade');
 ok(css.includes('min-width: 44px')&&css.includes('min-height: 44px'),'password eye has a 44px minimum touch target');
 ok(!/^\s*filter\s*:|rotate\s*\(|parallax|canvas|webgl/im.test(css),'artwork receives no destructive filter, rotation, parallax, canvas, or WebGL treatment');
