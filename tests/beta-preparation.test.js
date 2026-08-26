@@ -18,7 +18,7 @@ async function test(name,fn){await fn();tests++}
 (async()=>{
 await test('Beta vazia permanece bloqueada e identificada',()=>{
   const state=runtime.resolve({environment:'beta'});
-  equal(state.label,'Mentoria Black — V82 BETA');equal(state.isBeta,true);equal(state.configured,false);equal(state.blockedReason,'beta_configuration_missing');
+  equal(state.label,'AVIORA — Gestão Financeira V82 BETA');equal(state.isBeta,true);equal(state.configured,false);equal(state.blockedReason,'beta_configuration_missing');
 });
 
 await test('somente URL segura e chave publicável configuram Beta',()=>{
@@ -55,12 +55,7 @@ await test('artefato Beta remove configuração legada e injeta somente configur
     const html=fs.readFileSync(path.join(out,'index.html'),'utf8'),env=fs.readFileSync(path.join(out,'js','beta-environment.js'),'utf8');
     ok(html.includes('const SUPABASE_URL="";'));ok(html.includes('const SUPABASE_ANON_KEY="";'));ok(!html.includes('createClient(SUPABASE_URL,SUPABASE_ANON_KEY)'));
     ok(env.includes('isolated-beta.example.invalid'));ok(env.includes('sb_publishable_beta_test'));ok(!env.includes('service_role'));
-    for(const asset of [
-      'assets/login/meridian-day-desktop.png',
-      'assets/login/meridian-day-mobile.png',
-      'assets/login/meridian-night-desktop.png',
-      'assets/login/meridian-night-mobile.png'
-    ]){
+    for(const asset of ['assets/branding/aviora-official.jpg','assets/branding/aviora-login-hero.jpg']){
       ok(result.files.includes(asset),`artefato declara ${asset}`);
       ok(fs.existsSync(path.join(out,asset)),`artefato copia ${asset}`);
     }

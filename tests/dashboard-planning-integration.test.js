@@ -31,7 +31,7 @@ function render(selectedPlan=plan,transactions=[],rules=[],year=2026,month=8){
 }
 function renderActiveDashboard(selectedPlan=plan,transactions=[],rules=[],year=2026,month=8){
   const wrapperStart=html.indexOf('  window.dashboard = function(){',helperStart);
-  const wrapperEnd=html.indexOf("\n\n  document.title='Mentoria",wrapperStart);
+  const wrapperEnd=html.indexOf("\n\n  document.title='AVIORA",wrapperStart);
   const base=`<div class="kpis"></div><div class="grid"><section class="card s6"><h2>Cartões de crédito</h2></section><section class="card s12"><h2>Últimos lançamentos do período</h2></section></div>`;
   const context={DATA:{transactions,recurring:rules},FILTERS:{year,month},Date:FixedDate,console,MBPlanningV82:planning,
     CAT_ORDER:['Gastos Fixos','Investimentos','Conforto','Metas','Lazer','Conhecimento'],monthlyPlan:()=>selectedPlan,esc:value=>String(value),money:value=>`$${Number(value)}`,
@@ -53,7 +53,7 @@ test('Dashboard chama o motor canônico público, sem cálculo financeiro parale
 
 test('o renderer base não mantém os dois blocos legados duplicados',()=>{
   const baseStart=html.indexOf('function dashboard(){'),baseEnd=html.indexOf('function planning(){',baseStart);
-  const base=html.slice(baseStart,baseEnd),wrapper=html.slice(helperStart,html.indexOf("  document.title='Mentoria",helperStart));
+  const base=html.slice(baseStart,baseEnd),wrapper=html.slice(helperStart,html.indexOf("  document.title='AVIORA",helperStart));
   equal((base.match(/Planejado × realizado/g)||[]).length,0);
   equal((wrapper.match(/dashboard-planning-categories-v82/g)||[]).length,1);
   equal((wrapper.match(/Planejado × realizado por categoria/g)||[]).length,0);

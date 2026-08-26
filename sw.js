@@ -1,5 +1,5 @@
-const CACHE_NAME = 'mentoria-black-v82-production';
-const APP_SHELL = ['./','./index.html'];
+const CACHE_NAME = 'mentoria-black-v82-production-aviora-login-v3';
+const APP_SHELL = ['./','./index.html','./assets/aviora-v82.css','./assets/branding/aviora-official.jpg','./assets/branding/aviora-login-hero.jpg'];
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME)

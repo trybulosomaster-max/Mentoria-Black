@@ -6,12 +6,15 @@
 <meta name="theme-color" content="#070707">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Mentoria Black">
-<title>Mentoria Black — Gestão Financeira V82</title>
+<meta name="apple-mobile-web-app-title" content="AVIORA">
+<title>AVIORA — Gestão Financeira</title>
 <link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="assets/branding/aviora-official.jpg" type="image/jpeg">
+<link rel="apple-touch-icon" href="assets/branding/aviora-official.jpg">
 <link rel="stylesheet" href="knowledge/knowledge-area.css">
 <link rel="stylesheet" href="knowledge/knowledge-area-premium.css">
 <link rel="stylesheet" href="assets/meridian-black-day-night-login.css">
+<link rel="stylesheet" href="assets/aviora-v82.css?v=aviora-login-v3">
 <link rel="preload" href="assets/fonts/syncopate/Syncopate-Regular.ttf" as="font" type="font/ttf" crossorigin>
 <script src="js/production-environment.js"></script>
 <script src="js/production-runtime.js"></script>
@@ -66,19 +69,19 @@
 </style>
 </head>
 <body>
-<div id="v18Loading" class="v18-loading"><div class="v18-loading-box"><div class="v18-spinner"></div><div>Carregando Mentoria Black…</div></div></div>
-<section id="auth" class="auth meridian-day-night-login" aria-label="Meridian Black Financial Management" data-theme="night" data-orientation="desktop"
- data-day-desktop-src="assets/login/meridian-day-desktop.png" data-day-mobile-src="assets/login/meridian-day-mobile.png"
- data-night-desktop-src="assets/login/meridian-night-desktop.png" data-night-mobile-src="assets/login/meridian-night-mobile.png">
- <div class="meridian-theme-artboard">
+<div id="v18Loading" class="v18-loading"><div class="v18-loading-box"><div class="v18-spinner"></div><div>Carregando AVIORA…</div></div></div>
+<section id="auth" class="auth meridian-day-night-login" aria-label="AVIORA Gestão Financeira" data-theme="night" data-orientation="desktop"
+ data-day-desktop-src="assets/branding/aviora-login-hero.jpg" data-day-mobile-src="assets/branding/aviora-login-hero.jpg"
+ data-night-desktop-src="assets/branding/aviora-login-hero.jpg" data-night-mobile-src="assets/branding/aviora-login-hero.jpg">
+ <div class="meridian-theme-artboard aviora-login-hero" role="img" aria-label="Águia dourada da AVIORA em voo sobre candles financeiros">
   <img class="meridian-theme-image meridian-theme-image-day" data-meridian-theme-image="day" alt="" decoding="async">
   <img class="meridian-theme-image meridian-theme-image-night" data-meridian-theme-image="night" alt="" decoding="async">
  </div>
  <div class="meridian-login-layout">
   <form id="loginForm" class="meridian-day-night-form">
    <header class="meridian-brand">
-    <div class="meridian-brand-name">MERIDIAN BLACK</div>
-    <span class="meridian-brand-subtitle">FINANCIAL MANAGEMENT</span>
+    <div class="meridian-brand-name">AVIORA</div>
+    <span class="meridian-brand-subtitle">GESTÃO FINANCEIRA</span>
    </header>
    <div class="meridian-welcome">
     <h1>Bem-vindo de volta</h1>
@@ -125,23 +128,21 @@ window.MBMeridianLoginController=window.MBMeridianDayNightLogin.initialize({
  <div class="wrap">
   <header class="header">
    <div class="brand-full">
-    <svg class="crest" viewBox="0 0 180 180" aria-label="MB">
-     <g fill="none" stroke="#d9ad37" stroke-width="3"><circle cx="90" cy="98" r="52"/><path d="M38 102c-22 10-25 28-8 37m112-37c22 10 25 28 8 37M48 137c-18 7-21 17-10 24m104-24c18 7 21 17 10 24"/><path d="M51 57l-10-15 20 7 4-20 12 17 13-24 13 24 12-17 4 20 20-7-10 15"/><path d="M57 61h66"/></g><path d="M72 55h36l-3-23-15 12-15-12z" fill="#d9ad37"/><text x="90" y="113" text-anchor="middle" fill="#d9ad37" font-family="Georgia,serif" font-size="45">MB</text>
-    </svg>
-    <div class="title">MENTORIA BLACK</div><div class="sub">GESTÃO FINANCEIRA</div>
+    <img class="crest aviora-brand-mark" src="assets/branding/aviora-official.jpg" alt="Símbolo oficial da AVIORA">
+    <div class="brand-copy"><div class="title">AVIORA</div><div class="sub">Gestão Financeira</div></div>
    </div>
    <div id="commercialStatus" class="commercial-status hidden"></div>
    <div class="row" style="justify-content:space-between;margin-top:10px"><span class="muted small" id="userEmail"></span><div class="actions"><button class="btn" id="refresh">Atualizar</button><button class="btn" id="print">PDF / Imprimir</button><button class="btn" id="logout">Sair</button></div></div>
   </header>
   <nav id="nav" class="nav"></nav>
   <main id="view"></main>
-  <div class="footer">Mentoria Black — Gestão Financeira V82 • dados protegidos por usuário no Supabase</div>
+  <div class="footer">AVIORA — Gestão Financeira • dados protegidos por usuário</div>
  </div>
 </section>
 
 <section id="commercialGate" class="commercial-gate hidden">
  <div class="commercial-card">
-  <div class="brand-full"><div class="title">MENTORIA BLACK</div><div class="sub">ACESSO PREMIUM</div></div>
+  <div class="brand-full"><img class="aviora-brand-mark" src="assets/branding/aviora-official.jpg" alt="Símbolo oficial da AVIORA"><div class="brand-copy"><div class="title">AVIORA</div><div class="sub">Acesso premium</div></div></div>
   <div id="commercialGateBody"></div>
   <div class="actions" style="justify-content:center;margin-top:18px"><button class="btn" id="commercialLogout">Sair</button></div>
  </div>
@@ -938,11 +939,11 @@ $("logout").onclick=async()=>{await sb.auth.signOut();location.reload()};$("refr
 async function start(){try{await load();$("auth").classList.add("hidden");$("app").classList.remove("hidden");$("userEmail").textContent=USER.email||"";render()}catch(e){$("v18Loading")?.classList.add("hidden");$("authMsg").textContent="Erro ao carregar seus dados: "+e.message;console.error(e)}}
 /* V18 session bootstrap replaces the original bootstrap. */
 if("serviceWorker" in navigator){
-  const MB_SW_VERSION="24";
+  const MB_SW_VERSION="26";
   try{
     navigator.serviceWorker.addEventListener("controllerchange",()=>{
-      if(sessionStorage.getItem("mb-v24-reloaded")==="1")return;
-      sessionStorage.setItem("mb-v24-reloaded","1");
+      if(sessionStorage.getItem("mb-v26-reloaded")==="1")return;
+      sessionStorage.setItem("mb-v26-reloaded","1");
       location.reload();
     });
   }catch(e){}
@@ -1671,7 +1672,7 @@ if("serviceWorker" in navigator){
   };
 
 
-  document.title='Mentoria Black — Gestão Financeira V81 ESCUDO FINAL';
+  document.title='AVIORA — Gestão Financeira';
   const footer=document.querySelector('.footer'); if(footer) footer.textContent=footer.textContent.replace(/V18/g,'V19');
 
   const style=document.createElement('style'); style.id='v19-style'; style.textContent=`
@@ -1864,7 +1865,7 @@ if("serviceWorker" in navigator){
     }
   `;
   document.head.appendChild(style);
-  document.title='Mentoria Black — Gestão Financeira V81 ESCUDO FINAL';
+  document.title='AVIORA — Gestão Financeira';
 })();
 </script>
 <script>
@@ -1898,7 +1899,7 @@ setTimeout(()=>{
     #v19Count:disabled{opacity:.65}
   `;
   document.head.appendChild(style);
-  document.title='Mentoria Black — Gestão Financeira V81 ESCUDO FINAL';
+  document.title='AVIORA — Gestão Financeira';
   const footer=document.querySelector('.footer');
   if(footer)footer.textContent=footer.textContent.replace(/V22|V21\.1|V20|V19\.1|V19|V18/g,'V23');
 })();
@@ -2031,7 +2032,7 @@ setTimeout(()=>{
     toast(parts.join(' • ')+'.');
   };
 
-  document.title='Mentoria Black — Gestão Financeira V81 ESCUDO FINAL';
+  document.title='AVIORA — Gestão Financeira';
   const footer=document.querySelector('.footer');
   if(footer)footer.textContent=footer.textContent.replace(/V28|V27|V25|V24|V23|V22|V21\.1|V20|V19\.1|V19|V18/g,'V38');
 })();
@@ -2096,7 +2097,7 @@ setTimeout(()=>{
     .v38-status-row select{margin-top:4px}
   `;
   document.head.appendChild(style);
-  document.title='Mentoria Black — Gestão Financeira V81 ESCUDO FINAL';
+  document.title='AVIORA — Gestão Financeira';
   const footer=document.querySelector('.footer');
   if(footer)footer.textContent=footer.textContent.replace(/V38|V39/g,'V38');
 })();
@@ -2130,7 +2131,7 @@ setTimeout(()=>{
     .v38-recurring-tag b{color:#e4c55b}
   `;
   document.head.appendChild(style);
-  document.title='Mentoria Black — Gestão Financeira V81 ESCUDO FINAL';
+  document.title='AVIORA — Gestão Financeira';
   const footer=document.querySelector('.footer');
   if(footer)footer.textContent=footer.textContent.replace(/V38|V39/g,'V38');
 })();
@@ -2187,7 +2188,7 @@ setTimeout(()=>{
   `;
   document.head.appendChild(style);
 
-  document.title = 'Mentoria Black — Gestão Financeira V81 ESCUDO FINAL';
+  document.title = 'AVIORA — Gestão Financeira';
   const footer = document.querySelector('.footer');
   if(footer) footer.textContent = footer.textContent.replace(
     /V38|V39/g,
@@ -2574,7 +2575,7 @@ setTimeout(()=>{
   `;
   document.head.appendChild(style);
 
-  document.title = 'Mentoria Black — Gestão Financeira V52';
+  document.title = 'AVIORA — Gestão Financeira';
   const footer = document.querySelector('.footer');
   if(footer) footer.textContent = footer.textContent.replace(/V50|V51|V39|V38/g,'V52');
 
@@ -2708,7 +2709,7 @@ setTimeout(()=>{
   style.id='mb-v53-style';
   style.textContent=`.mb-v53-health-page .bar{margin-top:10px}`;
   document.head.appendChild(style);
-  document.title='Mentoria Black — Gestão Financeira V53';
+  document.title='AVIORA — Gestão Financeira';
   const footer=document.querySelector('.footer');
   if(footer) footer.textContent=footer.textContent.replace(/V52|V51|V50|V39/g,'V53');
 })();
@@ -2848,7 +2849,7 @@ window.MB_V50_HEALTH=function(){
 // Substitui a página independente de Reserva e Saúde Financeira.
 
 const st=document.createElement('style');st.id='mb-v56-style';st.textContent=`#v56FixedFields,#v56CustomFields{align-items:end}.v56-reserve-launch{margin-top:12px}`;document.head.appendChild(st);
-document.title='Mentoria Black — Gestão Financeira V56';
+document.title='AVIORA — Gestão Financeira';
 const footer=document.querySelector('.footer');if(footer)footer.textContent=footer.textContent.replace(/V53|V52|V51|V50|V39/g,'V56');
 
 // Primeira execução: migra a antiga Meta de Reserva para a nova carteira local.
@@ -3000,7 +3001,7 @@ migrateReserveGoals();
   window.MB_V56_RESERVE_PAGE=reservePage58;
 
 
-  document.title='Mentoria Black — Gestão Financeira V58';
+  document.title='AVIORA — Gestão Financeira';
   const footer=document.querySelector('.footer');
   if(footer)footer.textContent=footer.textContent.replace(/V56|V55|V54|V53|V52|V51|V50|V39/g,'V58');
 })();
@@ -3186,10 +3187,10 @@ migrateReserveGoals();
     return html;
   };
 
-  document.title='Mentoria Black — Gestão Financeira V82';
+  document.title='AVIORA — Gestão Financeira';
   if(window.MBProductionRuntime?.label) document.title=window.MBProductionRuntime.label;
   const footer=document.querySelector('.footer');
-  if(footer) footer.textContent=`${window.MBProductionRuntime?.label||'Mentoria Black — Gestão Financeira V82'} • dados protegidos por usuário no Supabase`;
+  if(footer) footer.textContent=`${window.MBProductionRuntime?.label||'AVIORA — Gestão Financeira'} • dados protegidos por usuário`;
 })();
 
 </script>

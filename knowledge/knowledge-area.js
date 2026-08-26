@@ -19,8 +19,8 @@
     return /^[A-Za-z0-9][A-Za-z0-9_./-]*$/.test(path)&&!/(^|\/)\.\.(\/|$)/.test(path)&&!/^[A-Za-z]+:/.test(path)?path:'';
   }
   function renderOfficialCover(publication){
-    const mark='assets/branding/mentoria-black-icon-512.png';
-    return `<figure class="knowledge-cover knowledge-cover-official" data-cover="premium"><img src="${safe(mark)}" alt="Símbolo oficial da Mentoria Black"></figure>`;
+    const mark='assets/branding/aviora-official.jpg';
+    return `<figure class="knowledge-cover knowledge-cover-official" data-cover="premium"><img src="${safe(mark)}" alt="Símbolo oficial da AVIORA"></figure>`;
   }
   function renderSection(section){
     if(!SECTION_TYPES.has(section?.section_type))return '';
@@ -70,7 +70,7 @@
   function renderLibrary(state){
     const publications=state.publications||[],chapters=state.chapters||[],progress=state.progress||[];
     if(!publications.length)return `<section class="knowledge-empty"><h2>Biblioteca em preparação</h2><p>Nenhuma publicação está disponível no momento.</p></section>`;
-    return `<header class="knowledge-title"><h1>Área de Conhecimento</h1><p>Conhecimento para transformar organização em direção.</p></header><div class="knowledge-library">${publications.map(publication=>{
+    return `<header class="knowledge-title"><span class="knowledge-kicker">Biblioteca AVIORA</span><h1>Conhecimento</h1><p>Educação financeira para decisões mais claras, organizadas e conscientes.</p></header><div class="knowledge-library">${publications.map(publication=>{
       const percent=publicationProgress(publication.id,chapters,progress),started=percent>0;
       return `<article class="knowledge-publication-card">${publication.cover_path?`<img class="knowledge-cover" src="${safe(safeAssetPath(publication.cover_path))}" alt="Capa de ${safe(publication.title)}">`:renderOfficialCover(publication)}<div class="knowledge-publication-copy"><h2>${safe(publication.title)}</h2>${publication.subtitle?`<p class="knowledge-subtitle">${safe(publication.subtitle)}</p>`:''}<p>${safe(publication.description||'')}</p><div class="knowledge-progress" aria-label="${percent}% concluído"><span style="width:${percent}%"></span></div><small>${percent}% concluído</small><div class="knowledge-actions"><button class="btn gold" data-knowledge-action="open-publication" data-id="${safe(publication.id)}">${started?'Continuar leitura':'Começar leitura'}</button></div></div></article>`;
     }).join('')}</div>`;
@@ -101,7 +101,7 @@
   }
 
   function renderPaywall(chapter){
-    return `<section class="knowledge-paywall"><svg class="knowledge-lock" aria-hidden="true" viewBox="0 0 24 24"><path d="M7 10V7a5 5 0 0 1 10 0v3M6 10h12v10H6zM12 14v2"/></svg><span class="knowledge-kicker">Conteúdo completo</span><h2>Continue sua leitura com a Área de Conhecimento.</h2>${chapter?`<p>${safe(chapter.excerpt||'O corpo completo deste capítulo é protegido.')}</p>`:'<p>Leia a amostra disponível ou conheça as opções de acesso à biblioteca.</p>'}<div class="knowledge-actions"><button class="btn gold" data-knowledge-action="checkout" data-offer="knowledge">Conhecer acesso completo</button><button class="btn" data-knowledge-action="checkout" data-offer="complete">Conhecer Mentoria Black Completa</button></div><small class="knowledge-paywall-note">Contratação online ainda não disponível. Nenhuma cobrança foi realizada.</small></section>`;
+    return `<section class="knowledge-paywall"><svg class="knowledge-lock" aria-hidden="true" viewBox="0 0 24 24"><path d="M7 10V7a5 5 0 0 1 10 0v3M6 10h12v10H6zM12 14v2"/></svg><span class="knowledge-kicker">Conteúdo completo</span><h2>Continue sua leitura na biblioteca AVIORA.</h2>${chapter?`<p>${safe(chapter.excerpt||'O corpo completo deste capítulo é protegido.')}</p>`:'<p>Leia a amostra disponível ou conheça as opções de acesso à biblioteca.</p>'}<div class="knowledge-actions"><button class="btn gold" data-knowledge-action="checkout" data-offer="knowledge">Conhecer acesso completo</button><button class="btn" data-knowledge-action="checkout" data-offer="complete">Conhecer AVIORA Completo</button></div><small class="knowledge-paywall-note">Contratação online ainda não disponível. Nenhuma cobrança foi realizada.</small></section>`;
   }
 
   function renderBookmarks(state){

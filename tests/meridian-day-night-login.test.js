@@ -176,17 +176,12 @@ ok(source.includes("setData(rootElement,'theme',active)"),'crossfade contract is
 
 const root=path.resolve(__dirname,'..');
 const index=fs.readFileSync(path.join(root,'index.html'),'utf8');
-const preview=fs.readFileSync(path.join(root,'meridian-black-day-night-login.preview.local.html'),'utf8');
-const css=fs.readFileSync(path.join(root,'assets/meridian-black-day-night-login.css'),'utf8');
-const assetHashes={
-  'assets/login/meridian-day-desktop.png':'899bff4231deeabe0cb96fc8d20423cba7d40fc4f56c36675489657f15fb96a4',
-  'assets/login/meridian-day-mobile.png':'f1da5499ea1606e897e1aa5c6f76b67165879cbd0130654e434b1ee8b1fd9f60',
-  'assets/login/meridian-night-desktop.png':'4a493788fa9c02eb166fac2a1ef21cb5880d15c772acd4af28ca707ca59d6175',
-  'assets/login/meridian-night-mobile.png':'213959ec99b9b8fc27e1ca78b8eab15281e5703efdc58458eb7a2a85821d773a'
-};
+const preview=fs.readFileSync(path.join(root,'aviora-v82.preview.local.html'),'utf8');
+const css=fs.readFileSync(path.join(root,'assets/meridian-black-day-night-login.css'),'utf8')+'\n'+fs.readFileSync(path.join(root,'assets/aviora-v82.css'),'utf8');
+const assetHashes={'assets/branding/aviora-login-hero.jpg':'3a9d0834f30e21433ecf66d70e6fdf86a7f38aa2ddf11d64a69c15a3dcd86933'};
 for(const [asset,expectedHash] of Object.entries(assetHashes)){
   const bytes=fs.readFileSync(path.join(root,asset));
-  equal(crypto.createHash('sha256').update(bytes).digest('hex'),expectedHash,`${asset} remains byte-identical to the approved artwork`);
+  equal(crypto.createHash('sha256').update(bytes).digest('hex'),expectedHash,`${asset} remains byte-identical to the approved official mark`);
   ok(index.includes(`${asset}\"`),`${asset} is explicitly reachable from production HTML`);
 }
 const collected=betaArtifact.localAssets(index);
@@ -204,17 +199,18 @@ ok(index.includes('window.MBMeridianLoginController?.recordSuccessfulLogin(email
 ok(index.indexOf('if(error){$("authMsg").textContent=error.message')<index.indexOf('window.MBMeridianLoginController?.recordSuccessfulLogin(email);'),'failed authentication exits before remember-email persistence');
 ok(index.indexOf('window.MBMeridianLoginController?.recordSuccessfulLogin(email);')<index.indexOf('USER=data.user;\n    await window.start();'),'remember-email does not alter the existing server_now startup chain');
 ok(!index.includes('URLSearchParams')&&!index.includes('?theme='),'production HTML has no preview theme override');
-ok(preview.includes('new URLSearchParams(window.location.search).get("theme")'),'only the local preview recognizes a forced theme');
-ok(preview.includes('requested==="day"||requested==="night"'),'preview rejects unsupported forced-theme values');
+ok(preview.includes("new URLSearchParams(location.search)")&&preview.includes("params.get('theme')||'auto'"),'only the local preview recognizes a forced theme');
+ok(preview.includes("theme==='day'||theme==='night'"),'preview rejects unsupported forced-theme values');
 ok(!/supabase|service[_-]?role|access[_-]?token|refresh[_-]?token/i.test(preview),'preview performs no real authentication and embeds no privileged credential');
-ok(css.includes('@media (max-width: 600px)'),'approved vertical artwork is limited to mobile widths');
-ok(css.includes('object-fit: cover'),'heroes fill every viewport without distorting their source pixels');
-ok(css.includes('rgba(5, 6, 5, .50)')&&css.includes('backdrop-filter: blur(15px)'),'login is a real translucent glass surface, not a baked card');
-ok(css.includes('min-height: calc(100dvh + 90px)'),'mobile adds scroll clearance instead of sacrificing the compass or touch targets');
-ok(css.includes('.meridian-theme-image-day { top: -14%; height: 114%'),'day mobile moves the entire compass above the glass card');
-ok(css.includes('.meridian-theme-image-night { top: -20%; height: 120%'),'night mobile removes excess sky and prioritizes the compass');
-ok(css.includes('rgba(5, 6, 5, .46)')&&css.includes('rgba(3, 4, 4, .50)'),'mobile glass is intentionally more transparent while preserving contrast');
-ok(index.includes('MERIDIAN BLACK')&&index.includes('FINANCIAL MANAGEMENT'),'real semantic Meridian branding is layered over the clean hero');
+ok(css.includes('@media (max-width: 600px)'),'mobile layout has a dedicated responsive contract');
+ok(css.includes('.aviora-login-hero .meridian-theme-image')&&css.includes('object-fit: contain'),'official mark scales proportionally without cropping or distortion');
+ok(css.includes('rgba(8,10,8,.56)')&&css.includes('backdrop-filter: blur(15px)'),'login remains a real translucent glass surface');
+ok(css.includes('scroll-padding-bottom: calc(40px + env(safe-area-inset-bottom))'),'mobile preserves natural Safari scroll clearance');
+ok(css.includes('height: clamp(310px, 44dvh, 400px)'),'mobile reserves a larger proportional hero stage above the card');
+ok(index.includes('AVIORA')&&index.includes('GESTÃO FINANCEIRA'),'real semantic AVIORA branding is layered over the existing hero');
+ok(index.includes('assets/branding/aviora-login-hero.jpg')&&index.includes('Águia dourada da AVIORA'),'approved circle-free AVIORA hero is used without a recreated mark');
+ok(!index.includes('assets/login/meridian-')&&!preview.includes('assets/login/meridian-'),'active login and preview no longer use hand/physical-compass artwork');
+ok(!index.includes('aviora-login-logo')&&!preview.includes('aviora-login-logo'),'card does not duplicate the large hero mark');
 ok(index.includes('Bem-vindo de volta')&&index.includes('Acesse sua conta para continuar'),'real welcome copy is available to assistive technology');
 ok(index.includes('class="meridian-login-options"'),'remember-email and recovery controls share the secondary row');
 ok(css.includes('@font-face')&&css.includes('font-family: "Meridian Syncopate"'),'official wordmark uses the bundled local geometric typeface');
@@ -222,11 +218,11 @@ ok(css.includes('font-family: "Meridian Syncopate"')&&css.includes('font-weight:
 ok(css.includes('letter-spacing: .125em')&&css.includes('text-indent: .125em'),'official mobile wordmark retains the approved tracking');
 ok(css.includes('font-weight: 400')&&css.includes('letter-spacing: .27em')&&css.includes('letter-spacing: .24em'),'Financial Management remains visually subordinate on desktop and mobile');
 ok(!index.includes('data-brand-font')&&!preview.includes('brandfont'),'temporary current/reference typography switching is fully removed');
-ok(css.includes('padding: calc(18px + env(safe-area-inset-top)) 12px calc(48px + env(safe-area-inset-bottom))'),'mobile layout reserves explicit Safari safe-area clearance below Create account');
+ok(css.includes('padding-bottom: calc(72px + env(safe-area-inset-bottom))'),'mobile layout reserves explicit Safari safe-area clearance below Create account');
 ok(css.includes('overflow-x: hidden')&&css.includes('overflow-y: auto'),'mobile allows natural vertical scrolling while preventing horizontal overflow');
-ok(css.includes('.meridian-theme-artboard { bottom: auto; height: calc(100dvh + 60px); }'),'approved mobile hero framing remains independent from the added bottom clearance');
+ok(css.includes('.aviora-login-hero {')&&css.includes('width: min(62vw, 1080px)'),'desktop keeps the AVIORA mark as a large independent hero');
 ok(css.includes('@media (prefers-reduced-motion: reduce)'),'reduced-motion disables the crossfade');
 ok(css.includes('min-width: 44px')&&css.includes('min-height: 44px'),'password eye has a 44px minimum touch target');
-ok(!/^\s*filter\s*:|rotate\s*\(|parallax|canvas|webgl/im.test(css),'artwork receives no destructive filter, rotation, parallax, canvas, or WebGL treatment');
+ok(!css.includes('.aviora-login-hero .meridian-theme-image {\n  filter:')&&!/rotate\s*\(|parallax|canvas|webgl/i.test(css),'login hero receives no destructive filter, rotation, parallax, canvas, or WebGL treatment');
 
 console.log(`meridian-day-night-login: ${assertions} assertions passed`);

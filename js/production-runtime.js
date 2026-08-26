@@ -9,7 +9,7 @@
 })(typeof globalThis!=='undefined'?globalThis:this,function(){
 'use strict';
 
-const LABEL='Mentoria Black — Gestão Financeira V82';
+const LABEL='AVIORA — Gestão Financeira';
 const EXPECTED_HOST='mwjqfzbpjmwiscvtxvfc.supabase.co';
 const isLocalHost=host=>['localhost','127.0.0.1','::1'].includes(String(host||'').toLowerCase());
 
@@ -55,7 +55,7 @@ function requireConfigured(document,state){
   if(state.configured)return state;
   const show=()=>{
     if(!document?.body)return;
-    document.body.innerHTML=`<main style="min-height:100vh;display:grid;place-items:center;background:#050505;color:#f5f5f5;font:14px system-ui;padding:24px"><section style="max-width:620px;border:1px solid #c9a227;border-radius:16px;padding:24px;background:#0d0d0d"><h1 style="color:#e4c55b">${LABEL}</h1><p>Configuração de produção indisponível. O acesso foi bloqueado para impedir conexão acidental com outro ambiente.</p></section></main>`;
+    document.body.innerHTML=`<main style="min-height:100vh;display:grid;place-items:center;background:#070807;color:#f4f1e9;font:14px system-ui;padding:24px"><section style="max-width:620px;border:1px solid #b8944a;border-radius:16px;padding:24px;background:#101210"><h1 style="color:#e5d6ad">${LABEL}</h1><p>Configuração de produção indisponível. O acesso foi bloqueado para impedir conexão acidental com outro ambiente.</p></section></main>`;
   };
   if(document?.readyState==='loading')document.addEventListener('DOMContentLoaded',show,{once:true});else show();
   throw new Error('V82 production blocked: production Supabase configuration is required');

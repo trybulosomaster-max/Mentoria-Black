@@ -20,8 +20,8 @@ function sanitizeIndex(source){
 
 function betaManifestSource(source){
   const manifest=JSON.parse(source);
-  manifest.name='Mentoria Black — V82 BETA';
-  manifest.short_name='MB V82 BETA';
+  manifest.name='AVIORA — Gestão Financeira V82 BETA';
+  manifest.short_name='AVIORA BETA';
   return `${JSON.stringify(manifest,null,2)}\n`;
 }
 
@@ -86,14 +86,14 @@ function validateBetaArtifact(pathOut){
     [html.includes('js/beta-runtime.js')&&!html.includes('js/production-runtime.js'),'Beta runtime'],
     [html.includes('js/beta-environment.js')&&!html.includes('js/production-environment.js'),'Beta environment'],
     [html.includes('MBBetaRuntime.requireConfigured')&&!html.includes('MBProductionRuntime'),'fail-closed Beta bootstrap'],
-    [manifest.includes('Mentoria Black — V82 BETA'),'Beta manifest identity'],
+    [manifest.includes('AVIORA — Gestão Financeira V82 BETA'),'Beta manifest identity'],
     [sw.includes('mentoria-black-v82-beta')&&!sw.includes('mentoria-black-v82-production'),'Beta cache identity'],
     [!combined.includes('mwjqfzbpjmwiscvtxvfc'),'production project isolation'],
     [!/(?:service[_-]?role|sb_secret_|SUPABASE_SERVICE_ROLE|DB_PASSWORD)/i.test(combined),'privileged secret exclusion']
   ];
   for(const [valid,label] of expectations)if(!valid)throw new Error(`invalid Beta artifact: ${label}`);
   for(const asset of localAssets(html))if(!fs.existsSync(path.join(output,asset)))throw new Error(`incomplete Beta artifact: ${asset}`);
-  return Object.freeze({valid:true,label:'Mentoria Black — V82 BETA',cache:'mentoria-black-v82-beta'});
+  return Object.freeze({valid:true,label:'AVIORA — Gestão Financeira V82 BETA',cache:'mentoria-black-v82-beta-aviora-login-v3'});
 }
 
 if(require.main===module){

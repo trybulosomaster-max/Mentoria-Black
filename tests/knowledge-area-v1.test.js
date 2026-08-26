@@ -36,14 +36,15 @@ await test('section renderer escapes content and supports all approved types',()
 
 await test('library is publication-driven and supports an empty state',()=>{
  const state={publications:[{id:'p1',title:'Mentoria Black',description:'Mock',publication_type:'book'}],chapters:[{id:'c1',publication_id:'p1'}],progress:[{chapter_id:'c1',progress_percent:50}]};
- const html=knowledge.renderLibrary(state);ok(html.includes('Área de Conhecimento'));ok(html.includes('50% concluído'));ok(html.includes('Continuar leitura'));ok(html.includes('mentoria-black-icon-512.png'));ok(!html.includes('knowledge-cover-placeholder'));
+ const html=knowledge.renderLibrary(state);ok(html.includes('Biblioteca AVIORA'));ok(html.includes('<h1>Conhecimento</h1>'));ok(html.includes('50% concluído'));ok(html.includes('Continuar leitura'));ok(html.includes('aviora-official.jpg'));ok(!html.includes('knowledge-cover-placeholder'));
  ok(knowledge.renderLibrary({publications:[],chapters:[],progress:[]}).includes('Nenhuma publicação'));
 });
 
 await test('official production cover is deterministic',()=>{
  const html=knowledge.renderLibrary({publications:[{id:'cover',title:'Mentoria Black'}],chapters:[],progress:[]});
- ok(html.includes('data-cover="premium"'));ok(html.includes('assets/branding/mentoria-black-icon-512.png'));
- ok(!html.includes('<figcaption>'));equal((html.match(/Mentoria Black/g)||[]).length,2);
+ ok(html.includes('data-cover="premium"'));ok(html.includes('assets/branding/aviora-official.jpg'));
+ ok(!html.includes('<figcaption>'));equal((html.match(/Mentoria Black/g)||[]).length,1);
+ ok(html.includes('assets/branding/aviora-official.jpg'));ok(html.includes('Símbolo oficial da AVIORA'));
  const stylesheet=fs.readFileSync(path.join(__dirname,'../knowledge/knowledge-area-premium.css'),'utf8');
  ok(stylesheet.includes('.knowledge-cover-official:before{display:none}'));ok(stylesheet.includes('background:transparent'));
 });

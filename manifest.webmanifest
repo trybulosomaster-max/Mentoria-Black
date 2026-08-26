@@ -1,9 +1,12 @@
 {
-  "name":"Mentoria Black",
-  "short_name":"Mentoria Black",
+  "name":"AVIORA — Gestão Financeira",
+  "short_name":"AVIORA",
   "start_url":"./",
   "display":"standalone",
-  "background_color":"#070707",
-  "theme_color":"#C9A227",
+  "background_color":"#070807",
+  "theme_color":"#B8944A",
+  "icons":[
+    {"src":"assets/branding/aviora-official.jpg","sizes":"1254x1254","type":"image/jpeg","purpose":"any"}
+  ],
   "lang":"pt-BR"
 }

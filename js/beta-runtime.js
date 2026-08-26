@@ -9,7 +9,7 @@
 })(typeof globalThis!=='undefined'?globalThis:this,function(){
 'use strict';
 
-const LABEL='Mentoria Black — V82 BETA';
+const LABEL='AVIORA — Gestão Financeira V82 BETA';
 const isLocalHost=host=>['localhost','127.0.0.1','::1'].includes(String(host||'').toLowerCase());
 
 function validUrl(value){
