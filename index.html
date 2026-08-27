@@ -15,6 +15,8 @@
 <link rel="stylesheet" href="knowledge/knowledge-area-premium.css">
 <link rel="stylesheet" href="assets/meridian-black-day-night-login.css">
 <link rel="stylesheet" href="assets/aviora-v82.css?v=aviora-login-v3">
+<link rel="stylesheet" href="assets/admin-area.css">
+<link rel="stylesheet" href="assets/account-security.css">
 <link rel="preload" href="assets/fonts/syncopate/Syncopate-Regular.ttf" as="font" type="font/ttf" crossorigin>
 <script src="js/production-environment.js"></script>
 <script src="js/production-runtime.js"></script>
@@ -33,6 +35,11 @@
 <script src="js/health-integration.js"></script>
 <script src="commercial/access-contract.js"></script>
 <script src="commercial/provider-contract.js"></script>
+<script src="commercial/admin-access-contract.js"></script>
+<script src="commercial/admin-presentation.js"></script>
+<script src="js/admin-access-client.js"></script>
+<script src="js/admin-area.js"></script>
+<script src="js/account-security.js"></script>
 <script src="knowledge/import-contract.js"></script>
 <script src="knowledge/knowledge-area.js"></script>
 <style>
@@ -124,6 +131,8 @@ window.MBMeridianLoginController=window.MBMeridianDayNightLogin.initialize({
 });
 </script>
 
+<section id="accountRecovery" class="hidden" aria-label="Recuperação segura da conta AVIORA"></section>
+
 <section id="app" class="hidden">
  <div class="wrap">
   <header class="header">
@@ -144,7 +153,14 @@ window.MBMeridianLoginController=window.MBMeridianDayNightLogin.initialize({
  <div class="commercial-card">
   <div class="brand-full"><img class="aviora-brand-mark" src="assets/branding/aviora-official.jpg" alt="Símbolo oficial da AVIORA"><div class="brand-copy"><div class="title">AVIORA</div><div class="sub">Acesso premium</div></div></div>
   <div id="commercialGateBody"></div>
-  <div class="actions" style="justify-content:center;margin-top:18px"><button class="btn" id="commercialLogout">Sair</button></div>
+  <div class="actions" style="justify-content:center;margin-top:18px"><button class="btn" id="commercialAccountSecurity">Minha conta</button><button class="btn" id="commercialLogout">Sair</button></div>
+ </div>
+</section>
+
+<section id="accountSecurityGate" class="hidden">
+ <div class="wrap">
+  <header class="header"><div class="brand-full"><img class="crest aviora-brand-mark" src="assets/branding/aviora-official.jpg" alt="Símbolo oficial da AVIORA"><div class="brand-copy"><div class="title">AVIORA</div><div class="sub">Gestão Financeira</div></div></div><div class="actions" style="justify-content:center"><button class="btn" id="accountSecurityGateBack">Voltar</button><button class="btn" id="accountSecurityGateLogout">Sair</button></div></header>
+  <main id="accountSecurityGateView"></main>
  </div>
 </section>
 
@@ -158,7 +174,41 @@ const SUPABASE_ANON_KEY="";
 const MB_PRODUCTION_RUNTIME=window.MBProductionRuntime.requireConfigured(document,window.MBProductionRuntime);
 const MB_PRODUCTION_FETCH=window.MBObservability.monitoredFetch(window.fetch.bind(window));
 const sb=supabase.createClient(MB_PRODUCTION_RUNTIME.supabaseUrl,MB_PRODUCTION_RUNTIME.supabasePublishableKey,{global:{fetch:MB_PRODUCTION_FETCH}});
+const AVIORA_SAFE_ERROR=(error,scope='admin')=>window.AVAdminPresentation.safeErrorMessage(error,{scope});
+const AVIORA_REPORT_DEVELOPMENT_ERROR=(context,error)=>{
+ const host=String(location.hostname||'');
+ if(host==='localhost'||host==='127.0.0.1'||/^192\.168\./.test(host))console.error(context,error);
+};
+const AVIORA_ADMIN_CLIENT=window.AVAdminAccessClient.createAdminAccessClient({supabaseClient:sb});
+const AVIORA_ADMIN_APP=window.AVAdminArea.createAdminArea({client:AVIORA_ADMIN_CLIENT,notify:(message,isError)=>toast(message,isError)});
 const $=id=>document.getElementById(id);
+const AVIORA_ACCOUNT_SECURITY=window.AVAccountSecurity.createAccountSecurity({
+  supabaseClient:sb,
+  authRedirectUrl:()=>MB_PRODUCTION_RUNTIME.authRedirectUrl||`${location.origin}${location.pathname}`,
+  locationObject:location,
+  notify:(message,isError)=>toast(message,isError),
+  onRecoveryComplete:()=>{
+    USER=null;
+    $("accountRecovery").classList.add("hidden");
+    $("accountRecovery").innerHTML="";
+    $("app").classList.add("hidden");
+    $("commercialGate").classList.add("hidden");
+    $("accountSecurityGate").classList.add("hidden");
+    $("auth").classList.remove("hidden");
+    $("authMsg").textContent="Senha atualizada. Entre novamente com sua nova senha.";
+    $("authMsg").className="msg meridian-auth-message ok";
+  }
+});
+function showAccountRecovery(){
+  $("v18Loading")?.classList.add("hidden");
+  $("auth").classList.add("hidden");
+  $("app").classList.add("hidden");
+  $("commercialGate").classList.add("hidden");
+  $("accountSecurityGate").classList.add("hidden");
+  AVIORA_ACCOUNT_SECURITY.mountRecovery($("accountRecovery"));
+}
+AVIORA_ACCOUNT_SECURITY.watch(showAccountRecovery);
+if(AVIORA_ACCOUNT_SECURITY.isRecoveryMode())showAccountRecovery();
 const money=v=>new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL"}).format(Number(v)||0);
 const num=v=>new Intl.NumberFormat("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2}).format(Number(v)||0);
 const pct=v=>(Number(v)||0).toLocaleString("pt-BR",{minimumFractionDigits:1,maximumFractionDigits:1})+"%";
@@ -470,7 +520,7 @@ function accountOptions(value=""){return `<option value="">Nenhuma</option>`+DAT
 function cardOptions(value=""){return `<option value="">Nenhum</option>`+DATA.cards.map(c=>`<option value="${c.id}" ${c.id===value?"selected":""}>${esc(c.name)}</option>`).join("")}
 function assetOptions(value=""){return `<option value="">Nenhum</option>`+(DATA.assets||[]).map(a=>`<option value="${a.id}" ${a.id===value?"selected":""}>${esc(a.name)}${a.institution?" — "+esc(a.institution):""}</option>`).join("")}
 function nav(){
- const tabs=[["dashboard","Dashboard"],["transactions","Lançamentos"],["planning","Planejamento"],["accounts","Contas"],["cards","Cartões"],["categories","Categorias"],["goals","Metas"],["recurring","Recorrências"],["wealth","Patrimônio"],["reports","Relatórios"],["knowledge","Conhecimento"]];
+ const tabs=[["dashboard","Dashboard"],["transactions","Lançamentos"],["planning","Planejamento"],["accounts","Contas"],["cards","Cartões"],["categories","Categorias"],["goals","Metas"],["recurring","Recorrências"],["wealth","Patrimônio"],["reports","Relatórios"],["knowledge","Conhecimento"],["account","Minha conta"]];
  $("nav").innerHTML=tabs.map(([id,l])=>`<button class="btn ${TAB===id?"active":""}" data-tab="${id}">${l}</button>`).join("");
  $("nav").querySelectorAll("[data-tab]").forEach(b=>b.onclick=()=>{TAB=b.dataset.tab;render()});
 }
@@ -933,10 +983,10 @@ function drawCharts(){
 }
 async function reload(){await load();render()}
 $("loginForm").onsubmit=async e=>{e.preventDefault();$("authMsg").textContent="Entrando...";const {data,error}=await sb.auth.signInWithPassword({email:$("loginEmail").value.trim(),password:$("loginPassword").value});if(error){$("authMsg").textContent=window.MBCommercialAccess.authErrorMessage(error);$("authMsg").className="msg err";return}USER=data.user;await start()};
-$("signup").onclick=async()=>{const email=$("loginEmail").value.trim(),password=$("loginPassword").value;if(!email||password.length<6){toast("Informe e-mail e senha com pelo menos 6 caracteres.",true);return}const {data,error}=await sb.auth.signUp({email,password});if(error){toast(error.message,true);return}$("authMsg").textContent=data.session?"Conta criada.":"Conta criada. Confirme seu e-mail para entrar."};
-$("resetPass").onclick=async()=>{const email=$("loginEmail").value.trim();if(!email){toast("Informe seu e-mail.",true);return}const {error}=await sb.auth.resetPasswordForEmail(email,{redirectTo:location.href.split("#")[0]});$("authMsg").textContent=error?"Erro: "+error.message:"Link de recuperação enviado."};
+$("signup").onclick=async()=>{const email=$("loginEmail").value.trim(),password=$("loginPassword").value;if(!email||password.length<6){toast("Informe e-mail e senha com pelo menos 6 caracteres.",true);return}const {data,error}=await sb.auth.signUp({email,password});if(error){toast(AVIORA_SAFE_ERROR(error,'auth'),true);return}$("authMsg").textContent=data.session?"Conta criada.":"Conta criada. Confirme seu e-mail para entrar."};
+$("resetPass").onclick=async()=>{const email=$("loginEmail").value.trim();if(!email){toast("Informe seu e-mail.",true);return}await AVIORA_ACCOUNT_SECURITY.requestRecovery(email);$("authMsg").textContent=window.AVAccountSecurity.GENERIC_RECOVERY_MESSAGE;$("authMsg").className="msg meridian-auth-message ok"};
 $("logout").onclick=async()=>{await sb.auth.signOut();location.reload()};$("refresh").onclick=async()=>{try{await reload();toast("Dados atualizados.")}catch(e){toast(e.message,true)}};$("print").onclick=()=>window.print();
-async function start(){try{await load();$("auth").classList.add("hidden");$("app").classList.remove("hidden");$("userEmail").textContent=USER.email||"";render()}catch(e){$("v18Loading")?.classList.add("hidden");$("authMsg").textContent=window.MBCommercialAccess.accountLoadErrorMessage(e)}}
+async function start(){try{await load();$("auth").classList.add("hidden");$("app").classList.remove("hidden");$("userEmail").textContent=USER.email||"";render()}catch(e){$("v18Loading")?.classList.add("hidden");$("authMsg").textContent=window.MBCommercialAccess.accountLoadErrorMessage(e);AVIORA_REPORT_DEVELOPMENT_ERROR('Initial load',e)}}
 /* V18 session bootstrap replaces the original bootstrap. */
 if("serviceWorker" in navigator){
   const MB_SW_VERSION="26";
@@ -1104,10 +1154,6 @@ if("serviceWorker" in navigator){
 */
 (function(){
   const checkoutAdapter=window.MBCommercialProvider.createMockCheckoutAdapter();
-  function reportDevelopmentError(context,error){
-    const host=String(location.hostname||'');
-    if(host==='localhost'||host==='127.0.0.1'||/^192\.168\./.test(host))console.error(context,error);
-  }
   window.commercialCheckout=async function(kind){
     const action={monthly:'createAppMonthlyCheckout',annual:'createAppAnnualCheckout',knowledge:'createKnowledgeCheckout',complete:'createCompleteCheckout'}[kind];
     const result=await checkoutAdapter[action]({paymentMethod:'PIX'});
@@ -1116,8 +1162,8 @@ if("serviceWorker" in navigator){
   };
   function showCommercialGate(state){
     const expired=state.experience==='trial_expired';
-    $("auth").classList.add("hidden");$("app").classList.add("hidden");$("commercialGate").classList.remove("hidden");
-    $("commercialGateBody").innerHTML=`<h1>${expired?'Seu período gratuito terminou.':'Seu acesso está pronto para evoluir.'}</h1><p class="muted">Seus dados financeiros permanecem preservados. Assim que um acesso APP for confirmado, você continua com a mesma conta.</p><div class="commercial-grid"><div class="commercial-option"><h2>Plano Mensal</h2><p class="muted">Aplicativo financeiro completo.</p><button class="btn gold" onclick="commercialCheckout('monthly')">Assinar mensal</button></div><div class="commercial-option"><h2>Plano Anual</h2><p class="muted">Aplicativo financeiro completo.</p><button class="btn gold" onclick="commercialCheckout('annual')">Assinar anual</button></div><div class="commercial-option"><h2>Plano Completo</h2><p class="muted">APP + KNOWLEDGE em concessões independentes.</p><button class="btn gold" onclick="commercialCheckout('complete')">Conhecer plano completo</button></div></div><div id="commercialKnowledgeRoot" class="knowledge-root"></div>`;
+    $("auth").classList.add("hidden");$("app").classList.add("hidden");$("accountSecurityGate").classList.add("hidden");$("commercialGate").classList.remove("hidden");
+    $("commercialGateBody").innerHTML=`<h1>${expired?'Seu período gratuito terminou.':'Seu acesso está pronto para evoluir.'}</h1><p class="muted">Seus dados financeiros permanecem preservados. Assim que um acesso ao Aplicativo for confirmado, você continua com a mesma conta.</p><div class="commercial-grid"><div class="commercial-option"><h2>Plano Mensal</h2><p class="muted">Aplicativo financeiro completo.</p><button class="btn gold" onclick="commercialCheckout('monthly')">Assinar mensal</button></div><div class="commercial-option"><h2>Plano Anual</h2><p class="muted">Aplicativo financeiro completo.</p><button class="btn gold" onclick="commercialCheckout('annual')">Assinar anual</button></div><div class="commercial-option"><h2>Plano Completo</h2><p class="muted">Aplicativo + Conhecimento em acessos independentes.</p><button class="btn gold" onclick="commercialCheckout('complete')">Conhecer plano completo</button></div></div><div id="commercialKnowledgeRoot" class="knowledge-root"></div>`;
     mountKnowledgeArea("commercialKnowledgeRoot",state.entitlements).catch(error=>toast(error.message,true));
     $("v18Loading")?.classList.add("hidden");
   }
@@ -1161,6 +1207,8 @@ if("serviceWorker" in navigator){
     if(resolved.error)throw resolved.error;
     const entitlement=window.MBCommercialAccess.normalizeEntitlements(resolved.data);
     if(!entitlement.app.hasAccess){showCommercialGate({entitlements:entitlement,experience:window.MBCommercialAccess.resolveExperience(resolved.data)});return}
+    await AVIORA_ADMIN_APP.loadContext({silent:true});
+    if(TAB==='administration'&&!AVIORA_ADMIN_APP.canShowNavigation())TAB='dashboard';
     await load();
     const result=await materializeRecurringV17();
     if(result?.transactions?.length) DATA.transactions.push(...result.transactions);
@@ -1168,10 +1216,19 @@ if("serviceWorker" in navigator){
   };
 
   window.start=async function(){
+    if(AVIORA_ACCOUNT_SECURITY.isRecoveryMode()){
+      showAccountRecovery();
+      return;
+    }
     try{
       $("authMsg").textContent="Carregando seus dados…";
       const commercial=await resolveCommercialSession();
+      if(AVIORA_ACCOUNT_SECURITY.isRecoveryMode()){
+        showAccountRecovery();
+        return;
+      }
       if(!commercial.entitlements.app.hasAccess){showCommercialGate(commercial);return}
+      await AVIORA_ADMIN_APP.loadContext({silent:true});
       await load();
       const result=await materializeRecurringV17();
       if(result?.transactions?.length) DATA.transactions.push(...result.transactions);
@@ -1189,7 +1246,7 @@ if("serviceWorker" in navigator){
       $("app").classList.add("hidden");
       $("authMsg").textContent=window.MBCommercialAccess.accountLoadErrorMessage(e);
       $("authMsg").className="msg meridian-auth-message err";
-      reportDevelopmentError('Commercial session',e);
+      AVIORA_REPORT_DEVELOPMENT_ERROR('Commercial session',e);
     }
   };
 
@@ -1206,8 +1263,15 @@ if("serviceWorker" in navigator){
     await window.start();
   };
 
-  $("logout").onclick=async()=>{await sb.auth.signOut();location.reload()};
-  $("commercialLogout").onclick=async()=>{await sb.auth.signOut();location.reload()};
+  $("logout").onclick=async()=>{AVIORA_ADMIN_APP.resetContext();await sb.auth.signOut();location.reload()};
+  $("commercialLogout").onclick=async()=>{AVIORA_ADMIN_APP.resetContext();await sb.auth.signOut();location.reload()};
+  $("commercialAccountSecurity").onclick=()=>{
+    $("commercialGate").classList.add("hidden");
+    $("accountSecurityGate").classList.remove("hidden");
+    AVIORA_ACCOUNT_SECURITY.mount($("accountSecurityGateView"),USER);
+  };
+  $("accountSecurityGateBack").onclick=()=>{$("accountSecurityGate").classList.add("hidden");$("commercialGate").classList.remove("hidden")};
+  $("accountSecurityGateLogout").onclick=()=>$("commercialLogout").click();
   $("refresh").onclick=async()=>{try{await window.reload();toast("Dados atualizados.")}catch(e){toast(e.message,true)}};
 
   (async()=>{
@@ -1219,12 +1283,13 @@ if("serviceWorker" in navigator){
       const session=result?.data?.session;
       if(session){
         USER=session.user;
-        await Promise.race([window.start(),timeout(25000)]);
+        if(AVIORA_ACCOUNT_SECURITY.isRecoveryMode())showAccountRecovery();
+        else await Promise.race([window.start(),timeout(25000)]);
       }else{
         $("v18Loading")?.classList.add("hidden");
       }
     }catch(e){
-      reportDevelopmentError('V18 bootstrap',e);
+      AVIORA_REPORT_DEVELOPMENT_ERROR('V18 bootstrap',e);
       $("v18Loading")?.classList.add("hidden");
       $("authMsg").textContent=window.MBCommercialAccess.accountLoadErrorMessage(e);
       $("authMsg").className="msg meridian-auth-message err";
@@ -3072,7 +3137,8 @@ migrateReserveGoals();
   };
 
   window.__MB_BASE_NAV60__ = function(){
-    const tabs=[['dashboard','Dashboard'],['transactions','Lançamentos'],['planning','Planejamento'],['accounts','Contas'],['cards','Cartões'],['categories','Categorias'],['goals','Metas'],['recurring','Recorrências'],['wealth','Patrimônio'],['reports','Relatórios'],['knowledge','Conhecimento']];
+    const tabs=[['dashboard','Dashboard'],['transactions','Lançamentos'],['planning','Planejamento'],['accounts','Contas'],['cards','Cartões'],['categories','Categorias'],['goals','Metas'],['recurring','Recorrências'],['wealth','Patrimônio'],['reports','Relatórios'],['knowledge','Conhecimento'],['account','Minha conta']];
+    if(typeof AVIORA_ADMIN_APP!=='undefined'&&AVIORA_ADMIN_APP.canShowNavigation())tabs.push(['administration','Administração']);
     const navEl=document.getElementById('nav');
     if(!navEl) return;
     navEl.setAttribute('aria-label','Navegação principal');
@@ -3084,6 +3150,20 @@ migrateReserveGoals();
   };
 
   window.render = function(){
+    if(TAB==='account'){
+      window.__MB_BASE_NAV60__();
+      installNavigation60();
+      const view=document.getElementById('view');
+      if(view)AVIORA_ACCOUNT_SECURITY.mount(view,USER);
+      return;
+    }
+    if(TAB==='administration'){
+      window.__MB_BASE_NAV60__();
+      installNavigation60();
+      const view=document.getElementById('view');
+      if(view)AVIORA_ADMIN_APP.mount(view);
+      return;
+    }
     if(TAB==='reserve-v52'){
       window.__MB_BASE_NAV60__();
       installNavigation60();

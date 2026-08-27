@@ -201,6 +201,10 @@ ok(activeLogin.includes('MBCommercialAccess.authErrorMessage(error)'),'active pr
 ok(!activeLogin.includes('error.message'),'active production login never renders the raw Supabase Auth message');
 ok(activeLogin.indexOf('if(error)')<activeLogin.indexOf('window.MBMeridianLoginController?.recordSuccessfulLogin(email);'),'failed authentication exits before remember-email persistence');
 ok(index.indexOf('window.MBMeridianLoginController?.recordSuccessfulLogin(email);')<index.indexOf('USER=data.user;\n    await window.start();'),'remember-email does not alter the existing server_now startup chain');
+ok(index.includes('MBCommercialAccess.accountLoadErrorMessage(e)'),'account-load failures use the sanitized commercial message');
+ok(index.includes("AVIORA_REPORT_DEVELOPMENT_ERROR('Commercial session',e)"),'commercial diagnostics use the development-only reporter');
+ok(index.includes("AVIORA_REPORT_DEVELOPMENT_ERROR('V18 bootstrap',e)"),'bootstrap diagnostics use the development-only reporter');
+ok(!index.includes('textContent="Erro ao carregar seus dados: "+e.message'),'technical session errors are not rendered to the user');
 ok(!index.includes('URLSearchParams')&&!index.includes('?theme='),'production HTML has no preview theme override');
 ok(preview.includes("new URLSearchParams(location.search)")&&preview.includes("params.get('theme')||'auto'"),'only the local preview recognizes a forced theme');
 ok(preview.includes("theme==='day'||theme==='night'"),'preview rejects unsupported forced-theme values');
