@@ -4,6 +4,7 @@ const PRODUCT_CODES=Object.freeze({APP:'APP',KNOWLEDGE:'KNOWLEDGE',COMPLETE:'COM
 const ACCESS_TYPES=Object.freeze(['paid','trial','manual','lifetime','internal']);
 const ACCESS_STATES=Object.freeze(['active','grace_period','past_due','expired','revoked','refunded','chargeback','administrative_review','none']);
 const TRIAL_RESULTS=Object.freeze(['started','already_active','already_used','not_eligible','internal_access']);
+const ACCESS_BASES=Object.freeze(['commercial','internal','internal_and_commercial','none']);
 const AUTH_ERROR_MESSAGES=Object.freeze({invalid_credentials:'E-mail ou senha incorretos.',email_not_confirmed:'Confirme seu e-mail antes de entrar.'});
 const NORMALIZED_ENTITLEMENTS=new WeakSet();
 
@@ -11,20 +12,46 @@ function entitlement(value){
   const source=value&&typeof value==='object'?value:{};
   const accessType=source.access_type||source.type;
   const state=source.state||source.status||'none';
+  const accessBasis=ACCESS_BASES.includes(source.access_basis)?source.access_basis:'none';
   return Object.freeze({
     hasAccess:source.has_access===true||source.access===true,
     access:source.has_access===true||source.access===true,
     accessType:ACCESS_TYPES.includes(accessType)?accessType:null,
     type:ACCESS_TYPES.includes(accessType)?accessType:null,
-    internalAccess:source.internal_access===true,
-    accessBasis:typeof source.access_basis==='string'?source.access_basis:null,
     source:typeof source.source==='string'?source.source:null,
     state:ACCESS_STATES.includes(state)?state:'none',
     status:ACCESS_STATES.includes(state)?state:'none',
     expiresAt:source.expires_at||null,
     graceUntil:source.grace_until||null,
     trialRemainingSeconds:Number.isFinite(Number(source.trial_remaining_seconds))?Math.max(0,Number(source.trial_remaining_seconds)):null,
-    commercialState:typeof source.commercial_state==='string'?source.commercial_state:null
+    commercialState:typeof source.commercial_state==='string'?source.commercial_state:null,
+    accessBasis,
+    internalAccess:source.internal_access===true,
+    commercialAccess:Object.freeze(source.commercial_access&&typeof source.commercial_access==='object'?{...source.commercial_access}:{has_access:false})
+  });
+}
+
+function explicitProductInternalAccess(value,fallback){
+  const source=value&&typeof value==='object'&&!Array.isArray(value)?value:null;
+  return source&&typeof source.internal_access==='boolean'?source.internal_access===true:fallback;
+}
+
+function internalAccess(value,appValue,knowledgeValue){
+  const source=value&&typeof value==='object'&&!Array.isArray(value)?value:null;
+  if(source){
+    return Object.freeze({
+      active:source.active===true,
+      app:source.app===true,
+      knowledge:source.knowledge===true,
+      role:typeof source.role==='string'?source.role:null
+    });
+  }
+  const active=value===true;
+  return Object.freeze({
+    active,
+    app:explicitProductInternalAccess(appValue,active),
+    knowledge:explicitProductInternalAccess(knowledgeValue,active),
+    role:null
   });
 }
 
@@ -32,7 +59,18 @@ function normalizeEntitlements(payload){
   if(!payload||typeof payload!=='object')throw new TypeError('invalid entitlement response');
   if(NORMALIZED_ENTITLEMENTS.has(payload))return payload;
   if(!payload.server_now)throw new TypeError('server_now is required');
-  const normalized=Object.freeze({serverNow:String(payload.server_now),internalAccess:payload.internal_access===true,accessBasis:typeof payload.access_basis==='string'?payload.access_basis:null,app:entitlement(payload.app),knowledge:entitlement(payload.knowledge),trial:Object.freeze(payload.trial&&typeof payload.trial==='object'?{...payload.trial}:{state:'eligible'})});
+  const app=entitlement(payload.app),knowledge=entitlement(payload.knowledge),internal=internalAccess(payload.internal_access,payload.app,payload.knowledge);
+  const hasCommercial=[app,knowledge].some(item=>item.hasAccess&&item.accessType!=='internal');
+  const inferredBasis=internal.active?(hasCommercial?'internal_and_commercial':'internal'):hasCommercial?'commercial':'none';
+  const basis=ACCESS_BASES.includes(payload.access_basis)?payload.access_basis:inferredBasis;
+  const normalized=Object.freeze({
+    serverNow:String(payload.server_now),
+    app,
+    knowledge,
+    trial:Object.freeze(payload.trial&&typeof payload.trial==='object'?{...payload.trial}:{state:'eligible'}),
+    internalAccess:internal,
+    accessBasis:basis
+  });
   NORMALIZED_ENTITLEMENTS.add(normalized);
   return normalized;
 }
@@ -55,7 +93,7 @@ function trialRemaining(entitlements){
 
 function trialNotice(entitlements){
   const state=normalizeEntitlements(entitlements);
-  if(state.internalAccess||state.app.internalAccess||state.knowledge.internalAccess)return '';
+  if(state.internalAccess.active===true)return '';
   const remaining=trialRemaining(state);
   if(!remaining)return '';
   const hours=Math.ceil(remaining/3600000);
@@ -86,6 +124,6 @@ async function beginCommercialSession(client){
   return Object.freeze({trialResult:trialRow?.result||null,entitlements,experience:resolveExperience(resolved.data)});
 }
 
-const api={PRODUCT_CODES,ACCESS_TYPES,ACCESS_STATES,TRIAL_RESULTS,normalizeEntitlements,resolveExperience,trialRemaining,trialNotice,authErrorMessage,accountLoadErrorMessage,beginCommercialSession};
+const api={PRODUCT_CODES,ACCESS_TYPES,ACCESS_STATES,TRIAL_RESULTS,ACCESS_BASES,normalizeEntitlements,resolveExperience,trialRemaining,trialNotice,authErrorMessage,accountLoadErrorMessage,beginCommercialSession};
 if(typeof module!=='undefined'&&module.exports)module.exports=api;
 if(typeof globalThis!=='undefined')globalThis.MBCommercialAccess=Object.freeze(api);

@@ -242,6 +242,9 @@ verify_jwt = true
 [functions.asaas-webhook]
 verify_jwt = false
 
+[functions.admin-access-control-v1]
+verify_jwt = true
+
 # Use a production-ready SMTP server
 # [auth.email.smtp]
 # enabled = true
