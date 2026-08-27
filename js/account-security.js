@@ -57,14 +57,30 @@
     return `<div class="account-security-area">
       <div class="pagehead"><div><h1>Minha conta</h1><p>Segurança e sessões da sua conta AVIORA.</p></div></div>
       <div class="account-security-grid">
-        <section class="card account-security-card" aria-labelledby="account-password-title"><h2 id="account-password-title">Alterar minha senha</h2><p class="desc">Confirme sua senha atual antes de definir uma nova.</p>${renderPasswordForm(false)}</section>
-        <section class="card account-security-card" aria-labelledby="account-recovery-title"><h2 id="account-recovery-title">Recuperação da conta</h2><p class="desc">Enviaremos um link de recuperação para <strong>${escapeHtml(user?.email||'seu e-mail')}</strong>.</p><button class="btn" type="button" data-account-security-action="recovery">Enviar link de recuperação</button><div class="account-security-message" data-account-recovery-message aria-live="polite"></div></section>
-        <section class="card account-security-card" aria-labelledby="account-sessions-title"><h2 id="account-sessions-title">Sessões</h2><p class="desc">Encerre as outras sessões sem sair deste dispositivo.</p><div class="notice">As outras sessões serão encerradas. A sessão atual permanecerá ativa. Tokens de acesso já emitidos podem continuar válidos até a expiração.</div><button class="btn danger" type="button" data-account-security-action="signout-others">Encerrar outras sessões</button><div class="account-security-message" data-account-sessions-message aria-live="polite"></div></section>
+        <section class="card account-security-card" data-account-security-section="password" aria-labelledby="account-password-trigger"><button class="account-security-trigger" id="account-password-trigger" type="button" aria-expanded="false" aria-controls="account-password-panel"><span><strong>Alterar minha senha</strong><small data-account-security-summary>Proteja sua conta com uma senha forte</small></span><span class="account-security-chevron" aria-hidden="true"></span></button><div class="account-security-panel" id="account-password-panel" role="region" aria-labelledby="account-password-trigger" hidden><p class="desc">Confirme sua senha atual antes de definir uma nova.</p>${renderPasswordForm(false)}</div></section>
+        <section class="card account-security-card" data-account-security-section="recovery" aria-labelledby="account-recovery-trigger"><button class="account-security-trigger" id="account-recovery-trigger" type="button" aria-expanded="false" aria-controls="account-recovery-panel"><span><strong>Recuperação da conta</strong><small data-account-security-summary>Use o e-mail cadastrado para recuperar o acesso</small></span><span class="account-security-chevron" aria-hidden="true"></span></button><div class="account-security-panel" id="account-recovery-panel" role="region" aria-labelledby="account-recovery-trigger" hidden><p class="desc">Enviaremos um link de recuperação para <strong>${escapeHtml(user?.email||'seu e-mail')}</strong>.</p><button class="btn" type="button" data-account-security-action="recovery">Enviar link de recuperação</button><div class="account-security-message" data-account-recovery-message aria-live="polite"></div></div></section>
+        <section class="card account-security-card" data-account-security-section="sessions" aria-labelledby="account-sessions-trigger"><button class="account-security-trigger" id="account-sessions-trigger" type="button" aria-expanded="false" aria-controls="account-sessions-panel"><span><strong>Sessões</strong><small data-account-security-summary>Esta sessão permanece ativa</small></span><span class="account-security-chevron" aria-hidden="true"></span></button><div class="account-security-panel" id="account-sessions-panel" role="region" aria-labelledby="account-sessions-trigger" hidden><p class="desc">Encerre as outras sessões sem sair deste dispositivo.</p><div class="notice">As outras sessões serão encerradas. A sessão atual permanecerá ativa. Tokens de acesso já emitidos podem continuar válidos até a expiração.</div><button class="btn danger" type="button" data-account-security-action="signout-others">Encerrar outras sessões</button><div class="account-security-message" data-account-sessions-message aria-live="polite"></div></div></section>
       </div>
     </div>`;
   }
   function renderRecoveryScreen(){
     return `<main class="account-recovery-shell"><section class="account-recovery-card"><div class="brand-copy"><div class="title">AVIORA</div><div class="sub">Gestão Financeira</div></div><h1>Defina sua nova senha</h1><p>Esta tela foi aberta por um link oficial de recuperação do Supabase Auth.</p>${renderPasswordForm(true)}</section></main>`;
+  }
+
+  function setAccountSecurityExpanded(trigger,panel,expanded){
+    if(!trigger||!panel)return;
+    trigger.setAttribute('aria-expanded',String(expanded));
+    panel.hidden=!expanded;
+    trigger.closest?.('.account-security-card')?.classList?.toggle?.('is-open',expanded);
+  }
+  function bindAccountSecuritySections(root){
+    root?.querySelectorAll?.('.account-security-trigger').forEach(trigger=>{
+      const panel=root.querySelector(`#${trigger.getAttribute('aria-controls')}`);
+      if(!panel||trigger.dataset.accountSecurityReady==='true')return;
+      trigger.dataset.accountSecurityReady='true';
+      setAccountSecurityExpanded(trigger,panel,false);
+      trigger.addEventListener('click',()=>setAccountSecurityExpanded(trigger,panel,trigger.getAttribute('aria-expanded')!=='true'));
+    });
   }
 
   function createAccountSecurity(options={}){
@@ -75,10 +91,19 @@
     const recoveryRedirect=()=>safeRecoveryRedirect(typeof options.authRedirectUrl==='function'?options.authRedirectUrl():options.authRedirectUrl,locationObject);
     let recoveryMode=isRecoveryLocation(locationObject),subscription=null;
 
+    function updateSectionSummary(element,text,tone=''){
+      const card=element?.closest?.('[data-account-security-section]');
+      const summary=card?.querySelector?.('[data-account-security-summary]');
+      if(!summary)return;
+      summary.textContent=text;
+      summary.classList.remove('ok','err');
+      if(tone)summary.classList.add(tone);
+    }
+
     async function changePassword(form,{recovery=false}={}){
       const current=form.elements.currentPassword?.value||'',next=form.elements.newPassword?.value||'',confirmation=form.elements.confirmPassword?.value||'';
       const message=form.querySelector('[data-account-security-message]'),button=form.querySelector('button[type="submit"]');
-      const show=(text,error=false)=>{if(message){message.textContent=text;message.className=`account-security-message ${error?'err':'ok'}`}};
+      const show=(text,error=false)=>{if(message){message.textContent=text;message.className=`account-security-message ${error?'err':'ok'}`};updateSectionSummary(form,text,error?'err':'ok')};
       if(!recovery&&!current){show('Informe sua senha atual.',true);return false}
       if(next!==confirmation){show('A confirmação da nova senha não confere.',true);return false}
       const issues=passwordIssues(next);
@@ -123,19 +148,20 @@
     function mount(root,user){
       if(!root)throw new TypeError('account security root is required');
       root.innerHTML=renderAccountSecurity(user);
+      bindAccountSecuritySections(root);
       bindPasswordForm(root,false);
       const recoveryButton=root.querySelector('[data-account-security-action="recovery"]');
       if(recoveryButton)recoveryButton.onclick=async()=>{
         const message=root.querySelector('[data-account-recovery-message]');
         recoveryButton.disabled=true;
-        try{const result=await requestRecovery(user?.email);if(message){message.textContent=result.message;message.className='account-security-message ok'}}catch(_error){if(message){message.textContent=GENERIC_RECOVERY_MESSAGE;message.className='account-security-message ok'}}
+        try{const result=await requestRecovery(user?.email);if(message){message.textContent=result.message;message.className='account-security-message ok'};updateSectionSummary(recoveryButton,'Instruções de recuperação solicitadas','ok')}catch(_error){if(message){message.textContent=GENERIC_RECOVERY_MESSAGE;message.className='account-security-message ok'};updateSectionSummary(recoveryButton,'Instruções de recuperação solicitadas','ok')}
         finally{recoveryButton.disabled=false}
       };
       const sessionsButton=root.querySelector('[data-account-security-action="signout-others"]');
       if(sessionsButton)sessionsButton.onclick=async()=>{
         const message=root.querySelector('[data-account-sessions-message]');
         sessionsButton.disabled=true;
-        try{await signOutOthers();if(message){message.textContent='As outras sessões foram encerradas. Esta sessão continua ativa.';message.className='account-security-message ok'}}catch(_error){if(message){message.textContent='Não foi possível encerrar as outras sessões.';message.className='account-security-message err'}}
+        try{await signOutOthers();if(message){message.textContent='As outras sessões foram encerradas. Esta sessão continua ativa.';message.className='account-security-message ok'};updateSectionSummary(sessionsButton,'Outras sessões encerradas; esta permanece ativa','ok')}catch(_error){if(message){message.textContent='Não foi possível encerrar as outras sessões.';message.className='account-security-message err'};updateSectionSummary(sessionsButton,'Não foi possível encerrar as outras sessões','err')}
         finally{sessionsButton.disabled=false}
       };
     }
@@ -161,5 +187,5 @@
     return Object.freeze({mount,mountRecovery,watch,destroy,changePassword,requestRecovery,signOutOthers,isRecoveryMode:()=>recoveryMode});
   }
 
-  return Object.freeze({MIN_PASSWORD_LENGTH,MAX_PASSWORD_LENGTH,GENERIC_RECOVERY_MESSAGE,passwordIssues,safeRecoveryRedirect,isRecoveryLocation,passwordErrorMessage,renderPasswordForm,renderAccountSecurity,renderRecoveryScreen,createAccountSecurity});
+  return Object.freeze({MIN_PASSWORD_LENGTH,MAX_PASSWORD_LENGTH,GENERIC_RECOVERY_MESSAGE,passwordIssues,safeRecoveryRedirect,isRecoveryLocation,passwordErrorMessage,renderPasswordForm,renderAccountSecurity,renderRecoveryScreen,setAccountSecurityExpanded,bindAccountSecuritySections,createAccountSecurity});
 });

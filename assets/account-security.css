@@ -1,9 +1,22 @@
 .account-security-area{display:grid;gap:16px;min-width:0}
-.account-security-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
-.account-security-card{display:flex;flex-direction:column;gap:12px;min-width:0}
-.account-security-card h2{font-size:18px;margin:0}
-.account-security-card .desc{line-height:1.55;margin:0}
-.account-security-card>.btn{align-self:flex-start;margin-top:auto}
+.account-security-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:12px}
+.account-security-card{min-width:0;overflow:hidden;padding:0}
+.account-security-card.is-open{border-color:var(--aviora-border-strong,#5a4c31)}
+.account-security-trigger{display:flex;width:100%;min-height:66px;align-items:center;justify-content:space-between;gap:16px;border:0;padding:15px 17px;background:transparent;color:inherit;text-align:left}
+.account-security-trigger>span:first-child{min-width:0}
+.account-security-trigger strong,.account-security-trigger small{display:block}
+.account-security-trigger strong{color:var(--aviora-text,#f5f3ed);font-size:15px}
+.account-security-trigger small{margin-top:5px;color:var(--muted);font-size:11px;line-height:1.45;overflow-wrap:anywhere}
+.account-security-trigger small.ok{color:var(--aviora-success,#86bb91)}
+.account-security-trigger small.err{color:var(--aviora-danger,#d88b8b)}
+.account-security-trigger:focus-visible{outline:2px solid var(--aviora-gold,#c9a85a);outline-offset:-3px}
+.account-security-chevron{position:relative;width:18px;height:18px;flex:0 0 18px}
+.account-security-chevron::before{position:absolute;inset:3px 1px;background:var(--aviora-gold-soft,#d9bc78);clip-path:polygon(0 16%,50% 66%,100% 16%,100% 38%,50% 88%,0 38%);content:""}
+.account-security-trigger[aria-expanded="true"] .account-security-chevron::before{clip-path:polygon(0 62%,50% 12%,100% 62%,100% 84%,50% 34%,0 84%)}
+.account-security-panel{display:grid;gap:12px;border-top:1px solid var(--aviora-border,#39352c);padding:17px}
+.account-security-panel[hidden]{display:none}
+.account-security-panel .desc{line-height:1.55;margin:0}
+.account-security-panel>.btn{justify-self:start}
 .account-security-form{display:grid;gap:11px}
 .account-security-form .field{margin:0}
 .account-security-message{min-height:20px;font-size:12px;line-height:1.45;color:var(--muted)}
@@ -16,5 +29,4 @@
 .account-recovery-card .sub{color:var(--aviora-champagne,#e5d6ad);font-size:10px;letter-spacing:.22em;text-transform:uppercase;margin-top:7px}
 .account-recovery-card h1{font-size:25px;margin:0 0 8px}
 .account-recovery-card>p{color:var(--muted);line-height:1.5;margin:0 0 20px}
-@media(max-width:980px){.account-security-grid{grid-template-columns:1fr 1fr}.account-security-card:last-child{grid-column:1/-1}}
-@media(max-width:600px){.account-security-grid{grid-template-columns:1fr}.account-security-card:last-child{grid-column:auto}.account-security-card>.btn,.account-security-form>.btn{width:100%;min-height:44px}.account-recovery-card{padding:22px 18px}.account-recovery-card .title{font-size:23px}.account-recovery-card h1{font-size:22px}}
+@media(max-width:600px){.account-security-trigger{min-height:72px;padding:14px 15px}.account-security-panel{padding:15px}.account-security-panel>.btn,.account-security-form>.btn{width:100%;min-height:44px}.account-recovery-card{padding:22px 18px}.account-recovery-card .title{font-size:23px}.account-recovery-card h1{font-size:22px}}

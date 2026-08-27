@@ -77,5 +77,26 @@ await test('rendered account security is available without administrative role',
   check(html.includes('maxlength="128"'));
   check(security.renderRecoveryScreen().includes('Defina sua nova senha'));
 });
+await test('Minha conta renders three safe collapsed sections without invented state',()=>{
+  const html=security.renderAccountSecurity({email:'customer@example.invalid'});
+  equal((html.match(/class="account-security-trigger"/g)||[]).length,3);
+  equal((html.match(/class="account-security-panel"/g)||[]).length,3);
+  equal((html.match(/aria-expanded="false"/g)||[]).length,3);
+  equal((html.match(/role="region"/g)||[]).length,3);
+  equal((html.match(/ hidden>/g)||[]).length,3);
+  for(const summary of ['Proteja sua conta com uma senha forte','Use o e-mail cadastrado para recuperar o acesso','Esta sessão permanece ativa'])check(html.includes(summary),`missing safe summary: ${summary}`);
+  check(!/\b\d+ sess(?:ão|ões) ativa|recuperação configurada/i.test(html));
+  for(const action of ['data-account-security-form="password"','data-account-security-action="recovery"','data-account-security-action="signout-others"'])check(html.includes(action),`missing ${action}`);
+});
+await test('account section state is semantic and toggles without changing Auth actions',()=>{
+  const attributes=new Map(),classes=[];
+  const trigger={setAttribute:(key,value)=>attributes.set(key,value),closest:()=>({classList:{toggle:(name,value)=>classes.push([name,value])}})};
+  const panel={hidden:false};
+  security.setAccountSecurityExpanded(trigger,panel,false);
+  equal(attributes.get('aria-expanded'),'false');equal(panel.hidden,true);
+  security.setAccountSecurityExpanded(trigger,panel,true);
+  equal(attributes.get('aria-expanded'),'true');equal(panel.hidden,false);
+  assert.deepStrictEqual(classes,[['is-open',false],['is-open',true]]);assertions++;
+});
 console.log(`account security: ${tests} tests, ${assertions} assertions passed`);
 })().catch(error=>{console.error(error);process.exitCode=1});
