@@ -13,14 +13,53 @@ await test('resolver covers trial, paid, knowledge, complete, grace and paywall'
  equal(access.resolveExperience({...base,app:{has_access:true,access_type:'paid'},knowledge:{has_access:true,access_type:'lifetime'}}),'complete');
  equal(access.resolveExperience({...base,trial:{state:'expired'},app:{has_access:false,state:'expired'},knowledge:{has_access:false}}),'trial_expired');
 });
+await test('internal admin access is normalized without becoming browser authorization',()=>{
+ equal(access.TRIAL_RESULTS.join(','),'started,already_active,already_used,not_eligible,internal_access');
+ equal(access.ACCESS_TYPES.join(','),'paid,trial,manual,lifetime,internal');
+ const payload={server_now:'2026-08-27T00:00:00Z',internal_access:true,access_basis:'internal_and_commercial',app:{has_access:true,access_type:'internal',internal_access:true,access_basis:'internal',state:'active',trial_remaining_seconds:259200},knowledge:{has_access:true,access_type:'internal',internal_access:true,access_basis:'internal_and_commercial',state:'active'},trial:{state:'active',expires_at:'2026-08-30T00:00:00Z'}};
+ const state=access.normalizeEntitlements(payload);
+ equal(state.internalAccess,true);equal(state.accessBasis,'internal_and_commercial');
+ equal(state.app.accessType,'internal');equal(state.app.internalAccess,true);equal(state.app.accessBasis,'internal');
+ equal(state.knowledge.accessType,'internal');equal(state.knowledge.internalAccess,true);equal(state.knowledge.accessBasis,'internal_and_commercial');
+ equal(access.resolveExperience(state),'complete');equal(access.trialNotice(state),'');
+ const denied={server_now:payload.server_now,internal_access:true,access_basis:'internal',app:{has_access:false,access_type:'internal',internal_access:true,access_basis:'internal'},knowledge:{has_access:false},trial:{state:'used'}};
+ equal(access.resolveExperience(denied),'no_access','internal metadata never invents access without the server has_access/access flag');
+});
 await test('trial display uses only server response',()=>{
  const state={server_now:'2026-08-22T00:00:00Z',app:{has_access:true,access_type:'trial',trial_remaining_seconds:604800},knowledge:{has_access:false},trial:{state:'active',expires_at:'2099-01-01'}};
  equal(access.trialRemaining(state),604800000);equal(access.trialNotice(state),'Teste gratuito — 7 dias restantes');
  const final={...state,app:{...state.app,trial_remaining_seconds:3600}};equal(access.trialNotice(final),'Teste gratuito — menos de 1 hora');
 });
+await test('internal OWNER and STAFF hide historical trial notice while CUSTOMER retains it',()=>{
+ const base={server_now:'2026-08-27T00:00:00Z',trial:{state:'active',expires_at:'2026-08-30T00:00:00Z'}};
+ const owner={...base,app:{has_access:true,access_type:'internal',internal_access:true,trial_remaining_seconds:259200},knowledge:{has_access:true,access_type:'internal',internal_access:true}};
+ const staff={...base,app:{has_access:true,access_type:'internal',internal_access:true,trial_remaining_seconds:259200},knowledge:{has_access:true,access_type:'internal',internal_access:true}};
+ const customer={...base,app:{has_access:true,access_type:'trial',trial_remaining_seconds:259200},knowledge:{has_access:false}};
+ equal(access.resolveExperience(owner),'complete');equal(access.resolveExperience(staff),'complete');
+ equal(access.trialNotice(owner),'');equal(access.trialNotice(staff),'');
+ equal(access.resolveExperience(customer),'app_trial');equal(access.trialNotice(customer),'Teste gratuito — 3 dias restantes');
+});
 await test('commercial bootstrap starts trial then resolves before app data',async()=>{
  const calls=[],client={rpc:async name=>{calls.push(name);return name==='start_my_app_trial'?{data:[{result:'started',trial_state:'active'}],error:null}:{data:{server_now:'2026-08-22T00:00:00Z',app:{has_access:true,access_type:'trial'},knowledge:{has_access:false},trial:{state:'active'}},error:null}}};
  const result=await access.beginCommercialSession(client);equal(calls.join(','),'start_my_app_trial,get_my_entitlements');equal(result.trialResult,'started');equal(result.experience,'app_trial');
+});
+await test('commercial bootstrap accepts only the canonical internal trial result',async()=>{
+ const calls=[],client={rpc:async name=>{calls.push(name);return name==='start_my_app_trial'?{data:[{result:'internal_access'}],error:null}:{data:{server_now:'2026-08-27T00:00:00Z',app:{has_access:true,access_type:'internal',internal_access:true,access_basis:'internal'},knowledge:{has_access:true,access_type:'internal',internal_access:true,access_basis:'internal'},trial:{state:'active'}},error:null}}};
+ const result=await access.beginCommercialSession(client);
+ equal(calls.join(','),'start_my_app_trial,get_my_entitlements','the frontend performs only the two read/entitlement RPCs');equal(result.trialResult,'internal_access');equal(result.experience,'complete');
+ const rejectedCalls=[],rejected={rpc:async name=>{rejectedCalls.push(name);return {data:[{result:'unexpected_internal_value'}],error:null}}};
+ await assert.rejects(()=>access.beginCommercialSession(rejected),/invalid trial result/);assertions++;
+ equal(rejectedCalls.join(','),'start_my_app_trial','unknown trial results fail before entitlement loading');
+});
+await test('Auth and account-load errors have safe Portuguese presentation',()=>{
+ equal(access.authErrorMessage({code:'invalid_credentials',message:'Invalid login credentials'}),'E-mail ou senha incorretos.');
+ equal(access.authErrorMessage({code:'email_not_confirmed',message:'Email not confirmed'}),'Confirme seu e-mail antes de entrar.');
+ equal(access.authErrorMessage({message:'Invalid login credentials'}),'E-mail ou senha incorretos.');
+ equal(access.authErrorMessage({message:'Email not confirmed'}),'Confirme seu e-mail antes de entrar.');
+ equal(access.authErrorMessage({message:'private upstream detail'}),'Não foi possível entrar. Tente novamente.');
+ equal(access.accountLoadErrorMessage(new TypeError('invalid trial result')),'Não foi possível carregar sua conta. Tente novamente.');
+ const html=fs.readFileSync(path.join(__dirname,'..','index.html'),'utf8');
+ equal((html.match(/MBCommercialAccess\.authErrorMessage\(error\)/g)||[]).length,2);ok(html.includes('MBCommercialAccess.accountLoadErrorMessage(e)'));
 });
 await test('existing login reuses only server-normalized entitlements',async()=>{
  const profiles=[

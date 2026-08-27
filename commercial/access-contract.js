@@ -1,9 +1,10 @@
 'use strict';
 
 const PRODUCT_CODES=Object.freeze({APP:'APP',KNOWLEDGE:'KNOWLEDGE',COMPLETE:'COMPLETE'});
-const ACCESS_TYPES=Object.freeze(['paid','trial','manual','lifetime']);
+const ACCESS_TYPES=Object.freeze(['paid','trial','manual','lifetime','internal']);
 const ACCESS_STATES=Object.freeze(['active','grace_period','past_due','expired','revoked','refunded','chargeback','administrative_review','none']);
-const TRIAL_RESULTS=Object.freeze(['started','already_active','already_used','not_eligible']);
+const TRIAL_RESULTS=Object.freeze(['started','already_active','already_used','not_eligible','internal_access']);
+const AUTH_ERROR_MESSAGES=Object.freeze({invalid_credentials:'E-mail ou senha incorretos.',email_not_confirmed:'Confirme seu e-mail antes de entrar.'});
 const NORMALIZED_ENTITLEMENTS=new WeakSet();
 
 function entitlement(value){
@@ -15,6 +16,8 @@ function entitlement(value){
     access:source.has_access===true||source.access===true,
     accessType:ACCESS_TYPES.includes(accessType)?accessType:null,
     type:ACCESS_TYPES.includes(accessType)?accessType:null,
+    internalAccess:source.internal_access===true,
+    accessBasis:typeof source.access_basis==='string'?source.access_basis:null,
     source:typeof source.source==='string'?source.source:null,
     state:ACCESS_STATES.includes(state)?state:'none',
     status:ACCESS_STATES.includes(state)?state:'none',
@@ -29,7 +32,7 @@ function normalizeEntitlements(payload){
   if(!payload||typeof payload!=='object')throw new TypeError('invalid entitlement response');
   if(NORMALIZED_ENTITLEMENTS.has(payload))return payload;
   if(!payload.server_now)throw new TypeError('server_now is required');
-  const normalized=Object.freeze({serverNow:String(payload.server_now),app:entitlement(payload.app),knowledge:entitlement(payload.knowledge),trial:Object.freeze(payload.trial&&typeof payload.trial==='object'?{...payload.trial}:{state:'eligible'})});
+  const normalized=Object.freeze({serverNow:String(payload.server_now),internalAccess:payload.internal_access===true,accessBasis:typeof payload.access_basis==='string'?payload.access_basis:null,app:entitlement(payload.app),knowledge:entitlement(payload.knowledge),trial:Object.freeze(payload.trial&&typeof payload.trial==='object'?{...payload.trial}:{state:'eligible'})});
   NORMALIZED_ENTITLEMENTS.add(normalized);
   return normalized;
 }
@@ -51,12 +54,25 @@ function trialRemaining(entitlements){
 }
 
 function trialNotice(entitlements){
-  const remaining=trialRemaining(entitlements);
+  const state=normalizeEntitlements(entitlements);
+  if(state.internalAccess||state.app.internalAccess||state.knowledge.internalAccess)return '';
+  const remaining=trialRemaining(state);
   if(!remaining)return '';
   const hours=Math.ceil(remaining/3600000);
   if(hours<=24)return `Teste gratuito — ${hours===1?'menos de 1 hora':`${hours} horas restantes`}`;
   return `Teste gratuito — ${Math.ceil(hours/24)} dias restantes`;
 }
+
+function authErrorMessage(error){
+  const code=String(error?.code||'').trim().toLowerCase();
+  if(AUTH_ERROR_MESSAGES[code])return AUTH_ERROR_MESSAGES[code];
+  const message=String(error?.message||'');
+  if(/invalid login credentials/i.test(message))return AUTH_ERROR_MESSAGES.invalid_credentials;
+  if(/email not confirmed/i.test(message))return AUTH_ERROR_MESSAGES.email_not_confirmed;
+  return 'Não foi possível entrar. Tente novamente.';
+}
+
+function accountLoadErrorMessage(){return 'Não foi possível carregar sua conta. Tente novamente.';}
 
 async function beginCommercialSession(client){
   if(!client||typeof client.rpc!=='function')throw new TypeError('Supabase client is required');
@@ -70,6 +86,6 @@ async function beginCommercialSession(client){
   return Object.freeze({trialResult:trialRow?.result||null,entitlements,experience:resolveExperience(resolved.data)});
 }
 
-const api={PRODUCT_CODES,ACCESS_TYPES,ACCESS_STATES,TRIAL_RESULTS,normalizeEntitlements,resolveExperience,trialRemaining,trialNotice,beginCommercialSession};
+const api={PRODUCT_CODES,ACCESS_TYPES,ACCESS_STATES,TRIAL_RESULTS,normalizeEntitlements,resolveExperience,trialRemaining,trialNotice,authErrorMessage,accountLoadErrorMessage,beginCommercialSession};
 if(typeof module!=='undefined'&&module.exports)module.exports=api;
 if(typeof globalThis!=='undefined')globalThis.MBCommercialAccess=Object.freeze(api);

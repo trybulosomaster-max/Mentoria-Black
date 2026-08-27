@@ -932,11 +932,11 @@ function drawCharts(){
   }
 }
 async function reload(){await load();render()}
-$("loginForm").onsubmit=async e=>{e.preventDefault();$("authMsg").textContent="Entrando...";const {data,error}=await sb.auth.signInWithPassword({email:$("loginEmail").value.trim(),password:$("loginPassword").value});if(error){$("authMsg").textContent=error.message;$("authMsg").className="msg err";return}USER=data.user;await start()};
+$("loginForm").onsubmit=async e=>{e.preventDefault();$("authMsg").textContent="Entrando...";const {data,error}=await sb.auth.signInWithPassword({email:$("loginEmail").value.trim(),password:$("loginPassword").value});if(error){$("authMsg").textContent=window.MBCommercialAccess.authErrorMessage(error);$("authMsg").className="msg err";return}USER=data.user;await start()};
 $("signup").onclick=async()=>{const email=$("loginEmail").value.trim(),password=$("loginPassword").value;if(!email||password.length<6){toast("Informe e-mail e senha com pelo menos 6 caracteres.",true);return}const {data,error}=await sb.auth.signUp({email,password});if(error){toast(error.message,true);return}$("authMsg").textContent=data.session?"Conta criada.":"Conta criada. Confirme seu e-mail para entrar."};
 $("resetPass").onclick=async()=>{const email=$("loginEmail").value.trim();if(!email){toast("Informe seu e-mail.",true);return}const {error}=await sb.auth.resetPasswordForEmail(email,{redirectTo:location.href.split("#")[0]});$("authMsg").textContent=error?"Erro: "+error.message:"Link de recuperação enviado."};
 $("logout").onclick=async()=>{await sb.auth.signOut();location.reload()};$("refresh").onclick=async()=>{try{await reload();toast("Dados atualizados.")}catch(e){toast(e.message,true)}};$("print").onclick=()=>window.print();
-async function start(){try{await load();$("auth").classList.add("hidden");$("app").classList.remove("hidden");$("userEmail").textContent=USER.email||"";render()}catch(e){$("v18Loading")?.classList.add("hidden");$("authMsg").textContent="Erro ao carregar seus dados: "+e.message;console.error(e)}}
+async function start(){try{await load();$("auth").classList.add("hidden");$("app").classList.remove("hidden");$("userEmail").textContent=USER.email||"";render()}catch(e){$("v18Loading")?.classList.add("hidden");$("authMsg").textContent=window.MBCommercialAccess.accountLoadErrorMessage(e)}}
 /* V18 session bootstrap replaces the original bootstrap. */
 if("serviceWorker" in navigator){
   const MB_SW_VERSION="26";
@@ -1104,6 +1104,10 @@ if("serviceWorker" in navigator){
 */
 (function(){
   const checkoutAdapter=window.MBCommercialProvider.createMockCheckoutAdapter();
+  function reportDevelopmentError(context,error){
+    const host=String(location.hostname||'');
+    if(host==='localhost'||host==='127.0.0.1'||/^192\.168\./.test(host))console.error(context,error);
+  }
   window.commercialCheckout=async function(kind){
     const action={monthly:'createAppMonthlyCheckout',annual:'createAppAnnualCheckout',knowledge:'createKnowledgeCheckout',complete:'createCompleteCheckout'}[kind];
     const result=await checkoutAdapter[action]({paymentMethod:'PIX'});
@@ -1183,9 +1187,9 @@ if("serviceWorker" in navigator){
       $("v18Loading")?.classList.add("hidden");
       $("auth").classList.remove("hidden");
       $("app").classList.add("hidden");
-      $("authMsg").textContent="Erro ao carregar seus dados: "+e.message;
+      $("authMsg").textContent=window.MBCommercialAccess.accountLoadErrorMessage(e);
       $("authMsg").className="msg meridian-auth-message err";
-      console.error(e);
+      reportDevelopmentError('Commercial session',e);
     }
   };
 
@@ -1196,7 +1200,7 @@ if("serviceWorker" in navigator){
     $("authMsg").className="msg meridian-auth-message";
     const email=$("loginEmail").value.trim();
     const {data,error}=await sb.auth.signInWithPassword({email,password:$("loginPassword").value});
-    if(error){$("authMsg").textContent=error.message;$("authMsg").className="msg meridian-auth-message err";return}
+    if(error){$("authMsg").textContent=window.MBCommercialAccess.authErrorMessage(error);$("authMsg").className="msg meridian-auth-message err";return}
     window.MBMeridianLoginController?.recordSuccessfulLogin(email);
     USER=data.user;
     await window.start();
@@ -1220,9 +1224,9 @@ if("serviceWorker" in navigator){
         $("v18Loading")?.classList.add("hidden");
       }
     }catch(e){
-      console.error("V18 bootstrap",e);
+      reportDevelopmentError('V18 bootstrap',e);
       $("v18Loading")?.classList.add("hidden");
-      $("authMsg").textContent="Não foi possível carregar o sistema. "+e.message;
+      $("authMsg").textContent=window.MBCommercialAccess.accountLoadErrorMessage(e);
       $("authMsg").className="msg meridian-auth-message err";
     }
   })();

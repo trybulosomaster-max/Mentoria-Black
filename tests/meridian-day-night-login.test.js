@@ -196,7 +196,10 @@ ok(index.includes('id="loginPassword" type="password" autocomplete="current-pass
 ok(index.includes('id="togglePassword" type="button" aria-label="Mostrar senha"'),'eye is a non-submit accessible control');
 ok(index.includes('id="rememberEmail" type="checkbox"'),'remember-email remains opt-in');
 ok(index.includes('window.MBMeridianLoginController?.recordSuccessfulLogin(email);'),'successful production authentication records only the opted-in email');
-ok(index.indexOf('if(error){$("authMsg").textContent=error.message')<index.indexOf('window.MBMeridianLoginController?.recordSuccessfulLogin(email);'),'failed authentication exits before remember-email persistence');
+const activeLoginStart=index.lastIndexOf('$("loginForm").onsubmit=async e=>'),activeLoginEnd=index.indexOf('$("logout").onclick',activeLoginStart),activeLogin=index.slice(activeLoginStart,activeLoginEnd);
+ok(activeLogin.includes('MBCommercialAccess.authErrorMessage(error)'),'active production login translates the Auth error before rendering it');
+ok(!activeLogin.includes('error.message'),'active production login never renders the raw Supabase Auth message');
+ok(activeLogin.indexOf('if(error)')<activeLogin.indexOf('window.MBMeridianLoginController?.recordSuccessfulLogin(email);'),'failed authentication exits before remember-email persistence');
 ok(index.indexOf('window.MBMeridianLoginController?.recordSuccessfulLogin(email);')<index.indexOf('USER=data.user;\n    await window.start();'),'remember-email does not alter the existing server_now startup chain');
 ok(!index.includes('URLSearchParams')&&!index.includes('?theme='),'production HTML has no preview theme override');
 ok(preview.includes("new URLSearchParams(location.search)")&&preview.includes("params.get('theme')||'auto'"),'only the local preview recognizes a forced theme');
