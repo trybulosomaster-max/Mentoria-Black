@@ -50,7 +50,7 @@ body {
 ::selection { background: rgba(184, 148, 74, .33); color: #fff; }
 
 .wrap { max-width: 1480px; padding: 22px clamp(14px, 2.4vw, 34px) 30px; }
-#app { min-height: 100dvh; background: transparent; }
+#app { min-height: 100svh; min-height: 100dvh; background: transparent; }
 
 /* Brand lockups */
 .aviora-brand-mark {
@@ -251,6 +251,7 @@ tbody tr:hover { background: rgba(255,255,255,.018); }
   --meridian-gold-hover: var(--aviora-gold-soft);
   --meridian-gold-dark: var(--aviora-gold-dark);
   --meridian-gold-soft: var(--aviora-champagne);
+  min-height: 100svh;
   min-height: 100dvh;
   background: #000;
 }
@@ -783,6 +784,14 @@ td { padding-block: 11px; }
   .formgrid { grid-template-columns: 1fr; }
   .modal { align-items: start; overflow-y: auto; }
   .modalbox { max-height: none; margin-block: 6px; }
+  input,select,textarea { font-size: 16px; }
+  .modal-foot {
+    position: sticky;
+    z-index: 2;
+    bottom: calc(-1 * env(safe-area-inset-bottom));
+    padding-bottom: max(12px,env(safe-area-inset-bottom));
+    background: var(--aviora-surface);
+  }
 
   .tx-results-card table:not(.report-table),
   .aviora-category-list table,

@@ -14,7 +14,7 @@
 <link rel="stylesheet" href="knowledge/knowledge-area.css">
 <link rel="stylesheet" href="knowledge/knowledge-area-premium.css">
 <link rel="stylesheet" href="assets/meridian-black-day-night-login.css">
-<link rel="stylesheet" href="assets/aviora-v82.css?v=aviora-visual-v1">
+<link rel="stylesheet" href="assets/aviora-v82.css?v=aviora-visual-v1-multiplatform">
 <link rel="stylesheet" href="assets/admin-area.css">
 <link rel="stylesheet" href="assets/account-security.css">
 <link rel="preload" href="assets/fonts/syncopate/Syncopate-Regular.ttf" as="font" type="font/ttf" crossorigin>
@@ -630,7 +630,7 @@ function chartBar(id,entries,total){
  const el=$(id);if(!el)return;CHARTS[id]?.destroy();
  const labels=entries.map(x=>x[0]),vals=entries.map(x=>x[1]),colors=labels.map(categoryColor);
  CHARTS[id]=new Chart(el,{type:"bar",data:{labels,datasets:[{data:vals,backgroundColor:colors,borderColor:colors,borderWidth:1,borderRadius:7}]},
- options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${money(c.raw)} • ${pct(total?c.raw/total*100:0)}`}}},
+ options:{responsive:true,maintainAspectRatio:false,animation:chartAnimation(),plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${money(c.raw)} • ${pct(total?c.raw/total*100:0)}`}}},
  scales:{x:{ticks:{color:"#aaa",maxRotation:30},grid:{color:"#222"}},y:{ticks:{color:"#888",callback:v=>money(v)},grid:{color:"#222"}}}}
  });
 }
@@ -958,25 +958,33 @@ async function mountKnowledgeArea(target,entitlements=COMMERCIAL_STATE?.entitlem
  await app.mount(root);
 }
 function render(){nav();$("view").innerHTML=TAB==="dashboard"?window.dashboard():TAB==="transactions"?window.transactions():TAB==="planning"?planning():TAB==="accounts"?accounts():TAB==="cards"?cards():TAB==="categories"?window.categories():TAB==="goals"?goals():TAB==="recurring"?recurring():TAB==="wealth"?wealth():TAB==="knowledge"?knowledge():reports();bindFilters();if(TAB==="knowledge")mountKnowledgeArea("knowledgeRoot").catch(error=>toast(error.message,true));requestAnimationFrame(()=>window.drawCharts())}
+function chartCanvasIsRenderable(id){
+  const canvas=$(id);
+  return window.AVIORA_VISUAL_V1?.chartCanvasIsRenderable(canvas)??Boolean(canvas&&!canvas.closest?.('[hidden]'));
+}
+function chartAnimation(){
+  const reduced=window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches===true;
+  return window.AVIORA_VISUAL_V1?.chartAnimation(reduced)??(reduced?false:{duration:240});
+}
 function drawCharts(){
   Object.values(CHARTS).forEach(c=>{try{c.destroy()}catch{}});CHARTS={};
   const rows=expensesByCat();
 
-  if(TAB==="dashboard"&&rows.length){
+  if(TAB==="dashboard"&&rows.length&&chartCanvasIsRenderable("dashCat")){
     chartBar("dashCat",rows,rows.reduce((a,b)=>a+b[1],0));
   }
 
-  if(TAB==="dashboard"&&document.getElementById("v15RevenueYear")){
+  if(TAB==="dashboard"&&chartCanvasIsRenderable("v15RevenueYear")){
     drawRevenue("v15RevenueYear",FILTERS.year);
   }
 
-  if(TAB==="planning"){
+  if(TAB==="planning"&&chartCanvasIsRenderable("planChart")){
     const p=monthlyPlan(),vals=planValues(p),e=CAT_ORDER.map(c=>[c,vals[c]]);
     const tot=e.reduce((a,b)=>a+b[1],0);
     chartBar("planChart",e,tot);
   }
 
-  if(TAB==="reports"){
+  if(TAB==="reports"&&chartCanvasIsRenderable("reportCat")){
     const reportRows=Object.entries(reportTotalsByCategory(buildReportDataset())).sort((a,b)=>b[1]-a[1]);
     if(reportRows.length)chartBar("reportCat",reportRows,reportRows.reduce((a,b)=>a+b[1],0));
   }
@@ -989,11 +997,11 @@ $("logout").onclick=async()=>{await sb.auth.signOut();location.reload()};$("refr
 async function start(){try{await load();$("auth").classList.add("hidden");$("app").classList.remove("hidden");$("userEmail").textContent=USER.email||"";render()}catch(e){$("v18Loading")?.classList.add("hidden");$("authMsg").textContent=window.MBCommercialAccess.accountLoadErrorMessage(e);AVIORA_REPORT_DEVELOPMENT_ERROR('Initial load',e)}}
 /* V18 session bootstrap replaces the original bootstrap. */
 if("serviceWorker" in navigator){
-  const MB_SW_VERSION="27";
+  const MB_SW_VERSION="28";
   try{
     navigator.serviceWorker.addEventListener("controllerchange",()=>{
-      if(sessionStorage.getItem("mb-v26-reloaded")==="1")return;
-      sessionStorage.setItem("mb-v26-reloaded","1");
+      if(sessionStorage.getItem("mb-v28-reloaded")==="1")return;
+      sessionStorage.setItem("mb-v28-reloaded","1");
       location.reload();
     });
   }catch(e){}
@@ -1120,6 +1128,7 @@ if("serviceWorker" in navigator){
       options:{
         responsive:true,
         maintainAspectRatio:false,
+        animation:chartAnimation(),
         interaction:{mode:"index",intersect:false},
         layout:{padding:{top:34,right:24,left:8,bottom:8}},
         plugins:{
@@ -3279,7 +3288,7 @@ migrateReserveGoals();
 
 </script>
 
-<script src="js/aviora-visual-v1.js?v=aviora-visual-v1"></script>
+<script src="js/aviora-visual-v1.js?v=aviora-visual-v1-multiplatform"></script>
 
 </body>
 </html>

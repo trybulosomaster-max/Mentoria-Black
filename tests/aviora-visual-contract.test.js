@@ -61,13 +61,14 @@ test('Knowledge adota o sistema AVIORA sem alterar o conteúdo canônico',()=>{
 });
 
 test('cache frontend referencia a nova camada visual e o asset oficial',()=>{
- ok(sw.includes('aviora-v1-visual-shell-v1'));
+ ok(sw.includes('aviora-v1-visual-shell-v2'));
  ok(sw.includes('./assets/aviora-v82.css'));
  ok(sw.includes('./js/aviora-visual-v1.js'));
  ok(sw.includes('./assets/branding/aviora-official.jpg'));
  ok(sw.includes('./assets/branding/aviora-login-hero.jpg'));
- ok(index.includes('<link rel="stylesheet" href="assets/aviora-v82.css?v=aviora-visual-v1">'));
- ok(index.includes('const MB_SW_VERSION="27"'));
+ ok(index.includes('<link rel="stylesheet" href="assets/aviora-v82.css?v=aviora-visual-v1-multiplatform">'));
+ ok(index.includes('const MB_SW_VERSION="28"'));
+ ok(index.includes('mb-v28-reloaded'));
 });
 
 test('preview é local e não inicializa Supabase',()=>{

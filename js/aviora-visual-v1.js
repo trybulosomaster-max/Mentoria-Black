@@ -60,6 +60,14 @@
     trigger.addEventListener('click',()=>setExpanded(trigger,panel,trigger.getAttribute('aria-expanded')!=='true'));
   }
 
+  function chartCanvasIsRenderable(canvas){
+    return Boolean(canvas&&!canvas.closest?.('[hidden]'));
+  }
+
+  function chartAnimation(reducedMotion=false){
+    return reducedMotion?false:Object.freeze({duration:240});
+  }
+
   function decorateNavigation(doc){
     doc.querySelectorAll('#nav [data-tab]').forEach(button=>{
       if(button.querySelector('.aviora-nav-icon'))return;
@@ -218,7 +226,7 @@
       button.addEventListener('click',()=>{
         [...tabs.children].forEach((tab,i)=>tab.setAttribute('aria-selected',String(i===index)));
         [...panels.children].forEach((panel,i)=>panel.hidden=i!==index);
-        requestAnimationFrame(()=>{try{root.CHARTS&&Object.values(root.CHARTS).forEach(chart=>chart?.resize?.())}catch(_){}});
+        requestAnimationFrame(()=>root.drawCharts?.());
       });
       tabs.append(button);panels.append(card);
     });
@@ -251,11 +259,13 @@
     const apply=()=>enhanceCurrentView(root);
     if(typeof root.render==='function'){
       const base=root.render;
-      root.render=function(){const result=base.apply(this,arguments);requestAnimationFrame(apply);return result};
+      root.render=function(){const result=base.apply(this,arguments);apply();return result};
     }
-    if(root.document.readyState==='loading')root.document.addEventListener('DOMContentLoaded',()=>requestAnimationFrame(apply),{once:true});
-    else requestAnimationFrame(apply);
+    if(root.document.readyState==='loading'){
+      apply();
+      root.document.addEventListener('DOMContentLoaded',apply,{once:true});
+    }else apply();
   }
 
-  return Object.freeze({transactionSummary,parsePtBrCurrency,setExpanded,wireAccordion,install});
+  return Object.freeze({transactionSummary,parsePtBrCurrency,setExpanded,wireAccordion,chartCanvasIsRenderable,chartAnimation,install});
 });

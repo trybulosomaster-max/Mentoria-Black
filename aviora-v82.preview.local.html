@@ -18,7 +18,7 @@
   @media(max-width:900px){.kpis{grid-template-columns:repeat(3,1fr)}.s6{grid-column:span 12}}
   @media(max-width:600px){.kpis{grid-template-columns:repeat(2,1fr)}.pagehead{display:block}}
  </style>
- <link rel="stylesheet" href="assets/aviora-v82.css?v=aviora-visual-v1">
+ <link rel="stylesheet" href="assets/aviora-v82.css?v=aviora-visual-v1-multiplatform">
 </head>
 <body>
 <section id="loginPreview" class="auth meridian-day-night-login hidden" aria-label="AVIORA Gestão Financeira" data-theme="night" data-orientation="desktop"
@@ -50,7 +50,7 @@
 <section id="knowledgePreview" class="hidden"><div class="wrap"><header class="header"><div class="brand-full"><img class="crest aviora-brand-mark" src="assets/branding/aviora-official.jpg" alt="Símbolo oficial da AVIORA"><div class="brand-copy"><div class="title">AVIORA</div><div class="sub">Gestão Financeira</div></div></div><div class="row"><button class="btn">Voltar ao app</button></div></header><main class="knowledge-root"><header class="knowledge-title"><span class="knowledge-kicker">Biblioteca</span><h1>Conhecimento</h1><p>Educação financeira para decisões mais claras, organizadas e conscientes.</p></header><div class="knowledge-library"><article class="knowledge-publication-card"><figure class="knowledge-cover knowledge-cover-official"><img src="assets/branding/aviora-official.jpg" alt="Símbolo oficial da AVIORA"></figure><div class="knowledge-publication-copy"><h2>Mentoria Black</h2><p class="knowledge-subtitle">Conhecimento para transformar organização em direção.</p><p>Conteúdo editorial existente, integrado à identidade AVIORA sem alteração do material canônico.</p><div class="knowledge-actions"><button class="btn gold">Começar leitura</button><button class="btn">Ver sumário</button></div></div></article></div></main></div></section>
 
 <script src="js/meridian-day-night-login.js"></script>
-<script src="js/aviora-visual-v1.js"></script>
+<script src="js/aviora-visual-v1.js?v=aviora-visual-v1-multiplatform"></script>
 <script>
  const params=new URLSearchParams(location.search),view=params.get('view')||'app',theme=params.get('theme')||'auto';
  const targets={login:document.getElementById('loginPreview'),app:document.getElementById('appPreview'),knowledge:document.getElementById('knowledgePreview')};

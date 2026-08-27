@@ -1,4 +1,4 @@
-const CACHE_NAME = 'aviora-v1-visual-shell-v1';
+const CACHE_NAME = 'aviora-v1-visual-shell-v2';
 const APP_SHELL = ['./','./index.html','./assets/aviora-v82.css','./js/aviora-visual-v1.js','./assets/branding/aviora-official.jpg','./assets/branding/aviora-login-hero.jpg'];
 self.addEventListener('install', event => {
   event.waitUntil(
