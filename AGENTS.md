@@ -37,6 +37,15 @@ Parar diante de conflito relevante, divergência de arquitetura, migration/RLS n
 - Acesso administrativo interno não é licença comercial.
 - CUSTOMER não recebe informação administrativa interna.
 
+## Multiplatform UI
+
+- Web agora; preservar portabilidade futura para iOS e Android.
+- Não depender de interação exclusiva da Web como único caminho.
+- Manter lógica financeira e de negócio separada da apresentação.
+- Garantir toque de pelo menos 44 px e respeito à safe-area.
+- Tratar performance como parte da qualidade da interface.
+- Cores das categorias são dados do usuário e permanecem consistentes.
+
 ## Notion
 
 Se disponível:
