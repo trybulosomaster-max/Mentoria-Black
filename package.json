@@ -1,0 +1,19 @@
+{
+  "name": "aviora-e2e",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Regressão E2E sintética e local do AVIORA",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test:e2e": "playwright test",
+    "test:e2e:chromium": "playwright test --project=chromium",
+    "test:e2e:headed": "playwright test --project=chromium --headed",
+    "test:e2e:report": "playwright show-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.62.1",
+    "chart.js": "4.4.9"
+  }
+}
