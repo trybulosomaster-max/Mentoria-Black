@@ -12,11 +12,12 @@ Esta camada usa Playwright contra `aviora-v82.preview.local.html`. O cenário é
 - Accordions, filtros, ações simuladas, estados vazio/erro, foco, ARIA, alvos de toque, overflow e geometria do header.
 - Lifecycle real de Chart.js com a mesma versão do app, servida localmente para não depender de CDN.
 - Bloqueio de toda requisição externa e de todo método HTTP de escrita.
+- Caracterização das nove áreas secundárias em normal/vazio/erro, mobile/desktop, nomes acessíveis e alvos de toque. Veja `aviora-secondary-tabs.spec.mjs`.
 
 ## Executar localmente
 
 ```bash
-npm ci
+npm ci --ignore-scripts
 ./node_modules/.bin/playwright install chromium webkit firefox
 npm run test:e2e
 ```
@@ -41,3 +42,5 @@ As comparações visuais usam estrutura, geometria e semântica acessível em ve
 - Safe-area física, barras móveis, teclado virtual e percepção visual final ainda exigem dispositivo real.
 - O preview usa a mesma versão de Chart.js do app, mas não testa disponibilidade, cache ou falhas da CDN de produção.
 - Ações de pagamento, edição e exclusão são simuladas e não persistem dados.
+- A competência de Cartões é validada a partir de `transaction_date` já presente na fixture. O helper real que sugere essa data está registrado como gap em `docs/AVIORA_NEXT_GATE_AUDIT.md` e não é encoberto pelo teste sintético.
+- A cobertura detalhada e seus limites estão em `docs/AVIORA_E2E_COVERAGE_MATRIX.md`.
