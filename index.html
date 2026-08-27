@@ -14,7 +14,7 @@
 <link rel="stylesheet" href="knowledge/knowledge-area.css">
 <link rel="stylesheet" href="knowledge/knowledge-area-premium.css">
 <link rel="stylesheet" href="assets/meridian-black-day-night-login.css">
-<link rel="stylesheet" href="assets/aviora-v82.css?v=aviora-login-v3">
+<link rel="stylesheet" href="assets/aviora-v82.css?v=aviora-visual-v1">
 <link rel="stylesheet" href="assets/admin-area.css">
 <link rel="stylesheet" href="assets/account-security.css">
 <link rel="preload" href="assets/fonts/syncopate/Syncopate-Regular.ttf" as="font" type="font/ttf" crossorigin>
@@ -989,7 +989,7 @@ $("logout").onclick=async()=>{await sb.auth.signOut();location.reload()};$("refr
 async function start(){try{await load();$("auth").classList.add("hidden");$("app").classList.remove("hidden");$("userEmail").textContent=USER.email||"";render()}catch(e){$("v18Loading")?.classList.add("hidden");$("authMsg").textContent=window.MBCommercialAccess.accountLoadErrorMessage(e);AVIORA_REPORT_DEVELOPMENT_ERROR('Initial load',e)}}
 /* V18 session bootstrap replaces the original bootstrap. */
 if("serviceWorker" in navigator){
-  const MB_SW_VERSION="26";
+  const MB_SW_VERSION="27";
   try{
     navigator.serviceWorker.addEventListener("controllerchange",()=>{
       if(sessionStorage.getItem("mb-v26-reloaded")==="1")return;
@@ -3278,6 +3278,8 @@ migrateReserveGoals();
 })();
 
 </script>
+
+<script src="js/aviora-visual-v1.js?v=aviora-visual-v1"></script>
 
 </body>
 </html>
