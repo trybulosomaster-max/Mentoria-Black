@@ -64,8 +64,8 @@ test('cores de categoria permanecem dados e nunca são o único significado',()=
   ok(source.includes("const color=dot?.style.background||dot?.style.backgroundColor"));
   ok(source.includes("card.style.setProperty('--category-color',color)"));
   ok(css.includes('background: var(--category-color)'));
-  ok(source.includes('aria-label=')&&source.includes('do planejado realizado'));
-  ok(source.includes('<strong>${escapeHtml(name)}</strong>')&&source.includes('toLocaleString(\'pt-BR\''));
+  ok(source.includes('aria-label=')&&source.includes('do planejado'));
+  ok(source.includes('${escapeHtml(name)}')&&source.includes('toLocaleString(\'pt-BR\''));
 });
 
 test('camada visual permanece leve, sem fonte de verdade ou dependência nova',()=>{

@@ -69,11 +69,65 @@
   }
 
   function decorateNavigation(doc){
-    doc.querySelectorAll('#nav [data-tab]').forEach(button=>{
+    const nav=doc.getElementById('nav');
+    if(!nav)return;
+    const destinations=[...nav.querySelectorAll(':scope > [data-tab]')];
+    destinations.forEach(button=>{
       if(button.querySelector('.aviora-nav-icon'))return;
       const tab=button.dataset.tab,path=ICONS[tab]||ICONS.dashboard;
       button.insertAdjacentHTML('afterbegin',`<svg class="aviora-nav-icon" aria-hidden="true" viewBox="0 0 24 24"><path d="${path}"/></svg>`);
     });
+    const existingTrigger=nav.querySelector('[data-aviora-mobile-nav-trigger]');
+    if(existingTrigger){
+      nav.classList.add('aviora-mobile-nav-ready');
+      const current=destinations.find(button=>button.classList.contains('active'))||destinations[0];
+      const currentLabel=current?.textContent.trim()||'Dashboard';
+      const label=existingTrigger.querySelector('strong');
+      if(label)label.textContent=currentLabel;
+      nav.querySelectorAll('.aviora-mobile-nav-item').forEach(item=>item.classList.toggle('active',item.dataset.tab===current?.dataset.tab));
+      return;
+    }
+    if(!destinations.length)return;
+
+    const active=destinations.find(button=>button.classList.contains('active'))||destinations[0];
+    const activeLabel=active.textContent.trim();
+    const trigger=doc.createElement('button');
+    const backdrop=doc.createElement('button');
+    const sheet=doc.createElement('section');
+    const panelId='aviora-mobile-navigation';
+    trigger.type='button';trigger.className='aviora-mobile-nav-trigger';trigger.dataset.avioraMobileNavTrigger='true';
+    trigger.setAttribute('aria-controls',panelId);trigger.setAttribute('aria-expanded','false');trigger.setAttribute('aria-haspopup','dialog');
+    trigger.innerHTML=`<span><small>Área atual</small><strong>${escapeHtml(activeLabel)}</strong></span><span class="aviora-mobile-menu-label">Menu</span>`;
+    backdrop.type='button';backdrop.className='aviora-mobile-nav-backdrop';backdrop.hidden=true;backdrop.setAttribute('aria-label','Fechar menu de navegação');
+    sheet.id=panelId;sheet.className='aviora-mobile-nav-sheet';sheet.hidden=true;sheet.setAttribute('role','dialog');sheet.setAttribute('aria-modal','true');sheet.setAttribute('aria-label','Áreas do AVIORA');
+    sheet.innerHTML='<header><strong>Navegação</strong><button type="button" class="aviora-mobile-nav-close" aria-label="Fechar menu">Fechar</button></header><div class="aviora-mobile-nav-list"></div>';
+    const list=sheet.querySelector('.aviora-mobile-nav-list');
+    destinations.forEach(button=>{
+      const item=button.cloneNode(true);item.classList.add('aviora-mobile-nav-item');
+      item.classList.toggle('active',button===active);item.removeAttribute('id');
+      item.addEventListener('click',()=>{close(false);button.click()});
+      list.append(item);
+    });
+    function open(){
+      trigger.setAttribute('aria-expanded','true');sheet.hidden=false;backdrop.hidden=false;
+      (sheet.querySelector('.aviora-mobile-nav-item.active')||sheet.querySelector('.aviora-mobile-nav-item'))?.focus();
+    }
+    function close(restore=true){
+      trigger.setAttribute('aria-expanded','false');sheet.hidden=true;backdrop.hidden=true;
+      if(restore)trigger.focus();
+    }
+    trigger.addEventListener('click',()=>trigger.getAttribute('aria-expanded')==='true'?close():open());
+    backdrop.addEventListener('click',()=>close());
+    sheet.querySelector('.aviora-mobile-nav-close').addEventListener('click',()=>close());
+    sheet.addEventListener('keydown',event=>{
+      if(event.key==='Escape'){event.preventDefault();close();return}
+      if(event.key!=='Tab')return;
+      const focusable=[...sheet.querySelectorAll('button:not([disabled])')].filter(control=>!control.hidden);
+      const first=focusable[0],last=focusable.at(-1);
+      if(event.shiftKey&&doc.activeElement===first){event.preventDefault();last?.focus()}
+      else if(!event.shiftKey&&doc.activeElement===last){event.preventDefault();first?.focus()}
+    });
+    nav.append(trigger,backdrop,sheet);nav.classList.add('aviora-mobile-nav-ready');
   }
 
   function decorateTables(scope){
@@ -116,10 +170,20 @@
     ].join('');
     filters.before(metrics);
 
+    const filterDisclosure=document.createElement('section');
+    const filterPanel=document.createElement('div');
+    const filterPanelId='aviora-transaction-filters-panel';
+    filterDisclosure.className='aviora-accordion aviora-transaction-filters';
+    filterDisclosure.innerHTML=`<button class="aviora-accordion-trigger" type="button" aria-controls="${filterPanelId}"><span><strong>Filtros</strong><small>Busca, tipo, categoria e período</small></span><span class="aviora-chevron" aria-hidden="true"></span></button>`;
+    filterPanel.className='aviora-accordion-panel';filterPanel.id=filterPanelId;
+    filters.before(filterDisclosure);filterPanel.append(filters);filterDisclosure.append(filterPanel);
+    const compact=root.matchMedia?.('(max-width: 720px)')?.matches===true;
+    wireAccordion(filterDisclosure.querySelector('button'),filterPanel,!compact);
+
     const tracking=document.createElement('section');
     tracking.className='aviora-accordion aviora-month-tracking';
     tracking.innerHTML=`<button class="aviora-accordion-trigger" type="button" aria-controls="aviora-month-tracking-panel"><span><strong>Acompanhamento do mês</strong><small>Planejado ${escapeHtml(format(summary.planned))} · Realizado ${escapeHtml(format(summary.realized))} · Projetado ${escapeHtml(format(summary.projected))}</small></span><span class="aviora-chevron" aria-hidden="true"></span></button><div class="aviora-accordion-panel" id="aviora-month-tracking-panel"><div class="aviora-month-values">${renderMetric('Planejado',format(summary.planned),'Orçamento do mês')}${renderMetric('Realizado',format(summary.realized),'Movimentações efetivadas')}${renderMetric('Previsão',format(summary.forecast),'Programado + projetado')}</div></div>`;
-    filters.after(tracking);
+    filterDisclosure.after(tracking);
     wireAccordion(tracking.querySelector('button'),tracking.querySelector('.aviora-accordion-panel'),false);
 
     const head=view.querySelector('.v22-results-head');
@@ -131,6 +195,14 @@
     wrapper.querySelector('.aviora-accordion-panel').append(results);
     if(head)head.remove();
     wireAccordion(wrapper.querySelector('button'),wrapper.querySelector('.aviora-accordion-panel'),false);
+
+    view.querySelectorAll('.tx-results-card td[data-label="Categoria"]').forEach(cell=>{
+      if(cell.querySelector('.aviora-category-dot'))return;
+      const category=cell.textContent.split('/')[0].trim();
+      const color=typeof categoryColor==='function'?categoryColor(category):'var(--aviora-gold)';
+      const dot=document.createElement('span');dot.className='aviora-category-dot';dot.setAttribute('aria-hidden','true');dot.style.background=color;
+      cell.prepend(dot);
+    });
   }
 
   function enhanceGoals(view){
@@ -166,22 +238,39 @@
     const wrap=section?.querySelector('.tablewrap');
     const rows=wrap?[...wrap.querySelectorAll('tbody tr')]:[];
     if(!section||!wrap||!rows.length||section.querySelector('.aviora-planning-bars'))return;
+    const labels=[...wrap.querySelectorAll('thead th')].map(cell=>cell.textContent.trim());
+    const column=label=>labels.indexOf(label);
     const cards=document.createElement('div');cards.className='aviora-planning-bars';
-    rows.slice(0,-1).forEach((row,index)=>{
-      const cells=[...row.children];if(cells.length<3)return;
-      const name=cells[0].textContent.trim(),planned=parsePtBrCurrency(cells[1].textContent),realized=parsePtBrCurrency(cells[2].textContent);
-      const ratio=planned>0?Math.max(0,Math.min(100,realized/planned*100)):realized>0?100:0;
+    rows.slice(0,-1).forEach(row=>{
+      const cells=[...row.children];if(cells.length<7)return;
+      const name=cells[0].textContent.trim();if(name==='Receitas')return;
+      const planned=parsePtBrCurrency(cells[column('Planejado')]?.textContent);
+      const realized=parsePtBrCurrency(cells[column('Realizado')]?.textContent);
+      const forecast=parsePtBrCurrency(cells[column('Previsão')]?.textContent);
+      const expected=parsePtBrCurrency(cells[column('Esperado')]?.textContent);
+      const realizedRatio=planned>0?Math.max(0,Math.min(100,realized/planned*100)):realized>0?100:0;
+      const expectedRatio=planned>0?Math.max(0,Math.min(100,expected/planned*100)):expected>0?100:0;
       const dot=cells[0].querySelector('.dot');
       const color=dot?.style.background||dot?.style.backgroundColor||'var(--aviora-gold)';
       const card=document.createElement('article');card.className='aviora-planning-row';
       card.style.setProperty('--category-color',color);
-      card.innerHTML=`<header><strong>${escapeHtml(name)}</strong><b>${ratio.toLocaleString('pt-BR',{maximumFractionDigits:1})}%</b></header><div class="aviora-category-progress" role="img" aria-label="${escapeHtml(`${name}: ${ratio.toLocaleString('pt-BR',{maximumFractionDigits:1})}% do planejado realizado`)}"><i style="width:${ratio}%"></i></div><p>${escapeHtml(cells[2].textContent.trim())} de ${escapeHtml(cells[1].textContent.trim())}${planned-realized>=0?` · restam ${escapeHtml((typeof money==='function'?money:moneyFallback)(planned-realized))}`:` · excedido em ${escapeHtml((typeof money==='function'?money:moneyFallback)(Math.abs(planned-realized)))}`}</p>${index?`<button class="aviora-text-action" type="button" data-aviora-category="${escapeHtml(name)}">Ver detalhes e lançamentos →</button>`:''}`;
+      const difference=planned-expected;
+      card.innerHTML=`<header><strong><span class="aviora-category-dot" aria-hidden="true"></span>${escapeHtml(name)}</strong><b>${expectedRatio.toLocaleString('pt-BR',{maximumFractionDigits:1})}% esperado</b></header><div class="aviora-category-progress" role="img" aria-label="${escapeHtml(`${name}: realizado ${realizedRatio.toLocaleString('pt-BR',{maximumFractionDigits:1})}% e esperado ${expectedRatio.toLocaleString('pt-BR',{maximumFractionDigits:1})}% do planejado`)}"><i class="expected" style="width:${expectedRatio}%"></i><b class="realized" style="width:${realizedRatio}%"></b></div><p><b>Realizado</b> ${escapeHtml((typeof money==='function'?money:moneyFallback)(realized))} · <b>Compromissos</b> ${escapeHtml((typeof money==='function'?money:moneyFallback)(forecast))} · <b>Esperado</b> ${escapeHtml((typeof money==='function'?money:moneyFallback)(expected))}</p><p>Planejado ${escapeHtml((typeof money==='function'?money:moneyFallback)(planned))}${difference>=0?` · restam ${escapeHtml((typeof money==='function'?money:moneyFallback)(difference))}`:` · excedido em ${escapeHtml((typeof money==='function'?money:moneyFallback)(Math.abs(difference)))}`}</p><button class="aviora-text-action" type="button" data-aviora-category="${escapeHtml(name)}">Ver detalhes e lançamentos →</button>`;
       cards.append(card);
     });
     section.insertBefore(cards,wrap);
-    const details=document.createElement('details');details.className='aviora-planning-table';
-    details.innerHTML='<summary>Ver comparação completa</summary>';
-    wrap.before(details);details.append(wrap);
+    const heading=section.querySelector(':scope > h2');
+    const description=section.querySelector(':scope > .desc');
+    const totalRow=rows.at(-1),totalCells=totalRow?[...totalRow.children]:[];
+    const plannedTotal=totalCells[column('Planejado')]?.textContent.trim()||'R$ 0,00';
+    const realizedTotal=totalCells[column('Realizado')]?.textContent.trim()||'R$ 0,00';
+    const expectedTotal=totalCells[column('Esperado')]?.textContent.trim()||'R$ 0,00';
+    const panel=document.createElement('div');panel.className='aviora-accordion-panel';panel.id='aviora-planning-categories-panel';
+    if(description)panel.append(description);panel.append(cards,wrap);
+    const trigger=document.createElement('button');trigger.className='aviora-accordion-trigger';trigger.type='button';trigger.setAttribute('aria-controls',panel.id);
+    trigger.innerHTML=`<span><strong>Planejamento por categoria · ${cards.children.length} categorias</strong><small>Planejado ${escapeHtml(plannedTotal)} · Realizado ${escapeHtml(realizedTotal)} · Esperado ${escapeHtml(expectedTotal)}</small></span><span class="aviora-chevron" aria-hidden="true"></span>`;
+    heading?.remove();section.classList.add('aviora-accordion','aviora-planning-categories');section.prepend(trigger,panel);
+    wireAccordion(trigger,panel,false);
     cards.querySelectorAll('[data-aviora-category]').forEach(button=>button.addEventListener('click',()=>{
       if(typeof FILTERS!=='undefined')FILTERS.txCategory=button.dataset.avioraCategory;
       if(typeof TAB!=='undefined')TAB='transactions';
@@ -198,7 +287,14 @@
 
   function enhanceDashboard(root,view){
     const kpis=[...view.querySelectorAll(':scope > .kpis .kpi')];
-    kpis.forEach((item,index)=>item.classList.add(index<4?'is-primary':'is-secondary'));
+    kpis.forEach((item,index)=>{
+      item.classList.add(index<4?'is-primary':'is-secondary');
+      const label=item.querySelector('.lab')?.textContent.trim()||'';
+      if(/Receitas/i.test(label))item.classList.add('aviora-kpi-income');
+      else if(/Despesas/i.test(label))item.classList.add('aviora-kpi-expense');
+      else if(/Investimentos/i.test(label))item.classList.add('aviora-kpi-investment');
+      else if(/Reserva|Patrimônio/i.test(label))item.classList.add('aviora-kpi-wealth');
+    });
     const grid=view.querySelector(':scope > .grid');
     if(!grid||view.querySelector('.aviora-dashboard-alerts'))return;
     const alerts=[];
@@ -211,6 +307,17 @@
       if(typeof TAB!=='undefined')TAB=button.dataset.avioraGo;
       root.render?.();
     }));
+
+    const latest=view.querySelector('[data-dashboard-latest]');
+    if(latest){
+      const heading=latest.querySelector(':scope > h2');
+      const count=latest.querySelectorAll('tbody tr').length;
+      const panel=document.createElement('div');panel.className='aviora-accordion-panel';panel.id='aviora-dashboard-latest-panel';
+      [...latest.children].filter(child=>child!==heading).forEach(child=>panel.append(child));
+      const trigger=document.createElement('button');trigger.className='aviora-accordion-trigger';trigger.type='button';trigger.setAttribute('aria-controls',panel.id);
+      trigger.innerHTML=`<span><strong>Últimos lançamentos do período · ${count} ${count===1?'lançamento':'lançamentos'}</strong><small>Abra para ver datas, categorias, status e ações</small></span><span class="aviora-chevron" aria-hidden="true"></span>`;
+      heading?.remove();latest.classList.add('aviora-accordion');latest.prepend(trigger,panel);wireAccordion(trigger,panel,false);
+    }
 
     const chartCards=[...grid.querySelectorAll('.card')].filter(card=>card.querySelector('canvas'));
     if(chartCards.length<2)return;

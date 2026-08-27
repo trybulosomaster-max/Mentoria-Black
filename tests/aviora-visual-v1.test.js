@@ -47,7 +47,7 @@ test('accordions são semânticos, fechados por padrão e não persistem estado'
 });
 
 test('Lançamentos, Metas e Planejamento recebem resumo primeiro e detalhe sob demanda',()=>{
-  for(const token of ['Acompanhamento do mês','Todos os lançamentos','aviora-goal-trigger','aviora-planning-bars','Ver comparação completa'])ok(source.includes(token),`missing ${token}`);
+  for(const token of ['Acompanhamento do mês','Todos os lançamentos','aviora-goal-trigger','aviora-planning-bars','Planejamento por categoria'])ok(source.includes(token),`missing ${token}`);
   ok(css.includes('.aviora-accordion-trigger'));
   ok(css.includes('.aviora-goal-panel[hidden]'));
 });
@@ -58,6 +58,7 @@ test('cores configuráveis das categorias atravessam tabela, barra e drill-down'
   ok(css.includes('background: var(--category-color)'));
   ok(index.includes('style="background:${categoryColor(category)}"'));
   ok(index.includes('x.color||categoryColor(x.name)'));
+  ok(index.includes('categories.Investimentos=Number(view.expected.investment)'));
 });
 
 test('Dashboard usa quatro KPIs primários, alertas e gráficos no mesmo palco',()=>{
@@ -65,6 +66,18 @@ test('Dashboard usa quatro KPIs primários, alertas e gráficos no mesmo palco',
   ok(source.includes('aviora-dashboard-alerts'));
   ok(source.includes("label=/categoria/i.test(raw)?'Distribuição':/evolu/i.test(raw)?'Evolução':'Comparação'"));
   ok(css.includes('.aviora-chart-stage'));
+  ok(source.includes('Últimos lançamentos do período ·'));
+  ok(source.includes("wireAccordion(trigger,panel,false)"));
+});
+
+test('navegação mobile mantém todos os destinos autorizados acessíveis em menu semântico',()=>{
+  ok(source.includes("nav.querySelectorAll(':scope > [data-tab]')"));
+  ok(source.includes("trigger.setAttribute('aria-controls',panelId)"));
+  ok(source.includes("sheet.addEventListener('keydown'"));
+  ok(source.includes("event.key==='Escape'"));
+  ok(source.includes("item.addEventListener('click'"));
+  ok(css.includes('.aviora-mobile-nav-sheet'));
+  ok(css.includes('.nav.aviora-mobile-nav-ready > [data-tab] { display: none; }'));
 });
 
 test('mobile 390/430 tem safe-area, touch e tabelas responsivas',()=>{
@@ -88,7 +101,10 @@ test('Login, Conhecimento e Administração preservam contratos funcionais',()=>
 
 test('preview local usa exatamente a mesma camada visual sem inicializar backend',()=>{
   ok(preview.includes('js/aviora-visual-v1.js'));
-  ok(preview.includes('data-tab="dashboard"'));
+  equal((preview.match(/data-tab="/g)||[]).length,15);
+  for(const tab of ['dashboard','transactions','planning','categories','recurring','wealth','account','reserve-v52','health-v53','administration'])ok(preview.includes(`data-tab="${tab}"`),`preview missing ${tab}`);
+  for(const hook of ['data-dashboard-latest','v22-tx-filters','planning-canonical','renderAccountSecurity'])ok(preview.includes(hook),`preview missing ${hook}`);
+  ok(preview.includes("params.get('tab')||'dashboard'"));
   ok(!preview.includes('createClient('));
   ok(!/service[_-]?role|access[_-]?token|refresh[_-]?token/i.test(preview));
 });
