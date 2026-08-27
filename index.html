@@ -221,6 +221,7 @@ let DATA={accounts:[],cards:[],categories:[],transactions:[],goals:[],recurring:
 let FILTERS={year:new Date().getFullYear(),month:new Date().getMonth()+1,txType:"",txCategory:"",txMonth:"",search:""};
 const defaultReportFilters=()=>({periodMode:"month",year:new Date().getFullYear(),month:new Date().getMonth()+1,years:[],dateFrom:"",dateTo:"",types:[],category:"",statuses:["realizado","pendente"],includeFuture:true,accountId:"",cardId:"",goalId:""});
 let REPORT_FILTERS=defaultReportFilters();
+let FINANCIAL_VIEW_CACHE=null;
 
 function toast(msg,err=false){$("toastBox").textContent=msg;$("toastBox").className=err?"errorbox":"notice";$("toast").classList.remove("hidden");clearTimeout(window.__toast);window.__toast=setTimeout(()=>$("toast").classList.add("hidden"),3500)}
 function modal(title,html){$("modalTitle").textContent=title;$("modalBody").innerHTML=html;$("modal").classList.remove("hidden")}
@@ -596,6 +597,20 @@ function totals(ts){
   return MBFinance.totals(ts);
 }
 function monthlyPlan(){return DATA.monthly.find(p=>Number(p.year)===Number(FILTERS.year)&&Number(p.month)===Number(FILTERS.month))||null}
+function financialPeriodView(){
+ if(FINANCIAL_VIEW_CACHE)return FINANCIAL_VIEW_CACHE;
+ if(typeof window.MBDashboardFinancialV82?.projectDashboardPeriod!=="function")return null;
+ const current=new Date(),now=`${current.getFullYear()}-${String(current.getMonth()+1).padStart(2,"0")}-${String(current.getDate()).padStart(2,"0")}`;
+ FINANCIAL_VIEW_CACHE=window.MBDashboardFinancialV82.projectDashboardPeriod(DATA.transactions||[],DATA.recurring||[],{year:FILTERS.year,month:FILTERS.month,now});
+ return FINANCIAL_VIEW_CACHE;
+}
+function expectedExpensesByCat(){
+ const view=financialPeriodView(),expected=view?.byCategory?.expected;
+ if(!expected)return expensesByCat();
+ const categories={...expected};
+ if(Number(view.expected?.investment)>0)categories.Investimentos=Number(view.expected.investment);
+ return Object.entries(categories).filter(([,value])=>Number(value)>0).sort((a,b)=>Number(b[1])-Number(a[1]));
+}
 function planValues(p){p=p||{};return {"Gastos Fixos":Number(p.fixed_expenses||0),"Investimentos":Number(p.investments||0),"Conforto":Number(p.comfort||0),"Metas":Number(p.goals||0),"Lazer":Number(p.leisure||0),"Conhecimento":Number(p.knowledge||0)}}
 function planTotal(p){return Object.values(planValues(p)).reduce((a,b)=>a+b,0)}
 function reserveInfo(){
@@ -724,7 +739,7 @@ async function deleteTransactionSmart(id){
  toast(choice==="one"?"Somente esta parcela foi excluída.":`${ids.length} parcela(s) excluída(s).`);
 }
 function dashboard(){
- const ts=periodTx(),t=totals(ts),res=reserveInfo(),cats=expensesByCat(ts),cards=cardSummary();
+ const ts=periodTx(),t=totals(ts),res=reserveInfo(),cats=expectedExpensesByCat(),cards=cardSummary();
  const reserveK=res.current?money(res.current):"R$ 0,00";
  return pageHead("Dashboard",`${MONTHS[FILTERS.month-1]} de ${FILTERS.year}` ,`<button class="btn gold" onclick="openTransaction()">＋ Lançamento</button>`) +
  `<div class="filters">
@@ -735,10 +750,10 @@ function dashboard(){
  ${periodAudit().length?`<div class="integrity-alert"><b>Auditoria automática:</b> ${periodAudit().length} parcela(s) duplicada(s) detectada(s) no período e ignorada(s) nos cálculos para evitar dupla contagem. Os registros originais permanecem intactos.</div>`:""}
  <div class="kpis">${kpi("Receitas",money(t.income),"período selecionado")}${kpi("Despesas",money(t.expense),"inclui investimentos")}${kpi("Saldo",money(t.balance),t.balance>=0?"positivo":"atenção")}${kpi("Investimentos",money(t.invest),"período selecionado")}${kpi("Gastos Fixos",money(cats.find(x=>x[0]==="Gastos Fixos")?.[1]||0),"despesas da categoria")}${kpi("Patrimônio Líquido",money(netWorth()),"estimativa atual")}</div>
  <div class="grid">
-  <section class="card s8"><h2>Despesas por categoria</h2><div class="desc">Valor + percentual diretamente acima de cada barra.</div>${cats.length?`<div class="chartbox"><canvas id="dashCat"></canvas></div>`:`<div class="empty">Ainda não há despesas neste período.</div>`}</section>
+  <section class="card s8"><h2>Despesas por categoria</h2><div class="desc">Realizado + compromissos conhecidos, preservando as cores das suas categorias.</div>${cats.length?`<div class="chartbox"><canvas id="dashCat"></canvas></div>`:`<div class="empty">Ainda não há despesas ou compromissos conhecidos neste período.</div>`}</section>
   <section class="card s4"><h2>Reserva de emergência</h2><div class="desc">Metas, contas ou ativos identificados como Reserva, Emergência ou Caixinha.</div><div style="font-size:28px;font-weight:850;margin:16px 0">${reserveK}</div>${res.target?`<div class="bar"><i style="width:${res.pct}%;background:var(--gold)"></i></div><div class="statline"><span>Progresso</span><strong>${pct(res.pct)}</strong></div>`:`<div class="notice">Cadastre uma meta/conta/ativo com nome contendo “Reserva”, “Emergência” ou “Caixinha”.</div>`}</section>
   <section class="card s6"><h2>Cartões de crédito</h2><div class="desc">Gastos do período por cartão.</div>${cards.rows.length?cards.rows.map(([c,v])=>`<div class="statline"><span>${esc(c.name)}</span><strong>${money(v)}</strong></div>`).join("")+`<div class="statline"><strong>Total</strong><strong>${money(cards.total)}</strong></div>`:`<div class="empty">Nenhum cartão cadastrado.</div>`}</section>
-  <section class="card s12"><h2>Últimos lançamentos do período</h2>${transactionTable([...periodTx()].sort((a,b)=>String(b.transaction_date).localeCompare(String(a.transaction_date))).slice(0,10))}</section>
+  <section class="card s12 dashboard-latest-transactions" data-dashboard-latest><h2>Últimos lançamentos do período</h2>${transactionTable([...periodTx()].sort((a,b)=>String(b.transaction_date).localeCompare(String(a.transaction_date))).slice(0,10))}</section>
  </div>`;
 }
 function planning(){
@@ -747,13 +762,18 @@ function planning(){
  const projection=window.MBPlanningV82.projectPlanningPeriod(monthlyPlan(),DATA.transactions||[],DATA.recurring||[],{year:FILTERS.year,month:FILTERS.month,now});
  const movementValue=(bucket,category)=>category==='Investimentos'?Number(bucket.investment||0):Number(bucket.consumptionByCategory?.[category]||0);
  const plannedValue=category=>category==='Investimentos'?Number(projection.planned.investment||0):Number(projection.planned.consumptionByCategory?.[category]||0);
- const trackingRows=CAT_ORDER.map(category=>`<tr><td><span class="dot" style="background:${categoryColor(category)}"></span>${esc(category)}</td><td>${money(plannedValue(category))}</td><td>${money(movementValue(projection.realized,category))}</td><td>${money(movementValue(projection.scheduledMaterialized,category))}</td><td>${money(movementValue(projection.projectedVirtual,category))}</td><td>${money(movementValue(projection.forecast,category))}</td></tr>`).join('');
- const incomeRow=`<tr><td><span class="dot" style="background:var(--ok)"></span>Receitas</td><td>${money(projection.planned.revenue)}</td><td>${money(projection.realized.income)}</td><td>${money(projection.scheduledMaterialized.income)}</td><td>${money(projection.projectedVirtual.income)}</td><td>${money(projection.forecast.income)}</td></tr>`;
- const trackingNotice=!projection.period.planFound?'<div class="notice" style="margin-bottom:10px">Ainda não há planejamento cadastrado para este mês. Os movimentos canônicos continuam disponíveis para acompanhamento.</div>':projection.unclassified.length?`<div class="notice" style="margin-bottom:10px">${projection.unclassified.length} lançamento(s) sem classificação canônica foram excluídos dos valores e permanecem disponíveis para auditoria.</div>`:'';
+ const expectedValue=category=>movementValue(projection.realized,category)+movementValue(projection.forecast,category);
+ const remainingValue=category=>plannedValue(category)-expectedValue(category);
+ const trackingRows=CAT_ORDER.map(category=>`<tr><td><span class="dot" style="background:${categoryColor(category)}"></span>${esc(category)}</td><td>${money(plannedValue(category))}</td><td>${money(movementValue(projection.realized,category))}</td><td>${money(movementValue(projection.scheduledMaterialized,category))}</td><td>${money(movementValue(projection.projectedVirtual,category))}</td><td>${money(movementValue(projection.forecast,category))}</td><td>${money(expectedValue(category))}</td><td>${remainingValue(category)>=0?money(remainingValue(category)):`Excedido ${money(Math.abs(remainingValue(category)))}`}</td></tr>`).join('');
+ const expectedIncome=projection.realized.income+projection.forecast.income;
+ const incomeRow=`<tr><td><span class="dot" style="background:var(--ok)"></span>Receitas</td><td>${money(projection.planned.revenue)}</td><td>${money(projection.realized.income)}</td><td>${money(projection.scheduledMaterialized.income)}</td><td>${money(projection.projectedVirtual.income)}</td><td>${money(projection.forecast.income)}</td><td>${money(expectedIncome)}</td><td>${money(expectedIncome-projection.planned.revenue)}</td></tr>`;
+ const trackingNotice=!projection.period.planFound?'<div class="notice" style="margin-bottom:10px">Ainda não há planejamento cadastrado para este mês. As movimentações conhecidas continuam disponíveis para acompanhamento.</div>':projection.unclassified.length?`<div class="notice" style="margin-bottom:10px">${projection.unclassified.length} lançamento(s) sem categoria reconhecida foram excluídos dos valores e permanecem disponíveis para revisão.</div>`:'';
+ const expectedOut=projection.realized.totalOut+projection.forecast.totalOut;
+ const expectedBalance=(projection.realized.income-projection.realized.totalOut)+(projection.forecast.income-projection.forecast.totalOut);
  return pageHead("Planejamento",`Cada combinação de ano + mês possui seu próprio planejamento.`,`<button class="btn gold" onclick="openPlan()">＋ Planejamento</button>`)+
- `<div class="filters"><div class="filter"><label>Ano</label><select id="planYear">${yearOptions()}</select></div><div class="filter"><label>Mês</label><select id="planMonth">${monthOptions()}</select></div><div class="filter"><label>Receita planejada</label><strong style="font-size:18px">${money(total)}</strong></div></div>
+ `<div class="filters"><div class="filter"><label>Ano</label><select id="planYear">${yearOptions()}</select></div><div class="filter"><label>Mês</label><select id="planMonth">${monthOptions()}</select></div><div class="filter planning-revenue"><label>Receita planejada</label><strong style="font-size:18px">${money(total)}</strong></div></div>
  <div class="kpis">${CAT_ORDER.map(c=>kpi(c,money(pv[c]),total?pct(pv[c]/total*100):"0,0%")).join("")}</div>
- <div class="grid"><section class="card s8"><h2>Distribuição planejada</h2><div class="desc">As cores são as mesmas cadastradas nas categorias.</div><div class="chartbox"><canvas id="planChart"></canvas></div></section><section class="card s4"><h2>Estratégia percentual</h2><div class="statline"><span>Base</span><strong>${money(total)}</strong></div>${CAT_ORDER.map(c=>`<div class="statline"><span><span class="dot" style="background:${categoryColor(c)}"></span>${c}</span><strong>${total?pct(pv[c]/total*100):"0,0%"}</strong></div>`).join("")}<div class="statline"><strong>Total distribuído</strong><strong>${money(sum)} (${total?pct(sum/total*100):"0,0%"})</strong></div></section><section class="card s12 planning-canonical"><h2>Acompanhamento canônico do mês</h2><div class="desc"><b>Realizado</b> já ocorreu • <b>Programado</b> está persistido • <b>Projetado</b> é virtual • <b>Previsão</b> = Programado + Projetado.</div>${trackingNotice}<div class="tablewrap"><table><thead><tr><th>Envelope</th><th>Planejado</th><th>Realizado</th><th>Programado</th><th>Projetado</th><th>Previsão</th></tr></thead><tbody>${incomeRow}${trackingRows}<tr><td><strong>Total de saídas</strong></td><td><strong>${money(projection.planned.totalOut)}</strong></td><td><strong>${money(projection.realized.totalOut)}</strong></td><td><strong>${money(projection.scheduledMaterialized.totalOut)}</strong></td><td><strong>${money(projection.projectedVirtual.totalOut)}</strong></td><td><strong>${money(projection.forecast.totalOut)}</strong></td></tr></tbody></table></div></section></div>`;
+ <div class="grid"><section class="card s8"><h2>Distribuição planejada</h2><div class="desc">As cores são as mesmas cadastradas nas categorias.</div><div class="chartbox"><canvas id="planChart"></canvas></div></section><section class="card s4"><h2>Estratégia percentual</h2><div class="statline"><span>Base</span><strong>${money(total)}</strong></div>${CAT_ORDER.map(c=>`<div class="statline"><span><span class="dot" style="background:${categoryColor(c)}"></span>${c}</span><strong>${total?pct(pv[c]/total*100):"0,0%"}</strong></div>`).join("")}<div class="statline"><strong>Total distribuído</strong><strong>${money(sum)} (${total?pct(sum/total*100):"0,0%"})</strong></div></section><section class="card s12 planning-month-summary"><h2>Resumo do mês</h2><div class="desc"><b>Realizado</b> já ocorreu • <b>Programado</b> está persistido • <b>Projetado</b> é virtual • <b>Previsão</b> = Programado + Projetado.</div>${trackingNotice}<div class="planning-month-summary-values"><div class="statline"><span>Planejado</span><strong>${money(projection.planned.totalOut)}</strong></div><div class="statline"><span>Realizado</span><strong>${money(projection.realized.totalOut)}</strong></div><div class="statline"><span>Compromissos conhecidos</span><strong>${money(projection.forecast.totalOut)}</strong></div><div class="statline"><span>Esperado no mês</span><strong>${money(expectedOut)}</strong></div><div class="statline"><span>Resultado esperado do mês</span><strong>${money(expectedBalance)}</strong></div></div></section><section class="card s12 planning-canonical"><h2>Planejamento por categoria</h2><div class="desc">O esperado no mês combina o realizado com a previsão sem alterar cada conceito.</div><div class="tablewrap"><table><thead><tr><th>Categoria</th><th>Planejado</th><th>Realizado</th><th>Programado</th><th>Projetado</th><th>Previsão</th><th>Esperado</th><th>Restante esperado</th></tr></thead><tbody>${incomeRow}${trackingRows}<tr><td><strong>Total de saídas</strong></td><td><strong>${money(projection.planned.totalOut)}</strong></td><td><strong>${money(projection.realized.totalOut)}</strong></td><td><strong>${money(projection.scheduledMaterialized.totalOut)}</strong></td><td><strong>${money(projection.projectedVirtual.totalOut)}</strong></td><td><strong>${money(projection.forecast.totalOut)}</strong></td><td><strong>${money(expectedOut)}</strong></td><td><strong>${projection.planned.totalOut-expectedOut>=0?money(projection.planned.totalOut-expectedOut):`Excedido ${money(expectedOut-projection.planned.totalOut)}`}</strong></td></tr></tbody></table></div></section></div>`;
 }
 function openPlan(){
  const p=monthlyPlan()||{};modal("Planejamento mensal",`<form id="planForm"><div class="formgrid"><div><label>Ano</label><select name="year">${yearOptions(p.year||FILTERS.year)}</select></div><div><label>Mês</label><select name="month">${monthOptions(p.month||FILTERS.month)}</select></div>${[["revenue","Receita"],["fixed_expenses","Gastos Fixos"],["investments","Investimentos"],["comfort","Conforto"],["goals","Metas"],["leisure","Lazer"],["knowledge","Conhecimento"]].map(([k,l])=>`<div class="field"><label>${l}</label><input name="${k}" class="money-field" value="${p[k]??""}" inputmode="decimal"></div>`).join("")}</div><div id="planMsg" class="msg"></div><div class="modal-foot"><button type="button" class="btn" onclick="closeModal()">Cancelar</button><button class="btn primary">Salvar planejamento</button></div></form>`);
@@ -957,7 +977,7 @@ async function mountKnowledgeArea(target,entitlements=COMMERCIAL_STATE?.entitlem
  const app=window.MBKnowledgeArea.createKnowledgeArea({client:sb,entitlements:entitlements||{knowledge:{hasAccess:false}},checkout:offer=>window.commercialCheckout(offer),notify:toast});
  await app.mount(root);
 }
-function render(){nav();$("view").innerHTML=TAB==="dashboard"?window.dashboard():TAB==="transactions"?window.transactions():TAB==="planning"?planning():TAB==="accounts"?accounts():TAB==="cards"?cards():TAB==="categories"?window.categories():TAB==="goals"?goals():TAB==="recurring"?recurring():TAB==="wealth"?wealth():TAB==="knowledge"?knowledge():reports();bindFilters();if(TAB==="knowledge")mountKnowledgeArea("knowledgeRoot").catch(error=>toast(error.message,true));requestAnimationFrame(()=>window.drawCharts())}
+function render(){FINANCIAL_VIEW_CACHE=null;nav();$("view").innerHTML=TAB==="dashboard"?window.dashboard():TAB==="transactions"?window.transactions():TAB==="planning"?planning():TAB==="accounts"?accounts():TAB==="cards"?cards():TAB==="categories"?window.categories():TAB==="goals"?goals():TAB==="recurring"?recurring():TAB==="wealth"?wealth():TAB==="knowledge"?knowledge():reports();bindFilters();if(TAB==="knowledge")mountKnowledgeArea("knowledgeRoot").catch(error=>toast(error.message,true));requestAnimationFrame(()=>window.drawCharts())}
 function chartCanvasIsRenderable(id){
   const canvas=$(id);
   return window.AVIORA_VISUAL_V1?.chartCanvasIsRenderable(canvas)??Boolean(canvas&&!canvas.closest?.('[hidden]'));
@@ -968,7 +988,7 @@ function chartAnimation(){
 }
 function drawCharts(){
   Object.values(CHARTS).forEach(c=>{try{c.destroy()}catch{}});CHARTS={};
-  const rows=expensesByCat();
+  const rows=TAB==="dashboard"?expectedExpensesByCat():expensesByCat();
 
   if(TAB==="dashboard"&&rows.length&&chartCanvasIsRenderable("dashCat")){
     chartBar("dashCat",rows,rows.reduce((a,b)=>a+b[1],0));
@@ -997,11 +1017,11 @@ $("logout").onclick=async()=>{await sb.auth.signOut();location.reload()};$("refr
 async function start(){try{await load();$("auth").classList.add("hidden");$("app").classList.remove("hidden");$("userEmail").textContent=USER.email||"";render()}catch(e){$("v18Loading")?.classList.add("hidden");$("authMsg").textContent=window.MBCommercialAccess.accountLoadErrorMessage(e);AVIORA_REPORT_DEVELOPMENT_ERROR('Initial load',e)}}
 /* V18 session bootstrap replaces the original bootstrap. */
 if("serviceWorker" in navigator){
-  const MB_SW_VERSION="28";
+  const MB_SW_VERSION="29";
   try{
     navigator.serviceWorker.addEventListener("controllerchange",()=>{
-      if(sessionStorage.getItem("mb-v28-reloaded")==="1")return;
-      sessionStorage.setItem("mb-v28-reloaded","1");
+      if(sessionStorage.getItem("mb-v29-reloaded")==="1")return;
+      sessionStorage.setItem("mb-v29-reloaded","1");
       location.reload();
     });
   }catch(e){}
@@ -3222,15 +3242,12 @@ migrateReserveGoals();
       DATA.transactions||[],DATA.recurring||[],
       {year:FILTERS.year,month:FILTERS.month,now}
     );
-    const movement=(bucket,category)=>category==='Investimentos'?Number(bucket.investment||0):Number(bucket.consumptionByCategory?.[category]||0);
-    const planned=category=>category==='Investimentos'?Number(projection.planned.investment||0):Number(projection.planned.consumptionByCategory?.[category]||0);
     const line=(label,value)=>`<div class="statline"><span>${label}</span><strong>${money(value)}</strong></div>`;
-    const rows=(Array.isArray(CAT_ORDER)?CAT_ORDER:[]).map(category=>`<tr><td><span class="dot" style="background:${typeof categoryColor==='function'?categoryColor(category):'var(--gold)'}"></span>${esc(category)}</td><td>${money(planned(category))}</td><td>${money(movement(projection.realized,category))}</td><td>${money(movement(projection.scheduledMaterialized,category))}</td><td>${money(movement(projection.projectedVirtual,category))}</td><td>${money(movement(projection.forecast,category))}</td></tr>`).join('');
-    const notice=!projection.period.planFound?'<div class="notice">Sem planejamento cadastrado neste mês; os movimentos canônicos continuam disponíveis.</div>':projection.unclassified.length?`<div class="notice">${projection.unclassified.length} lançamento(s) sem classificação canônica foram excluídos dos valores.</div>`:'';
-    const totalSection=`<section class="card s6 dashboard-planning-v82"><h2>Planejamento do mês</h2><div class="desc"><b>Realizado</b> já ocorreu • <b>Programado</b> está persistido • <b>Projetado</b> é virtual • <b>Previsão</b> = Programado + Projetado.</div>${notice}${line('Planejado',projection.planned.totalOut)}${line('Realizado',projection.realized.totalOut)}${line('Programado',projection.scheduledMaterialized.totalOut)}${line('Projetado',projection.projectedVirtual.totalOut)}${line('Previsão',projection.forecast.totalOut)}</section>`;
-    const investmentSection=`<section class="card s6 v60-invest-card"><h2>Investimentos</h2><div class="desc">Acompanhamento separado das despesas de consumo.</div>${line('Planejado',projection.planned.investment)}${line('Realizado',projection.realized.investment)}${line('Programado',projection.scheduledMaterialized.investment)}${line('Projetado',projection.projectedVirtual.investment)}${line('Previsão',projection.forecast.investment)}</section>`;
-    const categorySection=`<section class="card s12 dashboard-planning-categories-v82"><h2>Planejamento por envelope</h2><div class="tablewrap"><table><thead><tr><th>Envelope</th><th>Planejado</th><th>Realizado</th><th>Programado</th><th>Projetado</th><th>Previsão</th></tr></thead><tbody><tr><td><span class="dot" style="background:var(--ok)"></span>Receitas</td><td>${money(projection.planned.revenue)}</td><td>${money(projection.realized.income)}</td><td>${money(projection.scheduledMaterialized.income)}</td><td>${money(projection.projectedVirtual.income)}</td><td>${money(projection.forecast.income)}</td></tr>${rows}<tr><td><strong>Total de saídas</strong></td><td><strong>${money(projection.planned.totalOut)}</strong></td><td><strong>${money(projection.realized.totalOut)}</strong></td><td><strong>${money(projection.scheduledMaterialized.totalOut)}</strong></td><td><strong>${money(projection.projectedVirtual.totalOut)}</strong></td><td><strong>${money(projection.forecast.totalOut)}</strong></td></tr></tbody></table></div></section>`;
-    return totalSection+investmentSection+categorySection;
+    const notice=!projection.period.planFound?'<div class="notice">Sem planejamento cadastrado neste mês; os compromissos conhecidos continuam visíveis.</div>':projection.unclassified.length?`<div class="notice">${projection.unclassified.length} lançamento(s) sem categoria reconhecida foram excluídos dos valores.</div>`:'';
+    const expectedOut=projection.realized.totalOut+projection.forecast.totalOut;
+    const expectedResult=(projection.realized.income-projection.realized.totalOut)+(projection.forecast.income-projection.forecast.totalOut);
+    const remaining=projection.planned.totalOut-expectedOut;
+    return `<section class="card s12 dashboard-planning-v82"><div class="row" style="justify-content:space-between"><div><h2>Resumo do mês</h2><div class="desc">Realizado separado dos compromissos; Previsão = Programado + Projetado.</div></div><button class="btn" type="button" onclick="TAB='planning';render()">Abrir Planejamento</button></div>${notice}<div class="dashboard-month-summary">${line('Planejado',projection.planned.totalOut)}${line('Realizado',projection.realized.totalOut)}${line('Compromissos conhecidos',projection.forecast.totalOut)}${line('Esperado no mês',expectedOut)}${line('Resultado esperado',expectedResult)}${line(remaining>=0?'Restante esperado':'Excedido esperado',Math.abs(remaining))}</div></section>`;
   }
 
   window.dashboard = function(){
@@ -3246,14 +3263,18 @@ migrateReserveGoals();
     // KPIs únicos e coerentes com a regra financeira consolidada.
     const ts = typeof periodTx==='function' ? periodTx() : [];
     const total = typeof totals==='function' ? totals(ts) : {income:0,expense:0,invest:0,balance:0};
-    const now=new Date().toISOString().slice(0,10);
-    const financial=window.MBDashboardFinancialV82?.projectDashboardPeriod(DATA.transactions||[],DATA.recurring||[],{year:FILTERS.year,month:FILTERS.month,now});
+    const financial=typeof financialPeriodView==='function'?financialPeriodView():null;
     const reserve = typeof window.MB_V56_RESERVE_CURRENT==='function' ? window.MB_V56_RESERVE_CURRENT() : 0;
     const patrimonio = typeof netWorth==='function' ? netWorth() : 0;
     const kpiBlock = html.match(/<div class="kpis">[\s\S]*?(?=<div class="grid">)/);
     if(kpiBlock){
-      const realized=financial?.realized||{income:total.income,consumptionExpense:total.expense,investment:total.invest,availableBalance:total.balance};const forecast=financial?.forecast||{};
-      const replacement=`<div class="kpis">${kpi('Receitas',money(realized.income),'realizado')}${kpi('Despesas',money(realized.consumptionExpense),'consumo realizado')}${kpi('Saldo',money(realized.availableBalance),realized.availableBalance>=0?'realizado':'atenção')}${kpi('Investimentos',money(realized.investment),'realizado')}${kpi('Reserva de Emergência',money(reserve),'valor acumulado / disponível')}${kpi('Patrimônio Líquido',money(patrimonio),'estimativa atual')}</div>${financial?`<section class="card s12 dashboard-financial-v82"><div class="desc">Previsão separada: Programado + Projetado; não compõe o saldo realizado.</div><div class="statline"><span>Programado</span><strong>${money(financial.scheduled.availableBalanceEffect)}</strong></div><div class="statline"><span>Projetado</span><strong>${money(financial.projected.availableBalanceEffect)}</strong></div><div class="statline"><span>Previsão</span><strong>${money(forecast.availableBalanceEffect)}</strong></div></section>`:''}`;
+      const realized=financial?.realized||{income:total.income,consumptionExpense:total.expense,investment:total.invest,availableBalanceEffect:total.balance};
+      const forecast=financial?.forecast||{income:0,consumptionExpense:0,investment:0,availableBalanceEffect:0};
+      const expected=financial?.expected||{income:realized.income,consumptionExpense:realized.consumptionExpense,investment:realized.investment,availableBalanceEffect:realized.availableBalanceEffect};
+      const outlookKpi=(label,value,realizedValue,futureValue,tone,style='')=>`<article class="kpi aviora-outlook-kpi ${tone}" ${style}><div class="lab">${label}</div><div class="val">${money(value)}</div><div class="aviora-kpi-breakdown"><span>Realizado <b>${money(realizedValue)}</b></span><span>Previsão <b>${money(futureValue)}</b></span></div></article>`;
+      const balanceTone=expected.availableBalanceEffect>0?'aviora-kpi-positive':expected.availableBalanceEffect<0?'aviora-kpi-negative':'aviora-kpi-neutral';
+      const investmentColor=typeof categoryColor==='function'?categoryColor('Investimentos'):'var(--aviora-gold)';
+      const replacement=`<div class="kpis aviora-dashboard-kpis">${outlookKpi('Receitas',expected.income,realized.income,forecast.income,'aviora-kpi-income')}${outlookKpi('Despesas',expected.consumptionExpense,realized.consumptionExpense,forecast.consumptionExpense,'aviora-kpi-expense')}${outlookKpi('Resultado do mês',expected.availableBalanceEffect,realized.availableBalanceEffect,forecast.availableBalanceEffect,balanceTone)}${outlookKpi('Investimentos',expected.investment,realized.investment,forecast.investment,'aviora-kpi-investment',`style="--kpi-accent:${investmentColor}"`)}${kpi('Reserva de Emergência',money(reserve),'valor acumulado / disponível')}${kpi('Patrimônio Líquido',money(patrimonio),'estimativa atual')}</div>`;
       html=html.replace(kpiBlock[0],replacement);
     }
 
@@ -3274,7 +3295,7 @@ migrateReserveGoals();
 
     // Planejamento V82: um único motor compartilhado com a página Planejamento.
     const planningSection=dashboardPlanningSummary();
-    const planningAnchor='<section class="card s12"><h2>Últimos lançamentos do período</h2>';
+    const planningAnchor='<section class="card s12 dashboard-latest-transactions" data-dashboard-latest><h2>Últimos lançamentos do período</h2>';
     if(planningSection&&html.includes(planningAnchor)) html=html.replace(planningAnchor,planningSection+planningAnchor);
     else if(planningSection) html=html.replace('<div class="grid">','<div class="grid">'+planningSection);
     return html;
