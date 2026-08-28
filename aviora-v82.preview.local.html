@@ -91,7 +91,7 @@
  async function mountKnowledgePreview(root){
   if(!root)return null;
   const fixture=await KNOWLEDGE_FIXTURE;
-  return AVIORA_PREVIEW_ADAPTERS.mountKnowledge({root,fixture,renderer:MBKnowledgeArea,hasAccess:true});
+  return AVIORA_PREVIEW_ADAPTERS.mountKnowledge({root,fixture,renderer:MBKnowledgeArea,hasAccess:previewState!=='knowledge-locked'});
  }
  window.FILTERS={year:2026,month:8,txYear:2026,txMonth:8,txCategory:'all'};
  window.monthlyPlan=()=>({...DATA.monthlyPlan});

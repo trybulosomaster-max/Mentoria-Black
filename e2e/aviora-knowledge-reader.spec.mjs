@@ -58,6 +58,28 @@ test.describe('AVIORA — Reader avançado local e autorizado',()=>{
     await page.locator('.knowledge-annotation-card.note').getByRole('button',{name:'Excluir'}).click();await expect(page.locator('.knowledge-annotation-card')).toHaveCount(1);
   });
 
+  test('entitlement bloqueia corpo e busca protegidos sem esconder a amostra',async({page})=>{
+    await openPreview(page,{tab:'knowledge',state:'knowledge-locked',viewport:{width:390,height:844}});
+    await page.getByRole('button',{name:'Começar leitura'}).click();
+    await expect(page.getByRole('button',{name:'Ler'})).toBeVisible();
+    const locked=page.getByRole('button',{name:'Ver acesso'}).first();await expect(locked).toBeVisible();await locked.click();
+    await expect(page.getByRole('heading',{name:'Continue sua leitura na biblioteca AVIORA.'})).toBeVisible();
+    await expect(page.getByText('Conteúdo sintético protegido',{exact:false})).toHaveCount(0);
+    await openPreview(page,{tab:'knowledge',state:'knowledge-locked',viewport:{width:390,height:844}});await page.getByRole('button',{name:'Começar leitura'}).click();
+    await page.locator('[data-knowledge-search] input').fill('entitlement');await page.locator('[data-knowledge-search]').getByRole('button',{name:'Buscar'}).click();
+    await expect(page.getByText('Nenhum resultado autorizado encontrado.')).toBeVisible();
+  });
+
+  test('foco, labels e texto ampliado permanecem utilizáveis no mobile',async({page})=>{
+    await openPreview(page,{tab:'knowledge',viewport:{width:375,height:812}});await openFirstChapter(page);
+    const preferences=page.locator('.knowledge-reader-preferences summary');await preferences.focus();await page.keyboard.press('Tab');await page.keyboard.press('Shift+Tab');await expect(preferences).toBeFocused();
+    expect(await preferences.evaluate(node=>getComputedStyle(node).outlineStyle)).not.toBe('none');
+    await preferences.click();
+    const fontSize=page.getByLabel('Tamanho');await expect(fontSize).toBeVisible();await fontSize.selectOption('x-large');
+    await expect(page.locator('.knowledge-reader')).toHaveAttribute('data-reader-font-size','x-large');
+    await assertNoHorizontalOverflow(page);await assertTouchTargets(page,'.knowledge-root button:visible');
+  });
+
   for(const viewport of VIEWPORTS){
     test(`Reader mantém controles e leitura íntegros em ${viewport.name}`,async({page})=>{
       await openPreview(page,{tab:'knowledge',viewport});await openFirstChapter(page);

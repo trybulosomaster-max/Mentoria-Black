@@ -3,6 +3,10 @@
 .knowledge-toolbar .btn,
 .knowledge-reader-footer .btn{min-height:44px}
 
+.knowledge-root select:focus-visible,
+.knowledge-root textarea:focus-visible,
+.knowledge-root summary:focus-visible{outline:2px solid var(--aviora-gold-soft,#e4c55b);outline-offset:3px}
+
 .knowledge-cover-official{
   aspect-ratio:1;
   overflow:visible;

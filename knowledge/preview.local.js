@@ -16,7 +16,7 @@
   function query(table){
     const filters=[];let ascending=true;
     const chain={select(){return chain},eq(column,value){filters.push([column,value]);return chain},order(column,options={}){ascending=options.ascending!==false;return finish(column)},then(resolve,reject){return finish().then(resolve,reject)}};
-    function finish(order){let data=(database[table]||[]).filter(row=>filters.every(([key,value])=>row[key]===value));if(order)data=data.slice().sort((a,b)=>(a[order]>b[order]?1:-1)*(ascending?1:-1));return Promise.resolve({data,error:null})}
+    function finish(order){let data=(database[table]||[]).filter(row=>filters.every(([key,value])=>row[key]===value));if(table==='knowledge_sections'&&!window.previewKnowledgeAccess)data=data.filter(row=>row.access_level!=='knowledge');if(order)data=data.slice().sort((a,b)=>(a[order]>b[order]?1:-1)*(ascending?1:-1));return Promise.resolve({data,error:null})}
     return chain;
   }
   const client={

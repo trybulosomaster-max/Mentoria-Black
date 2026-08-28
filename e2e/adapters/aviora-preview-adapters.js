@@ -65,7 +65,7 @@
     return {knowledge_publications:publications,knowledge_parts:parts,knowledge_chapters:chapters,knowledge_sections:sections,knowledge_progress:[],knowledge_bookmarks:[]};
   }
 
-  function createKnowledgeClient(fixture){
+  function createKnowledgeClient(fixture,{hasAccess=true}={}){
     const database=buildKnowledgeDatabase(fixture);
     function query(table){
       const filters=[];let ascending=true;
@@ -77,6 +77,7 @@
       };
       function finish(order){
         let data=(database[table]||[]).filter(row=>filters.every(([key,value])=>row[key]===value));
+        if(table==='knowledge_sections'&&!hasAccess)data=data.filter(row=>row.access_level!=='knowledge');
         if(order)data=data.slice().sort((a,b)=>(a[order]>b[order]?1:-1)*(ascending?1:-1));
         return Promise.resolve({data,error:null});
       }
@@ -87,7 +88,7 @@
       async rpc(name,payload){
         if(name==='search_my_knowledge_v1'){
           const value=String(payload.p_query||'').toLocaleLowerCase('pt-BR');
-          return {data:database.knowledge_sections.filter(section=>JSON.stringify(section.content).toLocaleLowerCase('pt-BR').includes(value)).map(section=>{const chapter=database.knowledge_chapters.find(item=>item.id===section.chapter_id);return {chapter_id:chapter.id,chapter_title:chapter.title,snippet:section.content.text||section.content.prompt||''}}),error:null};
+          return {data:database.knowledge_sections.filter(section=>(hasAccess||section.access_level!=='knowledge')&&JSON.stringify(section.content).toLocaleLowerCase('pt-BR').includes(value)).map(section=>{const chapter=database.knowledge_chapters.find(item=>item.id===section.chapter_id);return {chapter_id:chapter.id,chapter_title:chapter.title,snippet:section.content.text||section.content.prompt||''}}),error:null};
         }
         if(name==='save_my_knowledge_progress_v1'){
           const row={publication_id:payload.p_publication_id,chapter_id:payload.p_chapter_id,progress_percent:payload.p_completed?100:payload.p_progress_percent,last_section_id:payload.p_last_section_id,last_read_at:'2026-08-27T12:00:00.000Z',completed_at:payload.p_completed?'2026-08-27T12:00:00.000Z':null};
@@ -106,7 +107,7 @@
   async function mountKnowledge({root,fixture,renderer,hasAccess=true}){
     if(!root||!renderer?.createKnowledgeArea)throw new TypeError('AVIORA Knowledge renderer is required');
     const app=renderer.createKnowledgeArea({
-      client:createKnowledgeClient(fixture),
+      client:createKnowledgeClient(fixture,{hasAccess}),
       entitlements:{knowledge:{hasAccess}},
       checkout:()=>({status:'synthetic'}),
       notify:()=>{},preferenceScope:'e2e-preview'

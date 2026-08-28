@@ -52,6 +52,8 @@ test('lista de anotações mantém nota, navegação ao trecho e exclusão expl�
   const state={chapters:[{id:'c',title:'Capítulo'}],readerAnnotations:[{id:'a',chapterId:'c',sectionId:'s',quote:'Trecho',kind:'note',note:'Comentário'}]};
   const html=knowledge.renderAnnotations(state,'c');
   for(const value of ['Anotações','Trecho','Comentário','data-section-id="s"','Editar','Excluir'])ok(html.includes(value),value);
+  ok(html.includes('label for="knowledge-annotation-note-a"'),'campo de edição possui label associado');
+  ok(html.includes('id="knowledge-annotation-note-a"'),'campo de edição possui identificador estável');
 });
 
 console.log(`knowledge-reader-advanced: ${tests} tests, ${assertions} assertions passed`);
