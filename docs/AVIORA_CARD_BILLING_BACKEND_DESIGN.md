@@ -1,12 +1,18 @@
 # AVIORA — Card Billing Backend Design Gate
 
-## Resultado do gate
+## Resultado da revisão
 
-`BACKEND_DESIGN_GATE = READY_FOR_EXPLICIT_MIGRATION_REVIEW`
+`BACKEND_DESIGN_GATE = PRODUCT_DECISION_REQUIRED`
 
-Nenhuma migration foi aplicada. Nenhum projeto Supabase foi acessado para escrita. A candidata local é `20260828130535_aviora_card_billing_backend_v1.sql`.
+`CARD_BILLING_BETA_READINESS = HOLD`
 
-O desenho preserva o Visual V1 e os motores existentes. A ativação é deliberadamente faseada: primeiro schema/RPCs, depois reconciliação explícita do legado, depois writer integrado e somente por último enforcement. A migration não faz backfill, não muda lançamentos e não ativa enforcement.
+`INITIAL_SCHEMA_MODE = SHADOW_ONLY`
+
+`REMOTE_APPLY = PROHIBITED_PENDING_PRODUCT_DECISIONS_AND_RUNTIME_VALIDATION`
+
+Nenhuma migration foi aplicada e nenhum projeto Supabase foi acessado para escrita. A candidata local é `20260828130535_aviora_card_billing_backend_v1.sql`.
+
+O desenho local é uma base útil, mas ainda não autoriza ativação funcional. A camada inicial deve permanecer aditiva e em shadow mode: pode preparar schema, RLS, views e RPCs para validação isolada, porém as RPCs mutadoras ficam sem `EXECUTE` para `authenticated` até as decisões de produto, a integração contábil da conta e os testes reais de RLS/concorrência passarem. O Visual V1 e os motores atuais permanecem congelados.
 
 ## 1. Auditoria do estado atual
 
@@ -18,32 +24,37 @@ O desenho preserva o Visual V1 e os motores existentes. A ativação é delibera
 | `financialEffect()` | compra afeta despesa; transferência estruturada é neutra | cartão não é conta/clearing |
 | RLS V82 | ownership por `user_id` e FKs compostas | ledger de cartão ainda ausente |
 
-Decisão: `PERSISTED_INVOICE_REQUIRED`. Datas e totais podem ser derivados, mas ciclo congelado, pagamento parcial, pagamento integral, crédito e retry exigem persistência auditável.
+Decisão confirmada: uma fatura liquidável exige persistência auditável. Permanecem abertas as decisões sobre calendário automático, forma contábil da liquidação, alocação de pagamentos, crédito, limite gerencial, séries parceladas e retenção.
 
-## 2. Entidades propostas
+## 2. Entidades locais propostas
 
 ### `card_billing_cycles`
 
-Congela `cycle_key`, início, fechamento e vencimento por usuário/cartão. A chave do ciclo é o primeiro dia do mês da competência já persistida em `transaction_date`. Alterar `closing_day` ou `due_day` do cartão não move histórico.
+Persiste snapshots explícitos de `cycle_key`, início, fechamento e vencimento por usuário/cartão. A candidata não contém helper de calendário nem RPC para construir/anexar ciclo: essas datas precisam ser fornecidas por um writer privilegiado futuro, depois da decisão de produto. Snapshots são imutáveis após inserção. O único contrato fechado é que `transaction_date` continua sendo a competência histórica canônica e jamais pode ser recalculada por fechamento ou vencimento.
 
 ### `transactions.card_billing_cycle_id`
 
-Vínculo explícito da compra/parcela ao ciclo. Começa nullable para compatibilidade. Não existe backfill por descrição, `note`, valor, data de compra ou outra heurística.
+Vínculo explícito e nullable da compra/parcela ao ciclo. Não há inferência histórica por descrição, `note`, valor, proximidade temporal ou data de compra.
 
 ### `card_invoice_payments`
 
-Ledger append-only de `payment` e `payment_reversal`, com conta de origem, operação idempotente e reversão auditável. Não é uma transação de despesa.
+Candidato normalizado a ledger append-only de `payment` e `payment_reversal`, com `user_id`, `billing_cycle_id`, conta de origem e operação idempotente. Não persiste `card_id`: o cartão deriva do ciclo, enquanto ownership de ciclo e conta é validado contra o `user_id` persistido. A persistência de um pagamento nesse ledger, sozinha, não reduz o saldo da conta consumido pelo produto atual. A representação contábil dessa redução permanece `ACCOUNT_SETTLEMENT_REQUIRED` e `PRODUCT_DECISION_REQUIRED`.
 
 ### `card_purchase_credits`
 
-Ledger append-only de `purchase_credit` e `credit_reversal`, sempre ligado à compra original e limitado ao seu valor líquido.
+Candidato normalizado a ledger append-only de `purchase_credit` e `credit_reversal`, com `user_id` e ligado por `transaction_id` à compra original. Não persiste `card_id` nem `billing_cycle_id`: ambos são derivados da transaction e o ownership é validado contra o `user_id` no insert. O período econômico em que o crédito neutraliza consumo e a relação entre crédito e obrigação ainda exigem decisão explícita.
+
+### Alocações
+
+A candidata local vincula cada pagamento diretamente a um único ciclo. O contrato anterior também propôs `card_payment_allocations`, capaz de alocar um pagamento entre ciclos/obrigações. Escolher pagamento estritamente mono-ciclo ou uma camada de alocações é `PRODUCT_DECISION_REQUIRED`; a ausência dessa decisão não pode ficar escondida na modelagem.
 
 ### Views
 
-- `card_invoice_balances_v1`: valores comprado, creditado, pago, em aberto e crédito excedente; ciclo e liquidação em eixos separados.
-- `card_limit_positions_v1`: limite cadastrado, comprometido e disponível. Limite igual ou menor que zero continua desconhecido (`NULL`). Disponibilidade pode ser negativa para expor excesso real, sem mascarar com zero.
+- `card_invoice_balances_v1`: agregação numérica crua de comprado, creditado, pago, aberto e crédito excedente; não emite lifecycle ou settlement state.
+- `card_billing_shadow_comparison_v1`: compara contagem/valor legados e estruturados por usuário, cartão e mês canônico de `transaction_date`, classificando apenas cobertura `complete`, `partial` ou `unlinked`.
+- não existe view de limite na candidata final. `AVIORA_MANAGED_AVAILABLE_LIMIT` permanece somente uma decisão contratual futura.
 
-## 3. Verdade financeira
+## 3. Verdade financeira e teste econômico de ouro
 
 ```text
 despesa econômica = compras de cartão efetivadas
@@ -52,158 +63,214 @@ pagamento = redução da conta + redução da obrigação, sem nova despesa
 crédito/estorno = evento compensatório ligado à compra, sem apagar histórico
 ```
 
-O ledger de pagamentos precisa ser incorporado futuramente ao cálculo patrimonial da conta como saída neutra em consumo. Esta etapa não altera `financial-core.js`; portanto não existe risco de dupla contabilização no Visual V1. O frontend não deve exibir o novo saldo até essa integração passar por gate próprio.
+O ledger local ainda não está integrado ao saldo da conta. Evitar uma segunda transação de despesa impede uma duplicação de consumo, mas não prova que a conta foi debitada. Antes de qualquer ativação, é obrigatório passar o teste econômico de ouro por todas as camadas consumidoras:
+
+```text
+conta inicial = R$ 5.000
+compra no cartão = R$ 1.000
+após a compra: despesa econômica = R$ 1.000
+após o pagamento: conta = R$ 4.000
+após o pagamento: despesa econômica continua = R$ 1.000
+Dashboard / Planejamento / Relatórios nunca exibem R$ 2.000 de consumo
+```
+
+Enquanto esse teste não existir e passar contra a implementação real, pagamento permanece não ativável.
 
 ## 4. Ciclo e competência
 
-- A competência econômica continua sendo `transaction_date`.
-- `cycle_key = primeiro dia do mês(transaction_date)`.
-- `closing_date` é congelada no mês anterior ao vencimento.
-- O dia de fechamento pertence ao ciclo que fecha naquele dia.
-- Dias 29–31 são limitados ao último dia existente do mês.
-- `due_date` é congelada no mês de `cycle_key`.
-- Ciclo fechado não aceita novo vínculo pelo RPC.
-- Transação já vinculada retorna o mesmo ciclo; não é movida automaticamente.
+### Contrato fechado
 
-O RPC `attach_my_card_transaction_to_cycle_v1()` materializa essa regra sem reclassificar registros antigos. Antes de enforcement, o writer de lançamentos deve chamar uma operação atômica própria; o RPC de attach é a ponte de transição, não o estado final do writer.
+- `transaction_date` permanece a competência econômica histórica.
+- Nenhuma migration ou RPC recalcula ou move automaticamente `transaction_date`.
+- Alterar `closing_day` ou `due_day` não move compras históricas.
+- Histórico sem vínculo inequívoco permanece sem ciclo estruturado.
+- A candidata não oferece calendar helper nem `attach_my_card_transaction_to_cycle_v1()`; não existe regra temporal escondida para o cliente.
+- Um ciclo inserido guarda snapshots imutáveis; mudança posterior no cartão não os reescreve.
+
+### Decisões pendentes
+
+- compra antes, no dia e depois do fechamento;
+- relação entre mês de fechamento e mês de vencimento;
+- tratamento de 28/29/30/31 e fevereiro;
+- timezone e instante exato do corte;
+- alteração das datas do cartão e efeito somente prospectivo;
+- significado de `current_date` para OPEN/CLOSED/DUE/OVERDUE.
+
+Esses pontos foram removidos da lógica da candidata local. Nenhum mutador pode fabricá-los ou ser liberado enquanto a decisão estiver aberta.
 
 ## 5. Estados
 
-### Eixo de ciclo
+Lifecycle e settlement state não são persistidos nem emitidos pela candidata final. `card_invoice_balances_v1` retorna apenas valores brutos.
 
-- `open`: antes do fechamento e não fechado explicitamente;
-- `closed`: depois do fechamento, antes do vencimento, ou sem saldo vencido;
-- `due`: vencimento hoje;
-- `overdue`: vencimento passou e existe saldo aberto.
+- `OPEN`, `CLOSED`, `DUE` e `OVERDUE` só poderão ser derivados depois de contrato temporal/timezone aprovado.
+- `PARTIALLY_PAID` e `PAID` só poderão ser derivados depois do contrato de pagamento/alocação e crédito.
 
-### Eixo de liquidação
+Essa remoção evita cristalizar semântica de produto ainda aberta no banco.
 
-- `empty`: sem compra;
-- `unpaid`: compra sem pagamento;
-- `partially_paid`: pagamento líquido positivo, menor que a obrigação;
-- `paid`: obrigação integralmente coberta por pagamentos/créditos.
+## 6. Limite gerencial
 
-Uma fatura pode ser simultaneamente `overdue + partially_paid`; por isso um status único seria semanticamente incorreto.
+Não existe fonte do emissor/banco. Qualquer resultado local é uma estimativa gerencial AVIORA e deve declarar sua cobertura.
 
-## 6. Limite
+Questões pendentes:
 
-Contrato V1 proposto:
+- valor total contratado versus parcelas materializadas;
+- momento de liberação após pagamento parcial;
+- tratamento de crédito, cancelamento e estorno;
+- compras não estruturadas ou fora do backfill;
+- limite nulo/zero;
+- ajustes, taxas e parcelamento do emissor.
 
-```text
-comprometido = soma dos saldos abertos de todos os ciclos persistidos
-disponível = limite cadastrado - comprometido
-```
+Não existe view de limite no schema candidato final. Uma eventual leitura futura deve usar nome/conteúdo equivalente a `AVIORA_MANAGED_AVAILABLE_LIMIT`, indicar quando a cobertura for parcial e entrar apenas após aprovação própria.
 
-Todas as parcelas materializadas e vinculadas comprometem limite, inclusive ciclos futuros. Projeções virtuais não comprometem limite. Pagamento e crédito liberam limite pelo valor líquido. Cancelado não entra no valor comprado. Um limite excedido produz disponibilidade negativa; o sistema não inventa uma recusa do emissor.
+## 7. RPCs e shadow mode
 
-## 7. RPCs transacionais
-
-| RPC | Papel | Concorrência/idempotência |
+| RPC candidata | Papel | Estado de ativação |
 |---|---|---|
-| `attach_my_card_transaction_to_cycle_v1` | vincular compra existente ao ciclo congelado | lock em transação e cartão; retry retorna o mesmo ciclo |
-| `pay_my_card_invoice_v1` | pagamento parcial/integral | lock ciclo+conta; `operation_id`; rejeita overpayment |
-| `reverse_my_card_payment_v1` | reversão integral auditável | uma reversão por pagamento |
-| `credit_my_card_purchase_v1` | crédito/estorno parcial ou integral | lock compra+ciclo; crédito líquido não supera compra |
-| `reverse_my_card_purchase_credit_v1` | reversão integral do crédito | uma reversão por crédito |
-| `get_my_card_billing_summary_v1` | leitura rica do próprio usuário | `SECURITY INVOKER`, RLS e `auth.uid()` |
+| `pay_my_card_invoice_v1` | pagamento parcial/integral mono-ciclo | bloqueada até contrato de alocação e integração da conta |
+| `reverse_my_card_payment_v1` | reversão integral auditável | bloqueada junto com pagamento |
+| `credit_my_card_purchase_v1` | crédito parcial/integral | bloqueada até contrato econômico do crédito |
+| `reverse_my_card_purchase_credit_v1` | reversão do crédito | bloqueada junto com crédito |
+| `get_my_card_billing_summary_v1` | leitura numérica crua do próprio usuário | leitura shadow; sem lifecycle, settlement ou limite |
 
-As mutações usam `SECURITY DEFINER` porque as três tabelas são read-only para clientes. Cada função fecha em `auth.uid()`, usa `search_path` controlado, valida ownership composto e tem `EXECUTE` concedido apenas a `authenticated`. Funções internas ficam em `billing_private`, sem grant ao cliente.
+Não existe RPC pública de criação/anexação de ciclo. As funções mutadoras de pagamento/crédito podem existir no schema local para revisão, mas a migration inicial shadow-only revoga `EXECUTE` de `PUBLIC`, `anon` e `authenticated`. Liberar cada mutador exige migration de ativação separada e explicitamente aprovada. Isso evita que uma instalação aditiva altere comportamento real antes de writer, conta e contratos estarem prontos.
 
-Ordem uniforme de locks: transação/registro original, ciclo, conta. O `operation_id` único fecha retry/replay; locks de linha serializam duas liquidações concorrentes do mesmo ciclo.
+## 8. Guard de transição legado → ledger
 
-## 8. RLS e grants
+O guard da transaction diferencia duas fases para preservar compatibilidade sem enfraquecer ledger usado:
 
-- RLS ativa nas três tabelas.
-- `anon`: nenhum grant.
-- `authenticated`: somente `SELECT` nas tabelas e execução dos RPCs públicos aprovados.
-- Policies: `SELECT TO authenticated USING ((select auth.uid()) = user_id)`.
-- Não existe policy direta de insert/update/delete.
-- Views são `security_invoker = true`, preservando RLS.
-- `PUBLIC` e `anon` perdem `EXECUTE` em todos os RPCs.
-- FKs compostas impedem misturar usuário/cartão/ciclo/conta/transação.
-- Trigger privado valida card/usuário/competência, rejeita ciclo fechado e torna o vínculo imutável mesmo diante de update direto.
+- antes de existir pagamento/crédito no ciclo: o writer legado continua podendo editar/excluir; ao mudar cartão, competência ou tipo, o vínculo estruturado é limpo, nunca recalculado;
+- depois de existir ledger no ciclo: ciclo, cartão, competência, tipo e valor ficam imutáveis; a transaction não pode cruzar a fronteira de cancelamento nem ser excluída; correção exige evento compensatório explícito.
 
-## 9. Invariantes
+O ciclo rejeita qualquer `UPDATE`. Os ledgers validam ownership/coerência no `INSERT` e rejeitam `UPDATE`/`DELETE`. Essa proteção forte começa quando há ledger; vínculo ainda sem ledger permanece deliberadamente compatível com o runtime legado.
 
-1. Uma compra vinculada pertence a um único ciclo.
-2. Um ciclo é único por usuário, cartão e competência.
-3. Datas do ciclo ficam congeladas.
-4. Compra cancelada não compõe a obrigação.
-5. Pagamento nunca entra como despesa econômica.
-6. Pagamento não supera saldo aberto no instante bloqueado.
-7. Crédito líquido não supera o valor da compra.
-8. Reversão é append-only e não apaga o original.
-9. Uma operação idempotente não produz duas linhas.
-10. Uma origem só pode ser conta do mesmo usuário.
-11. Nenhuma referência cross-user passa pelas FKs/RPCs.
-12. Nenhum valor de limite depende de DOM, `note` ou agrupamento textual.
-13. Parcela virtual não compromete limite; parcela materializada e vinculada compromete.
-14. Dados legados permanecem intocados e não são inferidos.
-15. Vínculo persistido não pode ser movido por edição posterior da compra.
+## 9. RLS, grants e segurança
 
-## 10. Retry e concorrência
+O desenho esperado é:
 
-- `pg_advisory_xact_lock` serializa instalação da migration.
-- Um advisory lock transacional por usuário/operação serializa retries concorrentes antes da checagem idempotente.
-- RPCs usam `SELECT ... FOR UPDATE` no agregado que protege a invariante.
-- Chaves `(user_id, operation_id)` garantem idempotência.
-- Retry com mesmo payload retorna o registro original.
-- Reutilizar `operation_id` com payload divergente falha com `23505` no pagamento.
-- Índices parciais impedem duas reversões do mesmo registro.
-- Deadlock deve ser retentado pelo cliente; a ordem de locks é fixa para reduzir sua ocorrência.
+- RLS ativa em todas as tabelas públicas novas;
+- `anon` sem leitura ou mutação;
+- `authenticated` apenas com leitura própria, e mutações somente depois de gate de ativação;
+- policies de leitura baseadas em `(select auth.uid()) = user_id`;
+- views com `security_invoker = true`;
+- `SECURITY DEFINER` com `search_path` fixo, ownership interno e sem SQL dinâmico;
+- nenhum cliente apto a fornecer `user_id` efetivo de outro usuário;
+- payment deriva cartão pelo ciclo; crédito deriva cartão/ciclo pela transaction, evitando colunas redundantes e drift;
+- referências de pagamento/ciclo/conta e crédito/compra coerentes no banco, não apenas na RPC;
+- ledgers protegidos contra `UPDATE`/`DELETE`, inclusive diante de acesso privilegiado acidental;
+- valores positivos e finitos; limite máximo/escala monetária continuam pendentes de contrato;
+- idempotência por usuário/operação e reversão única.
 
-## 11. Estratégia de rollout
+A revisão estática não prova políticas no banco alvo. RLS, grants, spoof de `user_id`, cross-user, search-path hijack e privilégios de funções precisam ser testados em clone isolado com papéis `anon`, `authenticated` A/B e contexto real de `auth.uid()`.
 
-1. backup e preflight read-only;
-2. aplicar schema/RLS/RPCs com Visual V1 ainda inalterado;
-3. validar owner/cross-user/idempotência em transações com rollback;
-4. reconciliar compras legadas somente por decisão explícita, nunca inferência;
-5. implementar writer atômico de novas compras/parcelas;
-6. integrar ledger à projeção patrimonial da conta e provar zero dupla despesa;
-7. integrar Cartões V2 ao backend;
-8. só então considerar enforcement de `card_billing_cycle_id`.
+## 10. Invariantes obrigatórias
 
-## 12. Rollback
+1. `transaction_date` nunca é reclassificada automaticamente.
+2. Uma compra vinculada pertence a um único ciclo; antes do ledger, edição estrutural limpa o vínculo sem recalcular; após ledger, não pode ser movida, cancelada, ter valor alterado ou ser excluída.
+3. Ciclo é único por usuário, cartão e competência; snapshots são imutáveis e não derivam de edição posterior.
+4. Compra cancelada não compõe obrigação.
+5. Pagamento reduz conta e obrigação sem criar segunda despesa.
+6. Pagamento não supera saldo aberto no instante serializado.
+7. Crédito líquido não supera a compra e respeita o contrato econômico aprovado.
+8. Original e reversão permanecem append-only; não há reversão duplicada.
+9. Retry com mesma operação e payload é idempotente; payload divergente falha.
+10. Conta, cartão, ciclo, pagamento, crédito e transaction sempre pertencem ao mesmo usuário.
+11. Cartão do payment deriva do ciclo e cartão/ciclo do credit derivam da transaction; não existem cópias redundantes para divergir.
+12. Limite gerencial não depende de DOM, `note` ou heurística textual.
+13. Série parcelada nova tem identidade, total, número, cartão, usuário e competência estruturados; legado ambíguo não é inferido.
+14. Dados legados permanecem intactos.
+15. Eventos concorrentes preservam saldo, idempotência e unicidade.
+
+Essas são condições de aceite. Elas só podem ser classificadas como garantidas depois de constraints/triggers e testes de runtime correspondentes; presença de SQL nominal ou teste textual não é prova suficiente.
+
+## 11. Backfill
+
+`BACKFILL_MODE = SAFE_NO_BACKFILL`
+
+A candidata não associa histórico automaticamente. Isso é intencional. Não haverá heurística por `note`, descrição, valor, data próxima ou padrão textual de parcela. Um backfill futuro pode ser parcial e só associar registros com evidência inequívoca; o restante permanece nullable e explicitamente fora da cobertura estruturada.
+
+## 12. Rollout e shadow validation
+
+1. resolver e registrar todas as decisões de produto pendentes;
+2. validar migration, rollback e drift guards em clone fiel e descartável;
+3. instalar somente schema shadow, com mutadores não concedidos e sem constructor/attach público de ciclo;
+4. alimentar ciclos/vínculos somente por fixture ou writer privilegiado controlado no clone;
+5. comparar contagem e valor legados versus estruturados por `transaction_date`, usando `card_billing_shadow_comparison_v1`, sem mudar a UI;
+6. executar fixtures sintéticas de RLS, retry, race, pagamento, crédito e reversão;
+7. definir calendário/writer atômico de compra/parcela e integração do pagamento com a conta;
+8. passar o teste econômico de ouro em Dashboard, Planejamento e Relatórios;
+9. aprovar contratos de estados, limite gerencial e cobertura de legado;
+10. liberar mutadores por migration própria;
+11. só então considerar consumidor Cartões V2 e enforcement.
+
+No shadow mode, a UI antiga continua sendo a verdade visível. O comparator expõe apenas coverage/count/amount crus; não calcula lifecycle, settlement, limite ou nova verdade financeira. Nenhuma divergência deve ser “corrigida” por backfill automático.
+
+## 13. Rollback
 
 ### Preferencial: application-first
 
-Reverter o consumidor, manter schema e ledger aditivos, desativar o writer novo e preservar dados. É o único rollback aceitável depois que existir qualquer pagamento, crédito ou vínculo.
+Depois de qualquer ativação, o rollback deve primeiro desabilitar consumidores/writers e manter schema/ledgers aditivos. Dados financeiros reais não podem ser apagados para voltar versão.
 
-### Schema rollback
+### Destrutivo, somente antes de uso/liberação
 
-`rollback_20260828130535_aviora_card_billing_backend_v1.sql` só executa se:
+O script de remoção de schema só é admissível se:
 
-- pagamentos = 0;
-- créditos = 0;
-- nenhum `transaction.card_billing_cycle_id` preenchido.
+- nenhum mutador tiver sido liberado;
+- ciclos, pagamentos e créditos estiverem vazios;
+- nenhuma transaction estiver vinculada;
+- não houver objeto preexistente ou alheio no schema privado;
+- grants estiverem revogados e writers drenados;
+- locks eliminarem corrida entre o guard e o `DROP`.
 
-Caso contrário falha fechado. Não existe ponto seguro para apagar ledger financeiro já utilizado.
+Se qualquer condição falhar, o rollback deve parar fechado. Após dados reais, usar rollback application-first ou migration forward corretiva, nunca `DROP` destrutivo.
 
-## 13. Matriz de risco
+## 14. Matriz de risco revisada
 
-| Risco | Severidade | Mitigação | Estado |
-|---|---:|---|---|
-| dupla contabilização compra + pagamento | crítica | pagamento fora de `transactions`; integração patrimonial em gate separado | CONTROLADO |
-| cross-user | crítica | `auth.uid()`, FKs compostas, RLS e testes A/B | CONTROLADO NO DESIGN |
-| pagamento duplicado/replay | alta | operação única + lock do ciclo | CONTROLADO NO DESIGN |
-| dois pagamentos concorrentes excederem saldo | alta | `FOR UPDATE` no ciclo e recálculo dentro da transação | CONTROLADO NO DESIGN |
-| crédito acima da compra | alta | lock da compra + soma líquida + check transacional | CONTROLADO NO DESIGN |
-| backfill heurístico incorreto | alta | nenhum backfill; vínculo nullable | ELIMINADO |
-| writer legado criar compra sem ciclo | alta | rollout em fases; writer atômico e enforcement futuros | ABERTO, NÃO BLOQUEIA INSTALAÇÃO ADITIVA |
-| saldos de conta ignorarem pagamento | alta | não expor UI antes do gate de integração patrimonial | ABERTO, BLOQUEIA ATIVAÇÃO FUNCIONAL |
-| lock DDL em `transactions` | média | janela controlada, `lock_timeout`, coluna nullable e FK `NOT VALID` | EXIGE PREFLIGHT |
-| `SECURITY DEFINER` mal concedido | alta | search_path fixo, revoke PUBLIC/anon, auth.uid e ownership interno | CONTROLADO NO DESIGN |
-| apagar ledger no rollback | crítica | rollback destrutivo recusa dados; application-first | ELIMINADO |
-| mudança visual acidental | baixa | nenhum HTML/CSS/JS visual alterado | ELIMINADO |
+| Risco | Severidade | Estado atual |
+|---|---:|---|
+| compra + pagamento duplicarem consumo | crítica | ABERTO; teste de ouro e integração da conta obrigatórios |
+| pagamento não reduzir saldo da conta | crítica | ABERTO; `ACCOUNT_SETTLEMENT_REQUIRED` |
+| regra automática de ciclo errada | crítica | ABERTO; `PRODUCT_DECISION_REQUIRED` |
+| cross-user / spoof / privilege escalation | crítica | MITIGAÇÃO ESTÁTICA; runtime clone obrigatório |
+| replay ou pagamento concorrente excedente | alta | MITIGAÇÃO ESTÁTICA; race/retry real obrigatório |
+| crédito/reversão inconsistentes | alta | ABERTO; contrato econômico + testes obrigatórios |
+| relações redundantes divergirem | alta | EXIGE INVARIANTE ESTRUTURAL |
+| backfill heurístico incorreto | alta | EVITADO POR `SAFE_NO_BACKFILL`; validar ausência |
+| limite apresentado como bancário | alta | ABERTO; usar conceito gerencial e aprovar fórmula |
+| série parcelada incompleta | alta | ABERTO; `PRODUCT_DECISION_REQUIRED` |
+| rollback apagar dados | crítica | ABERTO ATÉ GUARDS/LOCKS SEREM VALIDADOS |
+| migration drift/lock | alta | PREFLIGHT E CLONE OBRIGATÓRIOS |
+| mudança visual acidental | baixa | NÃO ENCONTRADA NO DIFF REVISADO |
 
-## 14. Gates ainda obrigatórios
+## 15. Testes obrigatórios antes de Beta
 
-- `MIGRATION_EXECUTION_AUTHORIZATION_REQUIRED`;
-- clone fiel com aplicação real da migration e pgTAP;
-- revisão do plano de query das views;
-- integração patrimonial do pagamento;
-- writer atômico de compra/parcela;
-- reconciliação explícita do legado;
-- ativação funcional e enforcement em comandos separados.
+- aplicação, rerun e drift incompatível da migration em clone;
+- RLS A/B, anon, cross-user e spoof de identificadores;
+- acesso direto às tabelas e ledgers;
+- pagamento parcial, integral, duplicado, overpayment, retry e race;
+- reversal e duplicate reversal;
+- crédito parcial/integral, excesso, reversão e concorrência;
+- antes/no/depois do fechamento, leap year, dias 28–31 e virada de ano, somente após decisão temporal;
+- edição do cartão sem mover histórico;
+- mutação/exclusão de compra já vinculada;
+- dois cartões e duas contas de usuários distintos;
+- série parcelada estruturada e legado ambíguo;
+- rollback vazio e recusa com qualquer ciclo/dado/vínculo;
+- teste econômico de ouro completo através dos consumidores financeiros.
+
+Testes estáticos/textuais ajudam a evitar regressão de artefato, mas não substituem PostgreSQL real, pgTAP e sessões concorrentes.
+
+## 16. Decisões de produto pendentes
+
+1. calendário de fechamento/vencimento, boundary, timezone e edição de datas;
+2. pagamento mono-ciclo versus `card_payment_allocations`;
+3. representação contábil do débito da conta sem segunda despesa;
+4. período econômico de créditos/estornos;
+5. semântica e rótulo do limite gerencial AVIORA;
+6. estrutura e retenção de séries parceladas;
+7. política de retenção/exclusão de compras e cartões com ledger.
+
+Enquanto qualquer decisão afetar contabilidade, vínculo histórico ou saldo, o gate permanece `PRODUCT_DECISION_REQUIRED`.
+
+`BACKFILL_MODE = SAFE_NO_BACKFILL`
 
 `VISUAL_V1_IMPACT = ZERO`

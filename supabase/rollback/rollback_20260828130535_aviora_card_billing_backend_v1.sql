@@ -8,17 +8,35 @@ set local lock_timeout = '15s';
 set local statement_timeout = '5min';
 select pg_advisory_xact_lock(hashtextextended('aviora:card-billing-backend-v1', 0));
 
-do $rollback_guard$
+do $rollback_preflight$
 begin
   if to_regclass('public.card_billing_cycles') is null
      or to_regclass('public.card_invoice_payments') is null
-     or to_regclass('public.card_purchase_credits') is null then
+     or to_regclass('public.card_purchase_credits') is null
+     or not exists (
+       select 1
+       from pg_namespace n
+       join pg_roles r on r.oid = n.nspowner
+       where n.nspname = 'billing_private'
+         and r.rolname = current_user
+     ) then
     raise exception 'card billing rollback requires the complete V1 schema'
       using errcode = 'P0001';
   end if;
+end
+$rollback_preflight$;
 
+lock table public.transactions,
+           public.card_billing_cycles,
+           public.card_invoice_payments,
+           public.card_purchase_credits
+  in access exclusive mode;
+
+do $rollback_guard$
+begin
   if exists (select 1 from public.card_invoice_payments)
      or exists (select 1 from public.card_purchase_credits)
+     or exists (select 1 from public.card_billing_cycles)
      or exists (
        select 1 from public.transactions
        where card_billing_cycle_id is not null
@@ -34,12 +52,25 @@ drop function public.reverse_my_card_purchase_credit_v1(uuid, uuid, timestamptz,
 drop function public.credit_my_card_purchase_v1(uuid, numeric, timestamptz, uuid, text);
 drop function public.reverse_my_card_payment_v1(uuid, uuid, timestamptz, text);
 drop function public.pay_my_card_invoice_v1(uuid, uuid, numeric, timestamptz, uuid);
-drop function public.attach_my_card_transaction_to_cycle_v1(uuid);
 
-drop view public.card_limit_positions_v1;
+drop view public.card_billing_shadow_comparison_v1;
 drop view public.card_invoice_balances_v1;
 
+drop trigger card_purchase_credits_append_only_v1 on public.card_purchase_credits;
+drop trigger card_purchase_credits_guard_insert_v1 on public.card_purchase_credits;
+drop trigger card_invoice_payments_append_only_v1 on public.card_invoice_payments;
+drop trigger card_invoice_payments_guard_insert_v1 on public.card_invoice_payments;
+drop trigger card_billing_cycles_immutable_v1 on public.card_billing_cycles;
+drop trigger transactions_guard_linked_card_delete_v1 on public.transactions;
 drop trigger transactions_guard_card_cycle_v1 on public.transactions;
+
+drop function billing_private.guard_payment_insert_v1();
+drop function billing_private.guard_purchase_credit_insert_v1();
+drop function billing_private.reject_ledger_mutation_v1();
+drop function billing_private.reject_cycle_update_v1();
+drop function billing_private.guard_transaction_cycle_v1();
+drop function billing_private.guard_linked_transaction_delete_v1();
+
 alter table public.transactions
   drop constraint transactions_card_billing_cycle_user_fkey;
 alter table public.transactions
@@ -49,10 +80,6 @@ drop table public.card_purchase_credits;
 drop table public.card_invoice_payments;
 drop table public.card_billing_cycles;
 
-drop function billing_private.ensure_cycle_v1(uuid, uuid, date);
-drop function billing_private.guard_transaction_cycle_v1();
-drop function billing_private.clamped_day_v1(date, integer);
-drop function billing_private.last_day_of_month_v1(date);
 drop schema billing_private;
 
 commit;
