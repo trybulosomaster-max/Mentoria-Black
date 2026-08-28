@@ -3,28 +3,22 @@
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const path=require('node:path');
-const {financialEffect}=require('../js/financial-core');
 
 const root=path.resolve(__dirname,'..');
-const migrationPath=path.join(root,'supabase/migrations/20260828130535_aviora_card_billing_backend_v1.sql');
-const rollbackPath=path.join(root,'supabase/rollback/rollback_20260828130535_aviora_card_billing_backend_v1.sql');
-const designPath=path.join(root,'docs/AVIORA_CARD_BILLING_BACKEND_DESIGN.md');
-const contractPath=path.join(root,'docs/AVIORA_CARD_BILLING_CONTRACT.md');
-const pgTapPath=path.join(root,'supabase/tests/card_billing_backend_v1_test.sql');
-const localRunnerPath=path.join(root,'supabase/tests/card_billing_backend_v1_local_test.sh');
-const migration=fs.readFileSync(migrationPath,'utf8');
-const rollback=fs.readFileSync(rollbackPath,'utf8');
-const design=fs.readFileSync(designPath,'utf8');
-const contract=fs.readFileSync(contractPath,'utf8');
-const pgTap=fs.readFileSync(pgTapPath,'utf8');
-const localRunner=fs.existsSync(localRunnerPath)?fs.readFileSync(localRunnerPath,'utf8'):'';
+const read=relative=>fs.readFileSync(path.join(root,relative),'utf8');
+const migration=read('supabase/migrations/20260828130535_aviora_card_billing_backend_v1.sql');
+const rollback=read('supabase/rollback/rollback_20260828130535_aviora_card_billing_backend_v1.sql');
+const design=read('docs/AVIORA_CARD_BILLING_BACKEND_DESIGN.md');
+const contract=read('docs/AVIORA_CARD_BILLING_CONTRACT.md');
+const pgTap=read('supabase/tests/card_billing_backend_v1_test.sql');
+const runner=read('supabase/tests/card_billing_backend_v1_local_test.sh');
 
 let tests=0,assertions=0;
 const ok=(value,message)=>{assertions++;assert.ok(value,message)};
 const equal=(actual,expected,message)=>{assertions++;assert.equal(actual,expected,message)};
 const test=(name,fn)=>{fn();tests++};
 const includesAll=(source,tokens)=>tokens.forEach(token=>ok(source.includes(token),token));
-const functionBody=(name)=>{
+const functionBody=name=>{
   const start=migration.indexOf(`create function public.${name}`);
   ok(start>=0,`${name}: function exists`);
   const end=migration.indexOf('\n$$;',start);
@@ -32,235 +26,248 @@ const functionBody=(name)=>{
   return migration.slice(start,end+4);
 };
 
-const mutationFunctions=[
-  ['pay_my_card_invoice_v1','uuid, uuid, numeric, timestamptz, uuid'],
-  ['reverse_my_card_payment_v1','uuid, uuid, timestamptz, text'],
-  ['credit_my_card_purchase_v1','uuid, numeric, timestamptz, uuid, text'],
-  ['reverse_my_card_purchase_credit_v1','uuid, uuid, timestamptz, text']
+const mutators=[
+  ['structure_my_card_purchase_v1','uuid'],
+  ['create_my_card_installment_series_v1','uuid, uuid, date, text, numeric, integer, text, text, text'],
+  ['pay_my_card_invoice_v1','uuid, uuid, numeric, date, uuid'],
+  ['reverse_my_card_payment_v1','uuid, uuid, date, text'],
+  ['credit_my_card_purchase_v1','uuid, numeric, date, uuid, text'],
+  ['reverse_my_card_purchase_credit_v1','uuid, uuid, date, text']
 ];
 
-test('migration é transacional, serializada e falha fechada em namespace preexistente',()=>{
+test('migration permanece transacional, serializada e fail-closed',()=>{
   ok(/^--[\s\S]*\nbegin;/m.test(migration));
-  ok(migration.includes("pg_advisory_xact_lock(hashtextextended('aviora:card-billing-backend-v1', 0))"));
-  ok(migration.trimEnd().endsWith('commit;'));
-  includesAll(migration,["set local lock_timeout = '15s'","set local statement_timeout = '5min'","to_regnamespace('billing_private') is not null","create schema billing_private;"]);
+  includesAll(migration,[
+    "pg_advisory_xact_lock(hashtextextended('aviora:card-billing-backend-v1', 0))",
+    "set local lock_timeout = '15s'", "set local statement_timeout = '5min'",
+    "to_regnamespace('billing_private') is not null",'semantic reconciliation is required',
+    'base column contract drift; reconcile schema before migration'
+  ]);
   ok(!migration.includes('create schema if not exists billing_private'));
+  ok(migration.trimEnd().endsWith('commit;'));
 });
 
-test('preflight exige contrato V82 e recusa drift semântico conhecido',()=>{
+test('preflight exige baseline V82 e não reescreve competência legada',()=>{
   includesAll(migration,[
     "to_regprocedure('auth.uid()') is null",
-    "p.prorettype <> 'uuid'::regtype",
-    'a.atttypid <> expected.type_oid',
-    'expected.require_not_null and not a.attnotnull',
-    'base column contract drift; reconcile schema before migration',
-    'public.cards','public.accounts','public.transactions',
-    'cards_id_user_id_key','accounts_id_user_id_key','transactions_id_user_id_key',
-    'semantic reconciliation is required','ownership and semantic reconciliation are required'
+    "('public', 'transactions',  'transaction_date', 'date'::regtype",
+    "('public', 'transactions',  'purchase_date',    'date'::regtype",
+    "('public', 'transactions',  'installment_series_id', 'uuid'::regtype",
+    'cards_id_user_id_key','accounts_id_user_id_key','transactions_id_user_id_key'
   ]);
-  ok(/\('public',\s*'transactions',\s*'transaction_date',\s*'date'::regtype,\s*true\)/.test(migration));
-});
-
-test('schema aditivo contém ciclos, pagamentos, créditos e vínculo explícito nullable',()=>{
-  for(const table of ['card_billing_cycles','card_invoice_payments','card_purchase_credits'])ok(migration.includes(`create table public.${table}`),table);
-  includesAll(migration,['add column card_billing_cycle_id uuid','references public.card_billing_cycles(id, user_id)','on delete restrict not valid','never backfilled by inference']);
-  ok(!/update public\.transactions\s+set\s+transaction_date/i.test(migration));
-});
-
-test('transaction_date permanece a competência canônica e nunca sofre backfill/reclassificação',()=>{
-  ok(migration.includes("date_trunc('month', t.transaction_date)::date as transaction_month"));
-  ok(!migration.includes('create function public.attach_my_card_transaction_to_cycle_v1'));
   ok(!/set\s+transaction_date\s*=/i.test(migration));
-  equal((migration.match(/update public\.transactions/g)||[]).length,0);
-  ok(!/(purchase_date|closing_day|due_day)[\s\S]{0,120}set\s+transaction_date/i.test(migration));
 });
 
-test('calendário não aprovado não tem construtor automático e datas persistidas são obrigatórias',()=>{
-  ok(!migration.includes('ensure_cycle_v1'));
-  ok(!migration.includes('clamped_day_v1'));
-  ok(!migration.includes('last_day_of_month_v1'));
-  includesAll(migration,['closing_date date not null','due_date date not null']);
+test('schema normalizado contém série, ciclo, pagamento, alocação, settlement e crédito',()=>{
+  for(const table of ['card_installment_series','card_billing_cycles','card_invoice_payments','card_payment_allocations','card_account_settlements','card_purchase_credits']){
+    ok(migration.includes(`create table public.${table}`),table);
+  }
+  includesAll(migration,[
+    'add column card_billing_cycle_id uuid','add column installment_total smallint',
+    'transactions_card_installment_shape_v1','card_payment_allocations_payment_key',
+    'card_account_settlements_payment_key','never backfilled by inference'
+  ]);
 });
 
-test('RLS expõe somente leitura própria nas três tabelas',()=>{
-  equal((migration.match(/enable row level security;/g)||[]).length,3);
-  equal((migration.match(/for select to authenticated/g)||[]).length,3);
-  equal((migration.match(/using \(\(select auth\.uid\(\)\) = user_id\)/g)||[]).length,3);
-  for(const table of ['card_billing_cycles','card_invoice_payments','card_purchase_credits']){
+test('calendário aprovado é civil, inclui fechamento e clampa dias inexistentes',()=>{
+  const body=migration.slice(migration.indexOf('create function billing_private.card_cycle_dates_v1'),migration.indexOf('create function billing_private.guard_cycle_insert_v1'));
+  includesAll(body,[
+    'p_purchase_date date','p_closing_day integer','p_due_day integer',
+    'billing_private.clamped_month_day_v1','if p_purchase_date > v_closing_date then',
+    "interval '1 month'",'v_previous_closing + 1'
+  ]);
+  ok(!/p_purchase_date\s*>=\s*v_closing_date/.test(body));
+  ok(!/(timezone|at time zone|timestamptz)/i.test(body));
+});
+
+test('ciclo congela snapshots e datas efetivas',()=>{
+  includesAll(migration,[
+    'closing_day_snapshot smallint not null','due_day_snapshot smallint not null',
+    'cycle_start_date date not null','closing_date date not null','due_date date not null',
+    'card_billing_cycles_calendar_guard_v1','card billing cycle snapshots are immutable',
+    "cycle_key = date_trunc('month', due_date)::date"
+  ]);
+});
+
+test('parcelas novas são estruturadas, completas, cent-exact e retidas',()=>{
+  const body=functionBody('create_my_card_installment_series_v1');
+  includesAll(body,[
+    'p_installment_total integer','installment_series_id, installment_number, installment_total',
+    'v_total_cents','v_base_cents','v_remainder','for v_number in 1..p_installment_total loop',
+    'operation_id payload mismatch','for key share','v_first_cycle := billing_private.ensure_cycle_for_purchase_v1',
+    "date_trunc('month', v_first_cycle.closing_date)",'billing_private.ensure_cycle_by_closing_month_v1'
+  ]);
+  includesAll(migration,[
+    'structured installment series must contain the complete cent-exact sequence',
+    'structured installment transaction cannot be deleted','card_installment_series_immutable_v1',
+    'Preserve that writer contract without inferring a V1 structured series'
+  ]);
+  ok(!body.includes('p_purchase_date + make_interval'),'installments advance from the frozen first closing month');
+  ok(!/(note|description)[\s\S]{0,160}(infer|regexp|similar)/i.test(migration));
+});
+
+test('novos valores monetários usam numeric(14,2) e guards fechados',()=>{
+  ok((migration.match(/numeric\(14,2\)/g)||[]).length>=4);
+  includesAll(migration,[
+    'original_amount <= 999999999999.99','amount <= 999999999999.99',
+    'amount = round(amount, 2)','original_amount = round(original_amount, 2)',
+    "amount < 'Infinity'::numeric","original_amount < 'Infinity'::numeric"
+  ]);
+});
+
+test('pagamento V1 é mono-ciclo, parcial/integral, atômico e sem overpayment',()=>{
+  const body=functionBody('pay_my_card_invoice_v1');
+  includesAll(body,[
+    'p_billing_cycle_id uuid','p_source_account_id uuid','p_effective_date date',
+    "':card-payment:'",'for update','source account not found',
+    'payment exceeds invoice outstanding amount','CREDIT_BALANCE_REVIEW_REQUIRED',
+    'insert into public.card_invoice_payments','insert into public.card_payment_allocations',
+    'insert into public.card_account_settlements','operation_id payload mismatch'
+  ]);
+  ok(!/p_(allocations|cycles)\b/.test(body));
+});
+
+test('settlement é explícito, auditável e neutro para despesa',()=>{
+  includesAll(migration,[
+    'create view public.card_account_settlement_effects_v1',
+    "case when p.entry_kind = 'payment' then -p.amount else p.amount end::numeric as account_delta",
+    '0::numeric as consumption_expense_delta',
+    'card payment must commit with exactly one allocation and one account settlement'
+  ]);
+  ok(!/insert into public\.transactions[\s\S]{0,500}(payment|settlement)/i.test(functionBody('pay_my_card_invoice_v1')));
+});
+
+test('crédito e estorno são append-only, não retroativos e retry-safe',()=>{
+  const credit=functionBody('credit_my_card_purchase_v1');
+  const reversal=functionBody('reverse_my_card_purchase_credit_v1');
+  includesAll(credit,['p_effective_date date',"':card-credit:'",'purchase credit exceeds original purchase amount','operation_id payload mismatch','for update']);
+  includesAll(reversal,['p_effective_date date',"':card-credit-reversal:'",'credit_reversal','reversal_of_id','operation_id payload mismatch']);
+  includesAll(migration,[
+    'new.effective_date < v_transaction.transaction_date','new.effective_date < v_original.effective_date',
+    'card_purchase_credits_single_reversal_uidx','card billing ledgers are append-only'
+  ]);
+});
+
+test('crédito reduz saldo antes do pagamento e carry-forward fica bloqueado',()=>{
+  includesAll(migration,[
+    'greatest(coalesce(pu.purchase_amount, 0) - coalesce(cr.credited_amount, 0) - coalesce(pa.paid_amount, 0), 0)',
+    'credit_balance_review_required',"then 'CREDIT_BALANCE_REVIEW_REQUIRED'",
+    "then 'partially_paid'","else 'open'"
+  ]);
+});
+
+test('limite é gerencial e exige cobertura estrutural comprovada',()=>{
+  includesAll(migration,[
+    'create view public.card_managed_limit_positions_v1',"'AVIORA_MANAGED_AVAILABLE_LIMIT'::text as metric_contract",
+    'managed_used_limit','managed_available_limit','structured_purchase_count = c.relevant_purchase_count',
+    "then 'CREDIT_BALANCE_REVIEW_REQUIRED'","then 'unlinked'","then 'partial'","then 'exceeded'",
+    'não representa autorizações, juros, tarifas ou compras ausentes no AVIORA'
+  ]);
+});
+
+test('RLS é leitura própria e mutadores permanecem dormentes',()=>{
+  equal((migration.match(/enable row level security;/g)||[]).length,6);
+  equal((migration.match(/for select to authenticated/g)||[]).length,6);
+  equal((migration.match(/using \(\(select auth\.uid\(\)\) = user_id\)/g)||[]).length,6);
+  for(const table of ['card_installment_series','card_billing_cycles','card_invoice_payments','card_payment_allocations','card_account_settlements','card_purchase_credits']){
     ok(migration.includes(`revoke all on table public.${table} from public, anon, authenticated`));
     ok(migration.includes(`grant select on table public.${table} to authenticated`));
   }
-  ok(!/grant (insert|update|delete).*authenticated/i.test(migration));
-});
-
-test('views preservam RLS e o shadow comparator não fabrica limite',()=>{
-  equal((migration.match(/with \(security_invoker = true\)/g)||[]).length,2);
-  includesAll(migration,['create view public.card_invoice_balances_v1','create view public.card_billing_shadow_comparison_v1','grant select on public.card_invoice_balances_v1 to authenticated','grant select on public.card_billing_shadow_comparison_v1 to authenticated']);
-  ok(!migration.includes('create view public.card_limit_positions_v1'));
-  includesAll(migration,["when structured_count = 0 then 'unlinked'","else 'partial'","then 'complete'"]);
-});
-
-test('RPCs mutadoras autenticam e fixam search_path, mas permanecem dormentes',()=>{
-  for(const [fn,args] of mutationFunctions){
-    const body=functionBody(fn);
-    includesAll(body,['security definer','auth.uid()','set search_path = pg_catalog, public']);
-    ok(migration.includes(`revoke all on function public.${fn}(${args}) from public, anon, authenticated`),`${fn}: revoke all client roles`);
-    ok(!migration.includes(`grant execute on function public.${fn}(${args}) to authenticated`),`${fn}: no authenticated activation grant`);
+  for(const [name,args] of mutators){
+    const body=functionBody(name);
+    includesAll(body,['security definer','auth.uid()','set search_path = pg_catalog']);
+    ok(migration.includes(`revoke all on function public.${name}(${args}) from public, anon, authenticated`));
+    ok(!migration.includes(`grant execute on function public.${name}(${args}) to authenticated`));
   }
-  ok(migration.includes('Shadow mode: mutation RPCs deliberately remain non-executable by authenticated'));
-  ok(migration.includes('grant execute on function public.get_my_card_billing_summary_v1(uuid) to authenticated'));
 });
 
-test('compra liquidada bloqueia mudanças econômicas e exclusão sob lock do ciclo',()=>{
+test('capability privada bloqueia vínculo estruturado por DML legado direto',()=>{
   includesAll(migration,[
-    'shadow billing writer is not activated',
-    "using errcode = '42501'",
-    'update of card_billing_cycle_id, user_id, card_id, transaction_date, transaction_type, amount, status',
-    'new.amount is distinct from old.amount',
-    'settled card purchase is immutable',
-    'settled card purchase cannot cross the cancellation boundary',
-    'transactions_guard_linked_card_delete_v1',
-    'settled card purchase cannot be deleted',
-    'for update;'
+    'create table billing_private.writer_context_v1',
+    'context.transaction_id = txid_current()',
+    "context.purpose in ('structure_purchase', 'create_installments')",
+    'structured card billing writer is not activated for direct transaction DML',
+    "values (txid_current(), v_user, 'structure_purchase')",
+    "values (txid_current(), v_user, 'create_installments')"
   ]);
-  ok(migration.includes('new.card_billing_cycle_id := null'));
+  ok(!migration.includes('grant select on billing_private.writer_context_v1'));
 });
 
-test('snapshots de ciclo e valores temporais/numéricos inválidos são bloqueados',()=>{
+test('views usam security_invoker e menor privilégio',()=>{
+  ok((migration.match(/with \(security_invoker = true\)/g)||[]).length>=5);
+  for(const view of ['card_invoice_balances_v1','card_account_settlement_effects_v1','card_purchase_credit_effects_v1','card_billing_shadow_comparison_v1','card_managed_limit_positions_v1']){
+    ok(migration.includes(`grant select on public.${view} to authenticated`),view);
+    ok(migration.includes(`revoke all on public.${view} from public, anon`),view);
+  }
+});
+
+test('concorrência e idempotência possuem locks e unicidade',()=>{
   includesAll(migration,[
-    'create trigger card_billing_cycles_immutable_v1',
-    'card billing cycle snapshots are immutable',
-    "amount > 0 and amount < 'Infinity'::numeric",
-    'check (isfinite(occurred_at))',
-    'new.transaction_date is null',
-    'not isfinite(new.transaction_date)',
-    'new.amount is null',
-    'not isfinite(p_occurred_at)'
+    'card_installment_series_operation_key unique (user_id, operation_id)',
+    'card_invoice_payments_operation_key unique (user_id, operation_id)',
+    'card_purchase_credits_operation_key unique (user_id, operation_id)',
+    'card_payment_allocations_payment_key unique (user_id, payment_entry_id)',
+    'card_account_settlements_payment_key unique (user_id, payment_entry_id)',
+    'card_invoice_payments_single_reversal_uidx','card_purchase_credits_single_reversal_uidx'
   ]);
+  ok((migration.match(/pg_advisory_xact_lock/g)||[]).length>=6);
+  ok((migration.match(/for update/g)||[]).length>=10);
 });
 
-test('ledgers validam coerência na inserção e são append-only estruturalmente',()=>{
-  includesAll(migration,[
-    'create function billing_private.guard_payment_insert_v1()',
-    'create function billing_private.guard_purchase_credit_insert_v1()',
-    'card_invoice_payments_guard_insert_v1',
-    'card_purchase_credits_guard_insert_v1',
-    'payment reversal must exactly compensate its original payment',
-    'credit reversal must exactly compensate its original credit',
-    'create function billing_private.reject_ledger_mutation_v1()',
-    'card billing ledgers are append-only',
-    'create trigger card_invoice_payments_append_only_v1',
-    'create trigger card_purchase_credits_append_only_v1',
-    'before update or delete on public.card_invoice_payments',
-    'before update or delete on public.card_purchase_credits'
-  ]);
-  ok(/card_invoice_payments_reason_check check \([\s\S]{0,400}entry_kind = 'payment_reversal'[\s\S]{0,160}reason_code is not null/.test(migration));
+test('backfill permanece conservador e transaction_date soberana',()=>{
+  includesAll(migration,['never backfilled by inference','transaction_date does not match the approved billing calendar; history was not changed']);
+  includesAll(design,['SAFE_NO_BACKFILL','transaction_date']);
+  ok(!/update public\.transactions\s+set\s+card_billing_cycle_id[\s\S]{0,300}(note|description)/i.test(migration));
 });
 
-test('idempotência e locks continuam presentes no desenho dormente',()=>{
-  equal((migration.match(/operation_id uuid not null/g)||[]).length,2);
-  equal((migration.match(/unique \(user_id, operation_id\)/g)||[]).length,2);
-  equal((migration.match(/':card-(?:payment|payment-reversal|credit|credit-reversal):'/g)||[]).length,4);
-  includesAll(migration,['card_invoice_payments_single_reversal_uidx','card_purchase_credits_single_reversal_uidx','operation_id payload mismatch','payment exceeds invoice outstanding amount','purchase credit exceeds original purchase amount']);
-  ok((migration.match(/for update;/g)||[]).length>=10);
-});
-
-test('saldo estrutural não persiste nem infere lifecycle ou settlement de produto',()=>{
-  includesAll(migration,['purchase_amount','credited_amount','paid_amount','outstanding_amount','credit_balance']);
-  ok(!migration.includes('settlement_state'));
-  ok(!migration.includes('lifecycle_state'));
-});
-
-test('teste econômico de ouro permanece requisito de ativação, não prova fictícia',()=>{
-  const purchase=financialEffect({transaction_type:'despesa',amount:1000,status:'realizado',transaction_date:'2026-08-20',card_id:'card'},{now:'2026-08-20'});
-  equal(purchase.consumptionExpenseAmount,1000);
-  equal(5000-1000,4000);
-  ok(!migration.includes("transaction_type, 'despesa'"));
-  ok(!/insert into public\.transactions[\s\S]{0,500}payment/i.test(migration));
-  ok(!/update public\.accounts[\s\S]{0,400}(opening_balance|statement_balance)/i.test(migration));
-  includesAll(design,['ACCOUNT_SETTLEMENT_REQUIRED','CARD_BILLING_BETA_READINESS = HOLD']);
-  ok(!migration.includes('grant execute on function public.pay_my_card_invoice_v1'));
-});
-
-test('limite gerencial permanece decisão documental e não é exposto pelo schema candidato',()=>{
-  ok(!migration.includes('card_limit_positions_v1'));
-  ok(!migration.includes('available_amount'));
-  includesAll(contract,['AVIORA_MANAGED_AVAILABLE_LIMIT','PRODUCT_DECISION_REQUIRED']);
-  includesAll(design,['CARD_BILLING_BETA_READINESS = HOLD','PRODUCT_DECISION_REQUIRED']);
-});
-
-test('rollback bloqueia corridas e qualquer ciclo/ledger/vínculo existente',()=>{
+test('rollback cobre tudo e falha fechado após uso',()=>{
   includesAll(rollback,[
     "pg_advisory_xact_lock(hashtextextended('aviora:card-billing-backend-v1', 0))",
-    "where n.nspname = 'billing_private'",
-    'and r.rolname = current_user',
-    'lock table public.transactions,',
-    'in access exclusive mode',
-    'if exists (select 1 from public.card_invoice_payments)',
-    'or exists (select 1 from public.card_purchase_credits)',
-    'or exists (select 1 from public.card_billing_cycles)',
-    'where card_billing_cycle_id is not null',
-    'use application-first rollback'
+    'lock table public.accounts','public.transactions','in access exclusive mode','public.card_installment_series',
+    'public.card_billing_cycles','public.card_invoice_payments','public.card_payment_allocations',
+    'public.card_account_settlements','public.card_purchase_credits','refusing destructive rollback',
+    'use application-first rollback','drop column installment_total','drop column card_billing_cycle_id'
   ]);
-  ok(rollback.indexOf('in access exclusive mode')<rollback.indexOf('if exists (select 1 from public.card_invoice_payments)'));
   ok(rollback.trimEnd().endsWith('commit;'));
 });
 
-test('backfill é conservador por omissão e nenhuma heurística histórica existe',()=>{
-  includesAll(design,['BACKFILL_MODE = SAFE_NO_BACKFILL','INITIAL_SCHEMA_MODE = SHADOW_ONLY']);
-  ok(migration.includes('never backfilled by inference'));
-  ok(!/(note|description)[\s\S]{0,200}card_billing_cycle_id/i.test(migration));
-  equal((migration.match(/update public\.transactions/g)||[]).length,0);
+test('shadow mode continua dormente',()=>{
+  includesAll(migration,['create view public.card_billing_shadow_comparison_v1','mutation RPCs deliberately remain non-executable by authenticated','grant execute on function public.get_my_card_billing_summary_v1(uuid) to authenticated']);
+  includesAll(design,['SHADOW','VISUAL_V1_IMPACT = ZERO']);
 });
 
-test('decisões de produto permanecem explícitas e bloqueiam aplicação Beta',()=>{
-  includesAll(design,[
-    'BACKEND_DESIGN_GATE = PRODUCT_DECISION_REQUIRED',
-    'CARD_BILLING_BETA_READINESS = HOLD',
-    'INITIAL_SCHEMA_MODE = SHADOW_ONLY',
-    'ACCOUNT_SETTLEMENT_REQUIRED',
-    'BACKFILL_MODE = SAFE_NO_BACKFILL',
-    'REMOTE_APPLY = PROHIBITED_PENDING_PRODUCT_DECISIONS_AND_RUNTIME_VALIDATION'
+test('documentação fecha V1 e isola dívidas V2',()=>{
+  const combined=design+'\n'+contract;
+  includesAll(combined,['transaction_date','SAFE_NO_BACKFILL','CREDIT_BALANCE_REVIEW_REQUIRED','AVIORA_MANAGED_AVAILABLE_LIMIT','numeric(14,2)','mono-ciclo','append-only','shadow','rollback']);
+});
+
+test('harness usa V81 + V82, ativa mutadores só no clone e prova golden',()=>{
+  includesAll(runner,[
+    '20260820161844_local_v81_structural_baseline.sql','20260820161846_add_v82_structured_financial_operations.sql',
+    'grant execute on function public.pay_my_card_invoice_v1','CARD_BILLING_BACKEND_READY_FOR_BETA_APPROVAL',
+    'GOLDEN_ACCOUNTING_TEST=PASS','card_account_settlement_effects_v1','run_payment','concurrent'
   ]);
-  includesAll(contract,[
-    'Decisão necessária para automatizar o ciclo',
-    'dia do fechamento',
-    'fuso/instante exato do fechamento',
-    'pagamentos/alocações',
-    'limite disponível',
-    'STRUCTURED_INSTALLMENT_SERIES_REQUIRED'
-  ]);
+  ok(!runner.includes('DB_URL'));ok(!runner.includes('PGPASSWORD'));ok(!runner.includes('--linked'));
+  ok(!/supabase\s+(db push|migration up|link)/i.test(runner));
 });
 
-test('artefatos não executam Supabase, não contêm alvo remoto e preservam Visual V1',()=>{
-  const combined=[migration,rollback,design,contract,pgTap,localRunner].join('\n');
-  ok(!/https?:\/\/[a-z]{20}\.supabase\.co/i.test(combined));
-  ok(!/project[_-]?ref\s*[:=]/i.test(combined));
-  ok(!/supabase\s+(db push|migration up|link)/i.test(combined));
-  ok(design.includes('VISUAL_V1_IMPACT = ZERO'));
-});
-
-test('pgTAP futuro cobre estrutura, RLS A/B, shadow grants e invariantes runtime',()=>{
-  ok(pgTap.includes('select no_plan()'));
+test('pgTAP cobre superfície, RLS, calendário, ledger e golden',()=>{
   for(const token of [
-    'relrowsecurity','policies_are','function_privs_are','index_is_unique','fk_ok',
-    'transactions_guard_linked_card_delete_v1','card_invoice_payments_append_only_v1',
-    'card_invoice_payments_guard_insert_v1','card_purchase_credits_guard_insert_v1',
-    'authenticated cannot activate dormant payment RPC','user B cannot read user A cycle',
-    'settled purchase amount is immutable','settled purchase cannot cross cancellation boundary',
-    'settled canonical transaction_date cannot be moved','persisted cycle closing_date cannot be NULL',
-    '@example.invalid'
+    'select no_plan()','relrowsecurity','policies_are','function_privs_are','card_installment_series',
+    'card_payment_allocations','card_account_settlements','user B cannot read user A cycle',
+    'closing day remains in current cycle','leap-year February clamps day 31 to 29',
+    'editing card dates does not rewrite cycle snapshots','payment creates exactly one allocation',
+    'settlement consumption delta is zero','managed limit is explicitly AVIORA-managed','@example.invalid'
   ])ok(pgTap.includes(token),token);
   ok(pgTap.trimEnd().endsWith('rollback;'));
 });
 
-test('runner descartável é limitado ao container local rotulado e trata golden como blocker',()=>{
-  ok(localRunner.length>0,'local disposable runner exists');
-  includesAll(localRunner,['supabase_db_${project_id}','com.supabase.cli.project','trap cleanup EXIT','card_billing_backend_v1_test.sql','GOLDEN_ACCOUNTING_ACTIVATION_BLOCKED','CARD_BILLING_BETA_READINESS=HOLD']);
-  ok(!localRunner.includes('DB_URL'));
-  ok(!localRunner.includes('PGPASSWORD'));
-  ok(!localRunner.includes('--linked'));
-  ok(!/supabase\s+(db push|migration up|link)/i.test(localRunner));
+test('artefatos não contêm alvo, segredo ou comando remoto',()=>{
+  const combined=[migration,rollback,design,contract,pgTap,runner].join('\n');
+  ok(!/https?:\/\/[a-z]{20}\.supabase\.co/i.test(combined));
+  ok(!/project[_-]?ref\s*[:=]/i.test(combined));
+  ok(!/service[_-]?role\s*[:=]/i.test(combined));
+  ok(!/supabase\s+(db push|migration up|link|functions deploy)/i.test(combined));
 });
 
 console.log(`card-billing-backend-design: ${tests} tests, ${assertions} assertions passed`);
