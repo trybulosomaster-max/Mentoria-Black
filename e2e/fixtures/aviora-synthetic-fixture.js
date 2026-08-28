@@ -21,11 +21,17 @@
     period:Object.freeze({year:2026,month:8}),
     profile:Object.freeze({id:'E2E_OWNER',role:'OWNER',email:'e2e-owner@invalid.test'}),
     accounts:Object.freeze([
-      Object.freeze({id:'account-main',name:'Conta principal',balance:12500}),
-      Object.freeze({id:'account-reserve',name:'Reserva',balance:18500})
+      Object.freeze({id:'account-main',name:'Conta principal',balance:12500,opening_balance:12500}),
+      Object.freeze({id:'account-reserve',name:'Reserva',balance:18500,opening_balance:18500})
+    ]),
+    assets:Object.freeze([
+      Object.freeze({id:'asset-fund',name:'Fundo sintético',institution:'Instituição local',current_value:5000})
+    ]),
+    liabilities:Object.freeze([
+      Object.freeze({id:'liability-loan',name:'Dívida sintética',balance:2000})
     ]),
     cards:Object.freeze([
-      Object.freeze({id:'card-gold',name:'Cartão AVIORA',closingDay:22,dueDay:30,limit:8000,currentInvoice:670})
+      Object.freeze({id:'card-gold',name:'Cartão AVIORA',institution:'Banco sintético',brand:'Visa',closing_day:22,due_day:30,limit:8000,note:'Fixture local sem dados reais'})
     ]),
     transactions:Object.freeze([
       Object.freeze({id:'salary-realized',description:'Receita mensal',transaction_type:'receita',category:'Receitas',subcategory:'Salário',amount:6000,status:'realizado',transaction_date:'2026-08-02',account_id:'account-main'}),

@@ -4,7 +4,8 @@ import {
   openPreview,
   navigateTo,
   assertNoHorizontalOverflow,
-  assertTouchTargets
+  assertTouchTargets,
+  VIEWPORTS
 } from './support/aviora-page.mjs';
 
 const money=value=>Number(value).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
@@ -14,13 +15,16 @@ test.describe('AVIORA — caracterização sintética das áreas secundárias',(
   test.beforeEach(async({page})=>{browserMonitor=await monitorBrowser(page)});
   test.afterEach(()=>browserMonitor.assertClean());
 
-  test('Cartões replica o resumo real enquanto o motor valida a competência sintética',async({page})=>{
+  test('Cartões expõe identidade e compromissos reais enquanto o motor valida a competência sintética',async({page})=>{
     await openPreview(page,{tab:'cards'});
     const card=page.locator('[data-card-id="card-gold"]');
     await expect(card).toBeVisible();
-    for(const text of ['Cartão AVIORA','R$ 670,00','período'])await expect(card).toContainText(text);
-    await expect(page.locator('#view')).not.toContainText(/Fatura atual|Limite|Fechamento|vencimento/);
-    await expect(card.getByRole('button')).toHaveCount(0);
+    for(const text of ['Cartão AVIORA','Banco sintético','Visa','R$ 670,00','esperado no mês'])await expect(card).toContainText(text);
+    await card.locator('summary').click();
+    for(const text of ['Limite cadastrado','R$ 8.000,00','Fechamento','dia 22','Vencimento','dia 30','Programado','R$ 670,00','Compromissos futuros','R$ 250,00'])await expect(card).toContainText(text);
+    await expect(page.locator('#view')).not.toContainText('Fatura atual');
+    await expect(card.getByRole('button',{name:'Ver em Lançamentos'})).toBeVisible();
+    await expect(card.getByRole('button',{name:'Editar cartão'})).toBeVisible();
 
     const competence=await page.evaluate(()=>{
       const scenario=AVIORA_E2E_FIXTURE.createScenario();
@@ -33,7 +37,7 @@ test.describe('AVIORA — caracterização sintética das áreas secundárias',(
         september:{ids:september.map(row=>row.id),total:september.reduce((sum,row)=>sum+row.amount,0)}
       };
     });
-    expect(competence.model).toMatchObject({limit:8000,currentInvoice:670,closingDay:22,dueDay:30});
+    expect(competence.model).toMatchObject({limit:8000,closing_day:22,due_day:30,brand:'Visa'});
     expect(competence.august).toEqual({ids:expect.arrayContaining(['card-pending','installment-current']),total:670});
     expect(competence.august.ids).not.toContain('installment-next');
     expect(competence.september).toEqual({ids:['installment-next'],total:250});
@@ -75,6 +79,7 @@ test.describe('AVIORA — caracterização sintética das áreas secundárias',(
     await openPreview(page,{tab:'recurring'});
     await expect(page.locator('[data-recurring-id]')).toHaveCount(4);
     const rent=page.locator('[data-recurring-id="recurring-rent"]');
+    await rent.locator('summary').click();
     for(const text of ['Aluguel mensal','Gastos Fixos','29/08/2026','R$ 1.500,00','Ativa'])await expect(rent).toContainText(text);
     await expect(rent.getByRole('button',{name:'Editar'})).toBeVisible();
 
@@ -105,7 +110,8 @@ test.describe('AVIORA — caracterização sintética das áreas secundárias',(
 
     await navigateTo(page,'wealth');
     const text=await page.locator('#view').textContent();
-    for(const value of [money(31000),money(18500)])expect(text).toContain(value);
+    for(const value of [money(34000),money(31000),money(5000),money(2000),money(18500)])expect(text).toContain(value);
+    await expect(page.locator('[data-liability-id="liability-loan"]')).toContainText('Dívida sintética');
     expect(text).not.toMatch(/NaN|Infinity/);
   });
 
@@ -144,7 +150,7 @@ test.describe('AVIORA — caracterização sintética das áreas secundárias',(
     }
   });
 
-  for(const viewport of [{name:'mobile',width:390,height:844},{name:'desktop',width:1440,height:900}]){
+  for(const viewport of VIEWPORTS){
     test(`áreas secundárias permanecem alcançáveis e sem overflow em ${viewport.name}`,async({page})=>{
       await openPreview(page,{tab:'accounts',viewport});
       for(const tab of ['accounts','cards','categories','goals','recurring','wealth','reports','reserve-v52','health-v53']){

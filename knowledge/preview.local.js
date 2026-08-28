@@ -49,7 +49,7 @@
   async function mount(access){
     window.previewKnowledgeAccess=access;
     document.getElementById('withAccess').classList.toggle('gold',access);document.getElementById('withoutAccess').classList.toggle('gold',!access);
-    await window.MBKnowledgeArea.createKnowledgeArea({client,entitlements:{knowledge:{hasAccess:access}},checkout:offer=>alert(`Checkout mock: ${offer}`),notify:message=>console.info(message)}).mount(previewRoot);syncPreviewCover();
+    await window.MBKnowledgeArea.createKnowledgeArea({client,entitlements:{knowledge:{hasAccess:access}},checkout:offer=>alert(`Checkout mock: ${offer}`),notify:message=>console.info(message),preferenceScope:'knowledge-local-preview'}).mount(previewRoot);syncPreviewCover();
   }
   document.getElementById('withAccess').onclick=()=>mount(true);document.getElementById('withoutAccess').onclick=()=>mount(false);
   await mount(true);

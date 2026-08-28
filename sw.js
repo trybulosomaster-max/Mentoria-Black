@@ -13,10 +13,11 @@ const SHELL_PATHS=[
   './assets/admin-area.css','./assets/account-security.css',
   './js/production-environment.js','./js/production-runtime.js','./js/meridian-day-night-login.js','./js/observability.js',
   './js/financial-core.js','./js/recurrence-projection.js','./js/structured-recurring-v82.js','./js/planning-integration.js',
+  './js/cards-view-data.js','./js/recurring-view-data.js',
   './js/goal-projection.js','./js/goals-integration.js','./js/reports-integration.js','./js/dashboard-financial-integration.js','./js/health-integration.js',
   './commercial/access-contract.js','./commercial/provider-contract.js','./commercial/admin-access-contract.js','./commercial/admin-presentation.js',
   './js/admin-access-client.js','./js/admin-area.js','./js/account-security.js',
-  './knowledge/import-contract.js','./knowledge/knowledge-area.js','./js/aviora-visual-v1.js'
+  './knowledge/import-contract.js','./knowledge/reader-experience.js','./knowledge/knowledge-area.js','./js/aviora-visual-v1.js'
 ];
 const APP_SHELL=SHELL_PATHS.map(versioned);
 const NAVIGATION_FALLBACK=versioned('./index.html');

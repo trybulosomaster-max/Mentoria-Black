@@ -58,6 +58,34 @@
   --shadow: var(--aviora-shadow);
 }
 
+/* Functional Master A: depth uses the approved Visual V1 primitives. */
+.aviora-card-list,.aviora-recurring-list{display:grid;gap:12px;margin-top:14px}
+.aviora-card-detail,.aviora-recurring-detail{padding:0;overflow:hidden}
+.aviora-card-detail>summary,.aviora-recurring-detail>summary{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:14px;align-items:center;min-height:64px;padding:14px 16px;cursor:pointer;list-style:none}
+.aviora-card-detail>summary::-webkit-details-marker,.aviora-recurring-detail>summary::-webkit-details-marker{display:none}
+.aviora-card-detail>summary span,.aviora-recurring-detail>summary span{display:grid;gap:4px;min-width:0}
+.aviora-card-detail>summary span:last-child,.aviora-recurring-detail>summary span:last-child{text-align:right}
+.aviora-card-detail>summary strong,.aviora-recurring-detail>summary strong{font-size:15px;overflow-wrap:anywhere}
+.aviora-card-detail>summary b,.aviora-recurring-detail>summary b{font-size:18px;color:var(--aviora-text)}
+.aviora-card-detail>summary small,.aviora-recurring-detail>summary small{color:var(--aviora-text-muted)}
+.aviora-card-detail>summary:focus-visible,.aviora-recurring-detail>summary:focus-visible{outline:var(--aviora-focus-ring);outline-offset:-3px}
+.aviora-card-detail-body,.aviora-recurring-detail-body{padding:16px;border-top:1px solid var(--aviora-border)}
+.aviora-card-identity{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:12px}
+.aviora-card-identity>span{display:grid;gap:4px;padding:10px 12px;border:1px solid var(--aviora-border);border-radius:var(--aviora-radius-sm);background:var(--aviora-surface-soft);color:var(--aviora-text-muted);font-size:11px}
+.aviora-card-identity b{color:var(--aviora-text);font-size:13px;overflow-wrap:anywhere}
+.aviora-card-period-kpis,.aviora-recurring-kpis{grid-template-columns:repeat(5,minmax(0,1fr))}
+.aviora-card-contract-note{margin:0 0 14px}.aviora-card-actions{justify-content:flex-end;margin-top:14px}
+.aviora-recurring-filters{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+.aviora-wealth-primary{margin:12px 0;font-size:30px;font-weight:850}
+.aviora-health-explanations{gap:8px}.aviora-health-explanations details{border:1px solid var(--aviora-border);border-radius:var(--aviora-radius-sm);background:var(--aviora-surface-soft)}
+.aviora-health-explanations summary{display:flex;align-items:center;min-height:44px;padding:9px 12px;font-weight:700;cursor:pointer}.aviora-health-explanations p{margin:0;padding:0 12px 12px;color:var(--aviora-text-muted);line-height:1.6}
+@media(max-width:900px){.aviora-card-period-kpis,.aviora-recurring-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:650px){
+  .aviora-card-detail>summary,.aviora-recurring-detail>summary{grid-template-columns:1fr;min-height:88px}.aviora-card-detail>summary span:last-child,.aviora-recurring-detail>summary span:last-child{text-align:left}
+  .aviora-card-detail-body,.aviora-recurring-detail-body{padding:12px}.aviora-card-period-kpis,.aviora-recurring-kpis{grid-template-columns:1fr 1fr}
+  .aviora-card-actions{display:grid;grid-template-columns:1fr}.aviora-card-actions .btn{min-height:44px}
+}
+
 html { color-scheme: dark; background: var(--aviora-bg-deep); scroll-padding-top: calc(16px + env(safe-area-inset-top)); }
 body {
   min-width: 0;

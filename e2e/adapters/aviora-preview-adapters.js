@@ -89,8 +89,15 @@
           const value=String(payload.p_query||'').toLocaleLowerCase('pt-BR');
           return {data:database.knowledge_sections.filter(section=>JSON.stringify(section.content).toLocaleLowerCase('pt-BR').includes(value)).map(section=>{const chapter=database.knowledge_chapters.find(item=>item.id===section.chapter_id);return {chapter_id:chapter.id,chapter_title:chapter.title,snippet:section.content.text||section.content.prompt||''}}),error:null};
         }
-        if(name==='save_my_knowledge_progress_v1')return {data:{publication_id:payload.p_publication_id,chapter_id:payload.p_chapter_id,progress_percent:payload.p_completed?100:payload.p_progress_percent,last_section_id:payload.p_last_section_id,last_read_at:'2026-08-27T12:00:00.000Z',completed_at:payload.p_completed?'2026-08-27T12:00:00.000Z':null},error:null};
-        if(name==='set_my_knowledge_bookmark_v1')return {data:Boolean(payload.p_enabled),error:null};
+        if(name==='save_my_knowledge_progress_v1'){
+          const row={publication_id:payload.p_publication_id,chapter_id:payload.p_chapter_id,progress_percent:payload.p_completed?100:payload.p_progress_percent,last_section_id:payload.p_last_section_id,last_read_at:'2026-08-27T12:00:00.000Z',completed_at:payload.p_completed?'2026-08-27T12:00:00.000Z':null};
+          database.knowledge_progress=database.knowledge_progress.filter(item=>item.chapter_id!==row.chapter_id).concat(row);return {data:row,error:null};
+        }
+        if(name==='set_my_knowledge_bookmark_v1'){
+          database.knowledge_bookmarks=database.knowledge_bookmarks.filter(item=>!(item.chapter_id===payload.p_chapter_id&&String(item.section_id||'')===String(payload.p_section_id||'')));
+          if(payload.p_enabled)database.knowledge_bookmarks.push({id:`bookmark-${payload.p_chapter_id}-${payload.p_section_id||'chapter'}`,publication_id:payload.p_publication_id,chapter_id:payload.p_chapter_id,section_id:payload.p_section_id||null,created_at:'2026-08-27T12:00:00.000Z'});
+          return {data:Boolean(payload.p_enabled),error:null};
+        }
         return {data:null,error:new Error('Unsupported synthetic knowledge RPC')};
       }
     });
@@ -102,7 +109,7 @@
       client:createKnowledgeClient(fixture),
       entitlements:{knowledge:{hasAccess}},
       checkout:()=>({status:'synthetic'}),
-      notify:()=>{}
+      notify:()=>{},preferenceScope:'e2e-preview'
     });
     await app.mount(root);
     return app;
