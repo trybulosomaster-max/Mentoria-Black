@@ -35,7 +35,9 @@ test.describe('AVIORA — fluxos sintéticos de usuário',()=>{
     await expect(page.getByRole('heading',{name:'Conhecimento'})).toBeVisible();
     await expect(page.locator('.knowledge-publication-card')).toBeVisible();
     await expect(page.getByRole('button',{name:'Começar leitura'})).toBeVisible();
-    await expect(page.getByRole('button',{name:'Ver sumário'})).toBeVisible();
+    await page.getByRole('button',{name:'Começar leitura'}).click();
+    await expect(page.getByRole('button',{name:'Meus favoritos'})).toBeVisible();
+    await expect(page.getByRole('heading',{name:'Mentoria Black'})).toBeVisible();
     await assertNoHorizontalOverflow(page);
   });
 
@@ -46,10 +48,10 @@ test.describe('AVIORA — fluxos sintéticos de usuário',()=>{
     for(const [tab,label] of DESTINATIONS){
       await page.locator(`#nav > [data-tab="${tab}"]`).click();
       await expect(page.locator('#view')).toHaveAttribute('data-aviora-view',tab);
-      await expect(page.locator('#view .pagehead h1')).toHaveText(label);
+      await expect(page.locator('#view h1').first()).toHaveText(tab==='cards'?'Cartões de crédito':label);
       await expect(page.locator('#nav > [data-tab][aria-current="page"]')).toHaveCount(1);
     }
-    await expect(page.locator('[data-management-card]')).toHaveCount(9);
+    await expect(page.locator('[data-admin-management-card]')).toHaveCount(9);
     await assertAriaControlsResolve(page);
   });
 

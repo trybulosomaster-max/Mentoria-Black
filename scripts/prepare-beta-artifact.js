@@ -28,7 +28,9 @@ function betaManifestSource(source){
 function betaServiceWorkerSource(source){
   const productionCache='mentoria-black-v82-production';
   if(!source.includes(productionCache))throw new Error('expected production cache identifier was not found');
-  return source.replaceAll(productionCache,'mentoria-black-v82-beta');
+  return source.replaceAll(productionCache,'mentoria-black-v82-beta')
+    .replaceAll('./js/production-environment.js','./js/beta-environment.js')
+    .replaceAll('./js/production-runtime.js','./js/beta-runtime.js');
 }
 
 function localAssets(source){

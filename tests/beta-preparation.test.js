@@ -96,7 +96,8 @@ await test('artefato Beta correto satisfaz identidade, runtime, cache e fail-clo
   const html=fs.readFileSync(path.join(out,'index.html'),'utf8'),manifest=fs.readFileSync(path.join(out,'manifest.webmanifest'),'utf8'),sw=fs.readFileSync(path.join(out,'sw.js'),'utf8');
   equal(artifact.validateBetaArtifact(out).valid,true);
   ok(html.includes('js/beta-runtime.js'));ok(html.includes('MBBetaRuntime.requireConfigured'));ok(manifest.includes('V82 BETA'));ok(sw.includes('mentoria-black-v82-beta'));
-  ok(!html.includes('production-runtime'));ok(!sw.includes('mentoria-black-v82-production'));
+  ok(sw.includes('./js/beta-environment.js'));ok(sw.includes('./js/beta-runtime.js'));
+  ok(!html.includes('production-runtime'));ok(!sw.includes('mentoria-black-v82-production'));ok(!sw.includes('./js/production-runtime.js'));
 }));
 
 await test('artefato Beta com runtime de produção é rejeitado',()=>withArtifact(out=>{
@@ -120,7 +121,7 @@ await test('scripts clássicos ativos compilam juntos sem colisão de escopo glo
   const root=path.resolve(__dirname,'..'),html=fs.readFileSync(path.join(root,'index.html'),'utf8'),sources=[];
   for(const match of html.matchAll(/<script([^>]*)>([\s\S]*?)<\/script>/gi)){
     const sourceMatch=match[1].match(/\bsrc="([^"]+)"/);
-    if(sourceMatch&&!/^https?:/i.test(sourceMatch[1]))sources.push(fs.readFileSync(path.join(root,sourceMatch[1]),'utf8'));
+    if(sourceMatch&&!/^https?:/i.test(sourceMatch[1]))sources.push(fs.readFileSync(path.join(root,sourceMatch[1].split(/[?#]/,1)[0]),'utf8'));
     if(!sourceMatch&&match[2].trim())sources.push(match[2]);
   }
   ok(sources.length>10);

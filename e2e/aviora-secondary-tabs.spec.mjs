@@ -14,13 +14,13 @@ test.describe('AVIORA — caracterização sintética das áreas secundárias',(
   test.beforeEach(async({page})=>{browserMonitor=await monitorBrowser(page)});
   test.afterEach(()=>browserMonitor.assertClean());
 
-  test('Cartões preserva limite, datas e a competência mensal da fixture sintética',async({page})=>{
+  test('Cartões replica o resumo real enquanto o motor valida a competência sintética',async({page})=>{
     await openPreview(page,{tab:'cards'});
     const card=page.locator('[data-card-id="card-gold"]');
     await expect(card).toBeVisible();
-    for(const text of ['Cartão AVIORA','Fatura atual','R$ 670,00','Limite','R$ 8.000,00','dia 22 / 30'])await expect(card).toContainText(text);
-    await expect(card.getByRole('button',{name:'Ver compras'})).toBeVisible();
-    await expect(card.getByRole('button',{name:'Editar'})).toBeVisible();
+    for(const text of ['Cartão AVIORA','R$ 670,00','período'])await expect(card).toContainText(text);
+    await expect(page.locator('#view')).not.toContainText(/Fatura atual|Limite|Fechamento|vencimento/);
+    await expect(card.getByRole('button')).toHaveCount(0);
 
     const competence=await page.evaluate(()=>{
       const scenario=AVIORA_E2E_FIXTURE.createScenario();
@@ -92,13 +92,13 @@ test.describe('AVIORA — caracterização sintética das áreas secundárias',(
     await expect(main).toContainText(money(12500));
     await expect(reserve).toContainText(money(18500));
     for(const account of [main,reserve]){
-      await expect(account.getByRole('button',{name:'Ver lançamentos'})).toBeVisible();
       await expect(account.getByRole('button',{name:'Editar'})).toBeVisible();
+      await expect(account.getByRole('button',{name:'Excluir'})).toBeVisible();
     }
 
     await navigateTo(page,'wealth');
     const text=await page.locator('#view').textContent();
-    for(const value of [money(103000),money(18700),money(84300)])expect(text).toContain(value);
+    for(const value of [money(31000),money(18500)])expect(text).toContain(value);
     expect(text).not.toMatch(/NaN|Infinity/);
   });
 
@@ -112,16 +112,18 @@ test.describe('AVIORA — caracterização sintética das áreas secundárias',(
     await assertTouchTargets(page,'#view button');
   });
 
-  test('Saúde e Reserva caracterizam somente a apresentação atual, sem impor a proposta futura',async({page})=>{
+  test('Saúde e Reserva não fabricam paridade quando exigem Beta autenticado',async({page})=>{
     await openPreview(page,{tab:'reserve-v52'});
     const reserve=page.locator('#view');
-    for(const text of ['Reserva de Emergência','Acumulado','R$ 18.500,00','Meta','R$ 30.000,00'])await expect(reserve).toContainText(text);
-    expect(await reserve.locator('.bar > i').evaluate(node=>node.style.width)).toBe('61.7%');
+    await expect(reserve).toHaveAttribute('data-preview-parity','REQUIRES_AUTHENTICATED_BETA_SMOKE');
+    for(const text of ['Reserva de Emergência','Validação autenticada necessária','não fabrica dados'])await expect(reserve).toContainText(text);
+    await expect(reserve).not.toContainText(/R\$|Acumulado|Meta/);
 
     await navigateTo(page,'health-v53');
     const health=page.locator('#view');
-    for(const text of ['Saúde Financeira','Diagnóstico sintético','Compromissos conhecidos representam 42%','Ver recomendações'])await expect(health).toContainText(text);
-    await expect(health.getByRole('button',{name:'Ver recomendações'})).toBeVisible();
+    await expect(health).toHaveAttribute('data-preview-parity','REQUIRES_AUTHENTICATED_BETA_SMOKE');
+    for(const text of ['Saúde Financeira','Validação autenticada necessária','não fabrica dados'])await expect(health).toContainText(text);
+    await expect(health).not.toContainText(/Diagnóstico|42%|recomendações/);
   });
 
   test('áreas secundárias reutilizam estados vazio e erro seguros sem fabricar dados',async({page})=>{

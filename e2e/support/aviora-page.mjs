@@ -63,13 +63,18 @@ export async function openPreview(page,{view='app',tab='dashboard',profile='owne
     await document.fonts?.ready;
     await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
   });
+  await expect.poll(()=>page.evaluate(()=>globalThis.AVIORA_PREVIEW_ASSET_MISMATCHES?.()||[])).toEqual([]);
   if(view==='app'){
     const expectedTab=profile==='customer'&&tab==='administration'?'dashboard':tab;
     await expect(page.locator('#appPreview')).not.toHaveClass(/hidden/);
     await expect(page.locator('#view')).toHaveAttribute('data-aviora-view',expectedTab);
     await expect.poll(()=>page.evaluate(()=>globalThis.__AVIORA_VISUAL_V1_INSTALLED__===true)).toBe(true);
+    if(expectedTab==='knowledge')await page.evaluate(()=>globalThis.AVIORA_PREVIEW_READY);
   }else if(view==='login')await expect(page.locator('#loginPreview')).not.toHaveClass(/hidden/);
-  else await expect(page.locator('#knowledgePreview')).not.toHaveClass(/hidden/);
+  else{
+    await expect(page.locator('#knowledgePreview')).not.toHaveClass(/hidden/);
+    await page.evaluate(()=>globalThis.AVIORA_PREVIEW_READY);
+  }
 }
 
 export async function navigateTo(page,tab){
@@ -81,6 +86,7 @@ export async function navigateTo(page,tab){
     await page.getByRole('dialog',{name:'Áreas do AVIORA'}).locator(`[data-tab="${tab}"]`).click();
   }
   await expect(page.locator('#view')).toHaveAttribute('data-aviora-view',tab);
+  if(tab==='knowledge')await page.evaluate(()=>globalThis.AVIORA_PREVIEW_READY);
 }
 
 export async function assertNoHorizontalOverflow(page){
