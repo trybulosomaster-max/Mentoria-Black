@@ -14,6 +14,20 @@
   const transactionType=row=>String(row?.transaction_type??row?.type??'').trim().toLowerCase();
   const isCardOutflow=row=>Boolean(cardId(row))&&['despesa','investimento'].includes(transactionType(row));
   const monthKey=(year,month)=>`${Number(year)}-${String(Number(month)).padStart(2,'0')}`;
+  const invoiceStates=Object.freeze(Object.fromEntries(
+    ['OPEN','CLOSED','DUE','PARTIALLY_PAID','PAID','OVERDUE'].map(state=>[state,'BACKEND_REQUIRED'])
+  ));
+  const billingContracts=Object.freeze({
+    gate:'REVIEW_REQUIRED',
+    invoiceMembership:'DERIVED_FROM_TRANSACTION_DATE',
+    invoiceBalance:'PENDENTE_DE_CONTRATO',
+    invoiceLifecycle:'PERSISTED_INVOICE_REQUIRED',
+    invoicePayment:'CARD_PAYMENT_CONTRACT_REQUIRED',
+    availableLimit:'BACKEND_REQUIRED',
+    installmentSeries:'STRUCTURED_INSTALLMENT_SERIES_REQUIRED',
+    cardReversal:'CARD_REVERSAL_CONTRACT_REQUIRED',
+    invoiceStates
+  });
   const monthEnd=(year,month)=>new Date(Date.UTC(Number(year),Number(month),0)).toISOString().slice(0,10);
   const nextMonth=(year,month,offset=1)=>{
     const date=new Date(Date.UTC(Number(year),Number(month)-1+Number(offset),1));
@@ -131,9 +145,9 @@
       totals:Object.freeze({realized:total('realized'),scheduled:total('scheduled'),projected:total('projected'),expected:total('expected')}),
       totalRegisteredLimit:money(rows.filter(row=>row.limitKnown).reduce((sum,row)=>sum+row.limit,0)),
       registeredLimitCards:rows.filter(row=>row.limitKnown).length,
-      contracts:Object.freeze({invoiceBalance:'PENDENTE_DE_CONTRATO',availableLimit:'PENDENTE_DE_CONTRATO'})
+      contracts:billingContracts
     });
   }
 
-  return Object.freeze({monthKey,nextMonth,parseInstallment,installmentSeriesKey,cardPeriodView});
+  return Object.freeze({monthKey,nextMonth,parseInstallment,installmentSeriesKey,cardPeriodView,billingContracts});
 });
