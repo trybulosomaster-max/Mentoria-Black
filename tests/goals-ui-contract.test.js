@@ -47,14 +47,18 @@ function render(){
 test('card Casamento comunica as métricas financeiras sem ambiguidade',()=>{
   const output=render();
   ok(output.includes('Realizado</span><strong>R$ 0.00'));
-  ok(output.includes('Programado</span><strong>R$ 4400.00'));
-  ok(output.includes('Projeção adicional</span><strong>R$ 20000.00'));
   ok(output.includes('Cobertura prevista</span><strong>R$ 24400.00'));
   ok(output.includes('48.8%'));
   ok(output.includes('Falta realizar</span><strong>R$ 50000.00'));
   ok(output.includes('Falta planejar</span><strong>R$ 25600.00'));
   ok(output.includes('Média mensal necessária'));
   ok(output.includes('R$ 819.67/mês'));
+  const primary=output.slice(output.indexOf('<div class="goal-values">'),output.indexOf('</div><details class="goal-coverage-composition">'));
+  ok(!primary.includes('Programado'));
+  ok(!primary.includes('Projeção adicional'));
+  ok(output.includes('<details class="goal-coverage-composition"><summary>Ver composição da cobertura</summary>'));
+  ok(output.includes('<dt>Programado</dt><dd>R$ 4400.00'));
+  ok(output.includes('<dt>Projeção adicional</dt><dd>R$ 20000.00'));
 });
 
 test('card Casamento mostra previsão posterior ao prazo',()=>{
@@ -71,6 +75,18 @@ test('renderer usa apenas fonte canônica para métricas e orçamento',()=>{
   ok(source.includes('engine.goalBudgetViewModel(metrics,monthlyPlan()?.goals)'));
   ok(!source.includes('legacyEngine.budget'));
   equal(goalsV82.goalViewModel(goal,transactions,recurring,{now:NOW}).estimatedCompletionDate,'2037-02-01');
+});
+
+test('composição apenas apresenta os componentes canônicos da cobertura',()=>{
+  const metric=goalsV82.goalViewModel(goal,transactions,recurring,{now:NOW});
+  equal(metric.programmed,4400);
+  equal(metric.projected,20000);
+  equal(metric.projectedCovered,24400);
+  equal(metric.programmed+metric.projected,metric.projectedCovered);
+  ok(source.includes('${money(item.programmed)}'));
+  ok(source.includes('${money(item.projected)}'));
+  ok(source.includes('${money(item.projectedCovered)}'));
+  ok(!source.includes('item.programmed+item.projected'));
 });
 
 console.log(`goals-ui-contract: ${tests} tests, ${assertions} assertions passed`);

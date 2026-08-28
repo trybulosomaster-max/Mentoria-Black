@@ -14,10 +14,10 @@ function fixedForMonth(rows,year,month,now){return rows.reduce((sum,row)=>{const
 function fixedAverage(rows,year,month,now){let total=0;for(let offset=1;offset<=6;offset++){const date=new Date(Date.UTC(year,month-1-offset,1));total+=fixedForMonth(rows,date.getUTCFullYear(),date.getUTCMonth()+1,now)}return total/6}
 function reserveSnapshot(ledger,settings,fixed){const balance=ledger.reduce((sum,item)=>sum+(item.type==='retirada'?-Number(item.amount||0):Number(item.amount||0)),0),mode=settings.targetMode==='custom'?'custom':'fixed',months=Math.max(.5,Number(settings.months||6)),target=mode==='custom'?Math.max(0,Number(settings.customTarget||0)):fixed*months;return {balance,mode,months,target,remaining:Math.max(0,target-balance),coverage:fixed>0?balance/fixed:0,progress:target>0?clamp(balance/target*100):0}}
 function component(key,score,evaluable,reason){return Object.freeze({key,score:evaluable?clamp(score):null,weight:WEIGHTS[key],evaluable,reason:evaluable?null:reason})}
-function healthScore({plan,transactions,rules,goalsData,reserve,year,month,now}){
-  const projection=dashboard.projectDashboardPeriod(transactions,rules,{year,month,now});
+function healthScore({plan,transactions,rules,goalsData,reserve,year,month,now,cardPurchaseCreditEffects}){
+  const projection=dashboard.projectDashboardPeriod(transactions,rules,{year,month,now,cardPurchaseCreditEffects});
   const plannedIncome=Number(plan?.revenue||0),plannedOut=['fixed_expenses','investments','comfort','goals','leisure','knowledge'].reduce((sum,key)=>sum+Number(plan?.[key]||0),0),actualOut=projection.realized.consumptionExpense+projection.realized.investment;
-  const fixedCurrent=fixedForMonth(transactions,year,month,now);
+  const fixedCurrent=Number(projection.byCategory?.realized?.['Gastos Fixos']||0);
   const goalRows=goals.projectGoalsForView(goalsData.filter(goal=>!/reserva|emerg[eê]ncia|caixinha/i.test(String(goal.name||''))&&Number(goal.target)>0),transactions,rules,{now});
   const components=[
     component('budget',plannedOut>0?clamp((1-Math.max(0,actualOut-plannedOut)/plannedOut)*100):null,plannedOut>0,'missing_monthly_plan'),

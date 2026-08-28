@@ -1,12 +1,12 @@
 {
   "name":"AVIORA — Gestão Financeira",
   "short_name":"AVIORA",
-  "start_url":"./",
+  "start_url":"./?v=aviora-card-billing-v1",
   "display":"standalone",
   "background_color":"#070807",
   "theme_color":"#B8944A",
   "icons":[
-    {"src":"assets/branding/aviora-official.jpg","sizes":"1254x1254","type":"image/jpeg","purpose":"any"}
+    {"src":"assets/branding/aviora-official.jpg?v=aviora-card-billing-v1","sizes":"1254x1254","type":"image/jpeg","purpose":"any"}
   ],
   "lang":"pt-BR"
 }

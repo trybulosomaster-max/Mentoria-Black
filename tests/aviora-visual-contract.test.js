@@ -61,16 +61,19 @@ test('Knowledge adota o sistema AVIORA sem alterar o conteúdo canônico',()=>{
 });
 
 test('cache frontend referencia a nova camada visual e o asset oficial',()=>{
- ok(sw.includes('mentoria-black-v82-production-aviora-login-v3'));
+ ok(sw.includes('mentoria-black-v82-production-aviora-shell-'));
+ ok(sw.includes("searchParams.get('v')"));
  ok(sw.includes('./assets/aviora-v82.css'));
+ ok(sw.includes('./js/aviora-visual-v1.js'));
  ok(sw.includes('./assets/branding/aviora-official.jpg'));
  ok(sw.includes('./assets/branding/aviora-login-hero.jpg'));
- ok(index.includes('<link rel="stylesheet" href="assets/aviora-v82.css?v=aviora-login-v3">'));
- ok(index.includes('const MB_SW_VERSION="26"'));
+ ok(index.includes('<meta name="aviora-build" content="aviora-card-billing-v1">'));
+ ok(index.includes('<link rel="stylesheet" href="assets/aviora-v82.css?v=aviora-card-billing-v1">'));
+ ok(index.includes('aviora-build-reloaded:${MB_BUILD_ID}'));
 });
 
 test('preview é local e não inicializa Supabase',()=>{
- ok(preview.includes("view=params.get('view')||'app'"));
+ ok(preview.includes("previewView=params.get('view')||'app'"));
  ok(preview.includes("theme=params.get('theme')||'auto'"));
  ok(!preview.includes('createClient('));
  ok(!preview.includes('SUPABASE_'));

@@ -1,9 +1,10 @@
 'use strict';
 (function(root,factory){
-  const api=factory();
+  const reader=typeof module!=='undefined'&&module.exports?require('./reader-experience'):root.MBKnowledgeReader;
+  const api=factory(reader);
   if(typeof module!=='undefined'&&module.exports)module.exports=api;
   root.MBKnowledgeArea=Object.freeze(api);
-})(typeof globalThis!=='undefined'?globalThis:this,function(){
+})(typeof globalThis!=='undefined'?globalThis:this,function(reader){
   const SECTION_TYPES=new Set([
     'paragraph','heading','subheading','quote','highlight','list','table',
     'exercise','exercise_black','checklist','chapter_checklist','rule_black',
@@ -13,6 +14,7 @@
   const hasKnowledge=entitlements=>Boolean(entitlements&&entitlements.knowledge&&entitlements.knowledge.hasAccess);
   const chapterAllowed=(chapter,entitlements)=>chapter.access_level!=='knowledge'||hasKnowledge(entitlements);
   const byPosition=(a,b)=>Number(a.position)-Number(b.position);
+  const readerDefaults=reader?.DEFAULT_PREFERENCES||{theme:'dark',fontSize:'medium',lineHeight:'comfortable',width:'comfortable'};
 
   function safeAssetPath(value){
     const path=String(value||'');
@@ -87,6 +89,27 @@
     }).join('')}</section>`).join('')}</div>${!entitled?renderPaywall():''}`;
   }
 
+  function renderReaderPreferences(state){
+    const prefs=state.readerPreferences||readerDefaults;
+    const option=(value,label,selected)=>`<option value="${value}" ${selected===value?'selected':''}>${label}</option>`;
+    return `<details class="knowledge-reader-preferences"><summary>Preferências de leitura</summary><div class="knowledge-reader-preference-grid">
+      <label>Tema<select data-knowledge-preference="theme">${option('dark','Escuro',prefs.theme)}${option('light','Claro',prefs.theme)}${option('sepia','Confortável',prefs.theme)}</select></label>
+      <label>Tamanho<select data-knowledge-preference="fontSize">${option('small','Menor',prefs.fontSize)}${option('medium','Padrão',prefs.fontSize)}${option('large','Maior',prefs.fontSize)}${option('x-large','Muito maior',prefs.fontSize)}</select></label>
+      <label>Entrelinhas<select data-knowledge-preference="lineHeight">${option('compact','Compacta',prefs.lineHeight)}${option('comfortable','Confortável',prefs.lineHeight)}${option('airy','Ampla',prefs.lineHeight)}</select></label>
+      <label>Largura<select data-knowledge-preference="width">${option('narrow','Estreita',prefs.width)}${option('comfortable','Confortável',prefs.width)}${option('wide','Ampla',prefs.width)}</select></label>
+    </div></details>`;
+  }
+
+  function renderAnnotationTools(state,chapter){
+    const count=(state.readerAnnotations||[]).filter(item=>item.chapterId===chapter.id).length;
+    return `<section class="knowledge-annotation-tools" aria-label="Ferramentas de anotação"><p>Selecione um trecho contínuo para grifar, sublinhar ou anotar.</p><div class="knowledge-annotation-actions">
+      <button class="btn" type="button" data-knowledge-action="annotate" data-kind="highlight" disabled>Grifar</button>
+      <button class="btn" type="button" data-knowledge-action="annotate" data-kind="underline" disabled>Sublinhar</button>
+      <button class="btn" type="button" data-knowledge-action="compose-note" disabled>Adicionar nota</button>
+      <button class="btn" type="button" data-knowledge-action="annotations" data-id="${safe(chapter.id)}">Anotações (${count})</button>
+    </div><form class="knowledge-note-composer hidden" data-knowledge-note-compose><label for="knowledgeNoteText">Nota sobre o trecho selecionado</label><textarea id="knowledgeNoteText" name="note" maxlength="4000" required></textarea><div class="knowledge-actions"><button class="btn gold" type="submit">Salvar nota</button><button class="btn" type="button" data-knowledge-action="cancel-note">Cancelar</button></div></form></section>`;
+  }
+
   function renderReader(state,chapterId){
     const chapter=state.chapters.find(item=>item.id===chapterId);
     if(!chapter)return renderLibrary(state);
@@ -97,7 +120,12 @@
     const chapterList=state.chapters.filter(item=>item.publication_id===chapter.publication_id).sort((a,b)=>partPosition(a.part_id)-partPosition(b.part_id)||byPosition(a,b)),index=chapterList.findIndex(item=>item.id===chapter.id),progress=progressFor(chapter.id,state.progress),bookmarked=state.bookmarks.some(item=>item.chapter_id===chapter.id&&item.section_id===null);
     const actions=allowed?`<button class="btn" data-knowledge-action="toggle-bookmark" data-id="${safe(chapter.id)}" data-enabled="${bookmarked?'false':'true'}">${bookmarked?'★ Favorito':'☆ Favoritar'}</button>`:'';
     const footer=allowed?`<footer class="knowledge-reader-footer"><button class="btn" ${index<=0?'disabled':''} data-knowledge-action="open-chapter" data-id="${safe(chapterList[index-1]?.id||'')}">← Anterior</button><button class="btn gold" data-knowledge-action="complete" data-id="${safe(chapter.id)}">${progress?.completed_at?'Concluído':'Marcar como concluído'}</button><button class="btn" ${index<0||index>=chapterList.length-1?'disabled':''} data-knowledge-action="open-chapter" data-id="${safe(chapterList[index+1]?.id||'')}">Próximo →</button></footer>`:renderPaywall(chapter);
-    return `<div class="knowledge-reader"><nav class="knowledge-toolbar"><button class="btn" data-knowledge-action="open-publication" data-id="${safe(chapter.publication_id)}">← Sumário</button>${actions}</nav><header><span class="knowledge-kicker">${allowed&&chapter.access_level!=='sample'?'Leitura':'Amostra'}</span><h1>${safe(chapter.title)}</h1>${chapter.subtitle?`<p>${safe(chapter.subtitle)}</p>`:''}${allowed?`<div class="knowledge-progress"><span style="width:${Number(progress?.progress_percent||0)}%"></span></div>`:''}</header><article class="knowledge-reading-body">${visibleSections.map(renderSection).join('')}</article>${footer}</div>`;
+    const prefs=state.readerPreferences||readerDefaults;
+    const sections=visibleSections.map(section=>{
+      const saved=state.bookmarks.some(item=>item.chapter_id===chapter.id&&item.section_id===section.id);
+      return `<section class="knowledge-section" id="knowledge-section-${safe(section.id)}" data-knowledge-section-id="${safe(section.id)}">${renderSection(section)}${allowed?`<button class="knowledge-section-bookmark" type="button" data-knowledge-action="toggle-section-bookmark" data-id="${safe(chapter.id)}" data-section-id="${safe(section.id)}" data-enabled="${saved?'false':'true'}">${saved?'★ Ponto salvo':'☆ Salvar este ponto'}</button>`:''}</section>`;
+    }).join('');
+    return `<div class="knowledge-reader" data-reader-theme="${safe(prefs.theme)}" data-reader-font-size="${safe(prefs.fontSize)}" data-reader-line-height="${safe(prefs.lineHeight)}" data-reader-width="${safe(prefs.width)}"><nav class="knowledge-toolbar"><button class="btn" data-knowledge-action="open-publication" data-id="${safe(chapter.publication_id)}">← Sumário</button>${actions}</nav>${allowed?renderReaderPreferences(state):''}<header><span class="knowledge-kicker">${allowed&&chapter.access_level!=='sample'?'Leitura':'Amostra'}</span><h1>${safe(chapter.title)}</h1>${chapter.subtitle?`<p>${safe(chapter.subtitle)}</p>`:''}${allowed?`<div class="knowledge-progress" aria-label="${Number(progress?.progress_percent||0)}% concluído"><span style="width:${Number(progress?.progress_percent||0)}%"></span></div>`:''}</header>${allowed?renderAnnotationTools(state,chapter):''}<article class="knowledge-reading-body">${sections}</article>${footer}</div>`;
   }
 
   function renderPaywall(chapter){
@@ -105,10 +133,16 @@
   }
 
   function renderBookmarks(state){
-    return `<div class="knowledge-toolbar"><button class="btn" data-knowledge-action="library">← Biblioteca</button></div><header class="knowledge-title compact"><h1>Meus favoritos</h1><p>Capítulos salvos para continuar depois.</p></header><div class="knowledge-toc">${state.bookmarks.length?state.bookmarks.map(bookmark=>{
+    return `<div class="knowledge-toolbar"><button class="btn" data-knowledge-action="library">← Biblioteca</button></div><header class="knowledge-title compact"><h1>Meus favoritos</h1><p>Capítulos e pontos salvos para continuar depois.</p></header><div class="knowledge-toc">${state.bookmarks.length?state.bookmarks.map(bookmark=>{
       const chapter=state.chapters.find(item=>item.id===bookmark.chapter_id);
-      return chapter?`<article class="knowledge-chapter-row"><div><h3>${safe(chapter.title)}</h3><small>${safe(chapter.estimated_read_minutes)} min</small></div><button class="btn" data-knowledge-action="open-chapter" data-id="${safe(chapter.id)}">Abrir</button></article>`:'';
+      return chapter?`<article class="knowledge-chapter-row"><div><h3>${safe(chapter.title)}</h3><small>${bookmark.section_id?'Ponto específico salvo':`${safe(chapter.estimated_read_minutes)} min`}</small></div><button class="btn" data-knowledge-action="open-chapter" data-id="${safe(chapter.id)}" data-section-id="${safe(bookmark.section_id||'')}">Abrir</button></article>`:'';
     }).join(''):'<section class="knowledge-empty"><p>Você ainda não adicionou favoritos.</p></section>'}</div>`;
+  }
+
+  function renderAnnotations(state,chapterId){
+    const chapter=state.chapters.find(item=>item.id===chapterId),items=(state.readerAnnotations||[]).filter(item=>item.chapterId===chapterId);
+    if(!chapter)return renderLibrary(state);
+    return `<div class="knowledge-toolbar"><button class="btn" data-knowledge-action="open-chapter" data-id="${safe(chapter.id)}">← Voltar à leitura</button></div><header class="knowledge-title compact"><h1>Anotações</h1><p>${safe(chapter.title)}</p></header><div class="knowledge-annotations-list">${items.length?items.map(item=>{const fieldId=`knowledge-annotation-note-${safe(item.id)}`;return `<article class="knowledge-annotation-card ${safe(item.kind)}"><blockquote>${safe(item.quote)}</blockquote>${item.note?`<p>${safe(item.note)}</p>`:''}<div class="knowledge-actions"><button class="btn" data-knowledge-action="open-chapter" data-id="${safe(chapter.id)}" data-section-id="${safe(item.sectionId)}">Ir ao trecho</button><button class="btn" data-knowledge-action="edit-annotation" data-id="${safe(item.id)}">Editar</button><button class="btn danger" data-knowledge-action="delete-annotation" data-id="${safe(item.id)}">Excluir</button></div><form class="knowledge-annotation-edit hidden" data-knowledge-annotation-edit="${safe(item.id)}"><label for="${fieldId}">Nota</label><textarea id="${fieldId}" name="note" maxlength="4000">${safe(item.note)}</textarea><button class="btn gold" type="submit">Salvar alteração</button></form></article>`}).join(''):'<section class="knowledge-empty"><p>Você ainda não criou destaques ou notas neste capítulo.</p></section>'}</div>`;
   }
 
   function renderSearch(state,results,query){
@@ -136,34 +170,85 @@
     });
   }
 
-  function createKnowledgeArea({client,entitlements,checkout,notify}={}){
-    const repository=createRepository(client),state={publications:[],parts:[],chapters:[],sections:[],progress:[],bookmarks:[],entitlements:entitlements||{knowledge:{hasAccess:false}},currentPublication:null,currentChapter:null},message=typeof notify==='function'?notify:()=>{};
-    let rootElement=null;
-    function show(html){if(rootElement)rootElement.innerHTML=html}
-    async function refresh(){Object.assign(state,await repository.catalog());show(renderLibrary(state))}
+  function createKnowledgeArea({client,entitlements,checkout,notify,preferenceScope='device',storage}={}){
+    const repository=createRepository(client),message=typeof notify==='function'?notify:()=>{};
+    let browserStorage=storage;
+    if(browserStorage===undefined){try{browserStorage=globalThis.localStorage}catch(_error){browserStorage=null}}
+    const readerStore=reader?.createReaderStore?.({storage:browserStorage,scope:preferenceScope})||null;
+    const state={publications:[],parts:[],chapters:[],sections:[],progress:[],bookmarks:[],entitlements:entitlements||{knowledge:{hasAccess:false}},currentPublication:null,currentChapter:null,readerPreferences:readerStore?.preferences()||readerDefaults,readerAnnotations:readerStore?.annotations()||[]};
+    let rootElement=null,readerAbort=null,progressTimer=null,pendingSelection=null,pendingNoteSelection=null;
+    function syncReaderState(){state.readerPreferences=readerStore?.preferences()||readerDefaults;state.readerAnnotations=readerStore?.annotations()||[]}
+    function show(html){readerAbort?.abort();readerAbort=null;clearTimeout(progressTimer);pendingSelection=null;pendingNoteSelection=null;if(rootElement)rootElement.innerHTML=html}
+    async function refresh(){Object.assign(state,await repository.catalog());syncReaderState();show(renderLibrary(state))}
     async function openPublication(id){state.currentPublication=id;show(renderToc(state,id))}
-    async function openChapter(id){
+    function bindReader(chapter,targetSectionId){
+      const body=rootElement?.querySelector('.knowledge-reading-body');if(!body||!readerStore||!reader)return;
+      reader.applyAnnotations(body,state.readerAnnotations.filter(item=>item.chapterId===chapter.id));
+      const doc=rootElement.ownerDocument,win=doc.defaultView,Abort=win?.AbortController||globalThis.AbortController;
+      readerAbort=Abort?new Abort():null;const signal=readerAbort?.signal;
+      const sections=[...body.querySelectorAll('[data-knowledge-section-id]')];
+      const saved=readerStore.position(chapter.id),server=progressFor(chapter.id,state.progress),resumeSection=targetSectionId||saved?.sectionId||server?.last_section_id;
+      if(resumeSection){
+        const target=sections.find(item=>item.dataset.knowledgeSectionId===resumeSection);
+        (win?.requestAnimationFrame||globalThis.requestAnimationFrame||setTimeout)(()=>target?.scrollIntoView({block:'start'}));
+      }
+      const updateSelection=()=>{
+        pendingSelection=reader.captureSelection(win?.getSelection?.(),body);
+        rootElement.querySelectorAll('[data-knowledge-action="annotate"],[data-knowledge-action="compose-note"]').forEach(button=>{button.disabled=!pendingSelection});
+      };
+      doc.addEventListener('selectionchange',updateSelection,signal?{signal}:undefined);
+      const savePosition=()=>{
+        if(!sections.length)return;
+        const viewport=Math.max(0,Number(win?.innerHeight||0)*.34);
+        let current=sections[0],index=0;
+        sections.forEach((section,sectionIndex)=>{if(section.getBoundingClientRect().top<=viewport){current=section;index=sectionIndex}});
+        const ratio=sections.length?(index+1)/sections.length:0;
+        readerStore.position(chapter.id,{sectionId:current.dataset.knowledgeSectionId,offsetRatio:ratio});
+        clearTimeout(progressTimer);progressTimer=setTimeout(()=>{
+          const completed=Boolean(progressFor(chapter.id,state.progress)?.completed_at),percent=completed?100:Math.max(1,Math.min(99,Math.round(ratio*100)));
+          repository.progress(chapter.publication_id,chapter.id,percent,current.dataset.knowledgeSectionId,completed).then(row=>{
+            const at=state.progress.findIndex(item=>item.chapter_id===chapter.id);if(at>=0)state.progress[at]=row;else state.progress.push(row);
+          }).catch(error=>message(error.message,true));
+        },650);
+      };
+      win?.addEventListener('scroll',savePosition,signal?{passive:true,signal}:{passive:true});
+    }
+    async function openChapter(id,{sectionId}={}){
       const chapter=state.chapters.find(item=>item.id===id);
       if(!chapter)return;
       state.currentPublication=chapter.publication_id;state.currentChapter=id;
-      state.sections=await repository.sections(id);
-      show(renderReader(state,id));
-      if(chapterAllowed(chapter,state.entitlements)&&state.sections.length){
-        const last=state.sections[0];
-        await repository.progress(chapter.publication_id,id,Math.max(1,Number(progressFor(id,state.progress)?.progress_percent||0)),last.id,false);
+      state.sections=await repository.sections(id);syncReaderState();show(renderReader(state,id));bindReader(chapter,sectionId);
+      if(chapterAllowed(chapter,state.entitlements)&&state.sections.length&&!progressFor(id,state.progress)){
+        const first=state.sections[0],row=await repository.progress(chapter.publication_id,id,1,first.id,false);state.progress.push(row);
       }
     }
     async function act(button){
       const action=button.dataset.knowledgeAction,id=button.dataset.id;
       if(action==='library')return show(renderLibrary(state));
       if(action==='open-publication')return openPublication(id);
-      if(action==='open-chapter'&&id)return openChapter(id);
+      if(action==='open-chapter'&&id)return openChapter(id,{sectionId:button.dataset.sectionId||null});
       if(action==='bookmarks')return show(renderBookmarks(state));
+      if(action==='annotations')return show(renderAnnotations(state,id));
       if(action==='checkout'&&typeof checkout==='function')return checkout(button.dataset.offer);
       if(action==='toggle-bookmark'){
         const chapter=state.chapters.find(item=>item.id===id);if(!chapter)return;
         await repository.bookmark(chapter.publication_id,id,null,button.dataset.enabled==='true');
         Object.assign(state,await repository.catalog());message('Favoritos atualizados.');return openChapter(id);
+      }
+      if(action==='toggle-section-bookmark'){
+        const chapter=state.chapters.find(item=>item.id===id),sectionId=button.dataset.sectionId;if(!chapter||!sectionId)return;
+        await repository.bookmark(chapter.publication_id,id,sectionId,button.dataset.enabled==='true');
+        Object.assign(state,await repository.catalog());message('Ponto de leitura atualizado.');return openChapter(id,{sectionId});
+      }
+      if(action==='annotate'&&pendingSelection){
+        readerStore.addAnnotation({...pendingSelection,publicationId:state.currentPublication,chapterId:state.currentChapter,kind:button.dataset.kind||'highlight'});
+        const sectionId=pendingSelection.sectionId;syncReaderState();message('Trecho salvo neste dispositivo.');return openChapter(state.currentChapter,{sectionId});
+      }
+      if(action==='compose-note'&&pendingSelection){pendingNoteSelection=pendingSelection;rootElement.querySelector('[data-knowledge-note-compose]')?.classList.remove('hidden');rootElement.querySelector('[data-knowledge-note-compose] textarea')?.focus();return}
+      if(action==='cancel-note'){pendingNoteSelection=null;rootElement.querySelector('[data-knowledge-note-compose]')?.classList.add('hidden');return}
+      if(action==='edit-annotation'){rootElement.querySelector(`[data-knowledge-annotation-edit="${id}"]`)?.classList.toggle('hidden');return}
+      if(action==='delete-annotation'){
+        readerStore.removeAnnotation(id);syncReaderState();message('Anotação excluída deste dispositivo.');return show(renderAnnotations(state,state.currentChapter));
       }
       if(action==='complete'){
         const chapter=state.chapters.find(item=>item.id===id);if(!chapter)return;
@@ -176,15 +261,30 @@
       rootElement=element;if(!rootElement)throw new TypeError('Knowledge root is required');
       rootElement.innerHTML='<section class="knowledge-empty"><p>Carregando biblioteca…</p></section>';
       rootElement.onclick=event=>{const button=event.target.closest('[data-knowledge-action]');if(button&&!button.disabled)act(button).catch(error=>message(error.message,true))};
+      rootElement.onchange=event=>{
+        const key=event.target.dataset.knowledgePreference;if(!key||!readerStore)return;
+        state.readerPreferences=readerStore.preferences({[key]:event.target.value});
+        const sectionId=readerStore.position(state.currentChapter)?.sectionId;openChapter(state.currentChapter,{sectionId}).catch(error=>message(error.message,true));
+      };
       rootElement.onsubmit=event=>{
-        if(!event.target.matches('[data-knowledge-search]'))return;
-        event.preventDefault();const query=new FormData(event.target).get('query');
-        repository.search(String(query||'')).then(results=>show(renderSearch(state,results,query))).catch(error=>message(error.message,true));
+        event.preventDefault();
+        if(event.target.matches('[data-knowledge-search]')){
+          const query=new FormData(event.target).get('query');
+          repository.search(String(query||'')).then(results=>{
+            const allowedChapters=new Set(state.chapters.filter(item=>item.publication_id===state.currentPublication).map(item=>item.id));
+            show(renderSearch(state,results.filter(item=>allowedChapters.has(item.chapter_id)),query));
+          }).catch(error=>message(error.message,true));return;
+        }
+        if(event.target.matches('[data-knowledge-note-compose]')&&pendingNoteSelection){
+          const note=new FormData(event.target).get('note');readerStore.addAnnotation({...pendingNoteSelection,publicationId:state.currentPublication,chapterId:state.currentChapter,kind:'note',note});
+          const sectionId=pendingNoteSelection.sectionId;pendingNoteSelection=null;syncReaderState();message('Nota salva neste dispositivo.');openChapter(state.currentChapter,{sectionId}).catch(error=>message(error.message,true));return;
+        }
+        const editId=event.target.dataset.knowledgeAnnotationEdit;if(editId){readerStore.updateAnnotation(editId,{note:new FormData(event.target).get('note')});syncReaderState();show(renderAnnotations(state,state.currentChapter));message('Nota atualizada neste dispositivo.');}
       };
       await refresh();return state;
     }
     return Object.freeze({mount,refresh,state,openPublication,openChapter});
   }
 
-  return {safe,safeAssetPath,renderSection,renderLibrary,renderToc,renderReader,renderPaywall,renderBookmarks,renderSearch,createRepository,createKnowledgeArea,chapterAllowed,publicationProgress};
+  return {safe,safeAssetPath,renderSection,renderLibrary,renderToc,renderReader,renderPaywall,renderBookmarks,renderAnnotations,renderSearch,createRepository,createKnowledgeArea,chapterAllowed,publicationProgress};
 });

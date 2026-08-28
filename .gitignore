@@ -4,3 +4,9 @@ dist-beta/
 supabase/functions/.env
 .DS_Store
 .local-content/
+node_modules/
+playwright-report/
+test-results/
+blob-report/
+playwright/.auth/
+.cache/ms-playwright/

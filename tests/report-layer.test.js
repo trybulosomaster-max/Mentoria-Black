@@ -117,6 +117,12 @@ const rescueAgg=api.reportAggregations([{transaction_type:'resgate',amount:100,s
 assert.strictEqual(rescueAgg.byType.resgate,100);
 assert.strictEqual(rescueAgg.movementTotal,100);
 
+const creditAdjustment={state:'efetivado',type:'despesa',transaction_type:'despesa',category:'Conforto',amount:200,consumptionDelta:-200,kind:'card_purchase_credit_adjustment'};
+const creditAgg=api.reportAggregations([creditAdjustment]);
+assert.strictEqual(creditAgg.byType.despesa,-200,'crédito deve reduzir a despesa agregada');
+assert.strictEqual(creditAgg.movementTotal,-200,'movimentação assinada deve refletir o ajuste');
+assert.strictEqual(creditAgg.periodBalance,200,'crédito deve compensar o saldo do período uma única vez');
+
 assert(html.includes('if(TAB==="reports")bindReportFilters()'), 'reports must use its own binder');
 assert(!html.includes('["planYear","planMonth"],["repYear","repMonth"]'), 'legacy shared report filters must be removed');
 assert(/@media print\{[\s\S]*\.report-no-print/.test(html), 'report print controls must be hidden');
@@ -126,4 +132,4 @@ assert(html.includes('kpi("Movimentação total"'), 'gross sum must be labelled 
 assert(html.includes('kpi("Saldo do período"'), 'canonical balance label must be explicit');
 assert(!html.includes('kpi("Resultado"'), 'movement or balance must not be labelled as result');
 
-console.log('report-layer: 40 assertions passed');
+console.log('report-layer: 43 assertions passed');
