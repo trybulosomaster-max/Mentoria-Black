@@ -75,6 +75,16 @@
 .aviora-card-identity b{color:var(--aviora-text);font-size:13px;overflow-wrap:anywhere}
 .aviora-card-period-kpis,.aviora-recurring-kpis{grid-template-columns:repeat(5,minmax(0,1fr))}
 .aviora-card-contract-note{margin:0 0 14px}.aviora-card-actions{justify-content:flex-end;margin-top:14px}
+.aviora-card-limit-copy{margin:10px 0 14px;line-height:1.5}
+.aviora-card-cycle-picker{display:grid;grid-template-columns:minmax(150px,220px) minmax(220px,1fr);gap:7px 12px;align-items:center;margin:12px 0;padding:12px;border:1px solid var(--aviora-border);border-radius:var(--aviora-radius-sm);background:var(--aviora-surface-soft)}
+.aviora-card-cycle-picker label{margin:0}.aviora-card-cycle-picker select{width:100%}.aviora-card-cycle-picker small{grid-column:1/-1;color:var(--aviora-text-muted);line-height:1.45}
+.aviora-card-toolbar{display:flex;align-items:end;justify-content:space-between;gap:14px;margin:16px 0 12px}.aviora-card-toolbar>div{display:grid;flex:1 1 420px;gap:6px;min-width:0}.aviora-card-toolbar input{width:100%}.aviora-card-toolbar>span{flex:0 0 auto;padding-bottom:12px;color:var(--aviora-text-muted);font-size:var(--aviora-text-sm);white-space:nowrap}
+.aviora-card-days{display:grid;gap:12px}.aviora-card-day{overflow:hidden;border:1px solid var(--aviora-border);border-radius:var(--aviora-radius-sm);background:var(--aviora-surface-soft)}
+.aviora-card-day>header,.aviora-card-day>footer{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 13px}.aviora-card-day>header{border-bottom:1px solid var(--aviora-border)}.aviora-card-day>header strong{font-size:14px}.aviora-card-day>header span{color:var(--aviora-text-muted);font-size:var(--aviora-text-sm)}.aviora-card-day>footer{border-top:1px solid var(--aviora-border);color:var(--aviora-text-muted)}.aviora-card-day>footer strong{color:var(--aviora-text);font-size:15px}
+.aviora-card-day-list{display:grid}.aviora-card-line{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:12px;align-items:center;padding:13px}.aviora-card-line+.aviora-card-line{border-top:1px solid rgba(255,255,255,.055)}
+.aviora-card-line-main{display:grid;gap:4px;min-width:0}.aviora-card-line-main>strong{overflow-wrap:anywhere;color:var(--aviora-text);font-size:14px}.aviora-card-line-main>span,.aviora-card-line-main>small{overflow-wrap:anywhere;color:var(--aviora-text-muted);line-height:1.4}.aviora-card-installment{color:var(--aviora-champagne);font-size:var(--aviora-text-sm);font-weight:650;white-space:nowrap}
+.aviora-card-line-value{display:grid;justify-items:end;gap:7px;min-width:max-content}.aviora-card-line-value>strong{color:var(--aviora-text);font-size:16px}.aviora-card-line-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:7px}.aviora-card-line-actions .btn{min-height:var(--aviora-touch)}
+.aviora-card-ledger{margin-top:12px;border:1px solid var(--aviora-border);border-radius:var(--aviora-radius-sm);background:var(--aviora-surface-soft)}.aviora-card-ledger>summary{display:flex;min-height:var(--aviora-touch);align-items:center;padding:9px 12px;cursor:pointer;font-weight:650}.aviora-card-ledger>summary:focus-visible{outline:2px solid var(--aviora-gold-soft);outline-offset:3px}.aviora-card-ledger>div{padding:0 12px 8px;border-top:1px solid var(--aviora-border)}.aviora-card-ledger .statline{align-items:center;flex-wrap:wrap}
 .aviora-recurring-filters{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
 .aviora-wealth-primary{margin:12px 0;font-size:30px;font-weight:850}
 .aviora-health-explanations{gap:8px}.aviora-health-explanations details{border:1px solid var(--aviora-border);border-radius:var(--aviora-radius-sm);background:var(--aviora-surface-soft)}
@@ -84,7 +94,12 @@
   .aviora-card-detail>summary,.aviora-recurring-detail>summary{grid-template-columns:1fr;min-height:88px}.aviora-card-detail>summary span:last-child,.aviora-recurring-detail>summary span:last-child{text-align:left}
   .aviora-card-detail-body,.aviora-recurring-detail-body{padding:12px}.aviora-card-period-kpis,.aviora-recurring-kpis{grid-template-columns:1fr 1fr}
   .aviora-card-actions{display:grid;grid-template-columns:1fr}.aviora-card-actions .btn{min-height:44px}
+  .aviora-card-cycle-picker{grid-template-columns:1fr}.aviora-card-cycle-picker small{grid-column:auto}
+  .aviora-card-toolbar{display:grid;align-items:stretch}.aviora-card-toolbar>div{flex-basis:auto}.aviora-card-toolbar>span{padding:0;white-space:normal}
+  .aviora-card-line{grid-template-columns:minmax(0,1fr) auto;align-items:start;padding:12px}.aviora-card-line-actions{grid-column:1/-1;display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));justify-content:stretch}.aviora-card-line-actions .btn{width:100%}
+  .aviora-card-day>header,.aviora-card-day>footer{padding-inline:12px}
 }
+@media(max-width:430px){.aviora-card-line-main>small{font-size:10px}.aviora-card-line-value>strong{font-size:15px}.aviora-card-line-value .tag{max-width:118px;text-align:center;white-space:normal}}
 
 html { color-scheme: dark; background: var(--aviora-bg-deep); scroll-padding-top: calc(16px + env(safe-area-inset-top)); }
 body {

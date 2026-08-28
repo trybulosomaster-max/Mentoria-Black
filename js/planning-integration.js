@@ -1,10 +1,10 @@
 (function(root, factory) {
   const api = typeof module === 'object' && module.exports
-    ? factory(require('./financial-core'), require('./recurrence-projection'))
-    : factory(root?.MBCanonicalFinance, root?.MBRecurrenceProjection);
+    ? factory(require('./financial-core'), require('./recurrence-projection'), require('./card-billing-financial-adjustments'))
+    : factory(root?.MBCanonicalFinance, root?.MBRecurrenceProjection, root?.MBCardBillingFinancialAdjustmentsV1);
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.MBPlanningV82 = api;
-})(typeof globalThis !== 'undefined' ? globalThis : this, function(financialCore, recurrenceProjection) {
+})(typeof globalThis !== 'undefined' ? globalThis : this, function(financialCore, recurrenceProjection, cardBillingAdjustments) {
 'use strict';
 
 if (!financialCore || !recurrenceProjection) throw new Error('Canonical planning dependencies are unavailable');
@@ -74,6 +74,12 @@ function addMovement(bucket,type,amount,category) {
   else if(type==='despesa')bucket.consumptionByCategory[category]=(bucket.consumptionByCategory[category]||0)+amount;
   else if(type==='investimento')bucket.investment+=amount;
   bucket.totalOut=Object.values(bucket.consumptionByCategory).reduce((sum,value)=>sum+value,0)+bucket.investment;
+}
+
+function addConsumptionDelta(bucket,amount,category) {
+  const next=Math.round(((bucket.consumptionByCategory[category]||0)+amount)*100)/100;
+  bucket.consumptionByCategory[category]=Object.is(next,-0)?0:next;
+  bucket.totalOut=Math.round((Object.values(bucket.consumptionByCategory).reduce((sum,value)=>sum+value,0)+bucket.investment)*100)/100;
 }
 
 function installmentDuplicateKey(row) {
@@ -166,6 +172,22 @@ function combineMovement(left,right) {
   return {income:left.income+right.income,consumptionByCategory:categories,investment,totalOut:Object.values(categories).reduce((sum,value)=>sum+value,0)+investment};
 }
 
+function applyCardCreditAdjustments(options,period,result) {
+  const source=options.cardPurchaseCreditEffects;
+  if(source===undefined||source===null)return;
+  if(!Array.isArray(source)){result.warnings.push('invalid_card_purchase_credit_effects');return}
+  if(!cardBillingAdjustments||typeof cardBillingAdjustments.normalizeCardPurchaseCreditEffects!=='function'){
+    result.warnings.push('card_credit_adjustments_dependency_unavailable');return;
+  }
+  const normalized=cardBillingAdjustments.normalizeCardPurchaseCreditEffects(source,{now:options.now});
+  result.warnings.push(...normalized.warnings);
+  for(const adjustment of normalized.adjustments){
+    if(!inPeriod(adjustment.effectiveDate,period))continue;
+    addConsumptionDelta(result.realized,adjustment.consumptionDelta,adjustment.category);
+    result.details.cardPurchaseCreditAdjustments.push(adjustment);
+  }
+}
+
 function projectPlanningPeriod(plan,transactions,recurringRules,options={}) {
   if(!Array.isArray(transactions))throw new TypeError('transactions must be an array');
   if(!Array.isArray(recurringRules))throw new TypeError('recurringRules must be an array');
@@ -178,10 +200,11 @@ function projectPlanningPeriod(plan,transactions,recurringRules,options={}) {
     period:Object.freeze({...period,planFound:!!selectedPlan}),planned:plannedValues(selectedPlan,warnings),
     realized:emptyMovement(),scheduledMaterialized:emptyMovement(),projectedVirtual:emptyMovement(),forecast:emptyMovement(),
     transfers:emptyNeutral(),rescues:emptyNeutral(),unclassified:[],warnings,
-    details:{realized:[],scheduledMaterialized:[],projectedVirtual:[]}
+    details:{realized:[],scheduledMaterialized:[],projectedVirtual:[],cardPurchaseCreditAdjustments:[]}
   };
   const materialized=dedupeTransactions(transactions,warnings);
   classifyMaterialized(materialized,period,now,result);
+  applyCardCreditAdjustments(options,period,result);
   classifyProjected(recurringRules,materialized,period,now,options,result);
   result.forecast=combineMovement(result.scheduledMaterialized,result.projectedVirtual);
   result.transfers.forecast=result.transfers.scheduledMaterialized+result.transfers.projectedVirtual;

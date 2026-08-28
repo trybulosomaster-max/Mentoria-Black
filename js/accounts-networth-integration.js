@@ -200,11 +200,138 @@ function projectAccountBalances(accounts,transactions,options={}){
   return {...state,appliedMovements:applied,skippedMovements:skipped,adjustmentsApplied,netWorth};
 }
 
+function accountPositionDate(value){
+  return core.financialDate({transaction_date:value});
+}
+
+function strictSignedCents(value){
+  if(value===null||value===undefined||value==='')return null;
+  if(typeof value==='string'&&!/^-?(?:\d+\.?\d*|\.\d+)$/.test(value.trim()))return null;
+  const number=Number(value),rounded=Math.round(number*100);
+  return Number.isFinite(number)&&rounded!==0&&Math.abs(number-rounded/100)<1e-8?rounded:null;
+}
+
+function sameOwner(account,row,label,warnings){
+  const accountUser=id(account?.user_id),rowUser=id(row?.user_id);
+  const identity=id(row?.id??row?.settlement_id??row?.payment_entry_id??row?.operation_id)||'unknown';
+  if(!accountUser)return true;
+  if(!rowUser){warnings.push(`missing_${label}_user_id:${identity}`);return false}
+  if(accountUser!==rowUser){warnings.push(`cross_user_${label}:${identity}`);return false}
+  return true;
+}
+
+function projectAccountPositionsAsOf(accounts,transactions,options={}){
+  if(!Array.isArray(accounts)||!Array.isArray(transactions))throw new TypeError('accounts and transactions must be arrays');
+  if(options.settlementEffects!==undefined&&!Array.isArray(options.settlementEffects))throw new TypeError('settlementEffects must be an array');
+  const asOf=accountPositionDate(options.asOf),warnings=[];
+  if(!asOf)throw new TypeError('options.asOf must be a valid date');
+
+  const seenAccounts=new Set(),duplicateAccountIds=new Set();
+  const positions=cloneRows(accounts).map(account=>{
+    const accountId=id(account?.id),statementCents=cents(account?.statement_balance),balanceAsOf=accountPositionDate(account?.balance_as_of);
+    const duplicate=!!accountId&&seenAccounts.has(accountId);
+    if(!accountId)warnings.push('missing_account_id');
+    else if(duplicate){warnings.push(`duplicate_account_id:${accountId}`);duplicateAccountIds.add(accountId)}
+    else seenAccounts.add(accountId);
+    let status='READY';
+    if(duplicate)status='DUPLICATE_ACCOUNT_ID';
+    else if(statementCents===null||!balanceAsOf)status='BALANCE_SNAPSHOT_REQUIRED';
+    else if(asOf<balanceAsOf)status='HISTORICAL_POSITION_UNAVAILABLE';
+    if(status!=='READY')warnings.push(`${status}:${accountId||'unknown'}`);
+    return {...account,statementBalance:money(statementCents),balanceAsOf:balanceAsOf||null,asOf,status,movementDelta:0,settlementDelta:0,projectedBalance:status==='READY'?money(statementCents):null};
+  });
+  for(const account of positions)if(duplicateAccountIds.has(id(account.id))){account.status='DUPLICATE_ACCOUNT_ID';account.projectedBalance=null}
+
+  const readyAccounts=positions.filter(account=>account.status==='READY'&&id(account.id));
+  const transactionIds=new Set();
+  let appliedMovementLegs=0,skippedMovements=0;
+  for(const transaction of transactions){
+    const transactionId=id(transaction?.id),date=core.financialDate(transaction);
+    if(!transactionId){warnings.push('missing_transaction_id');skippedMovements++;continue}
+    if(transactionIds.has(transactionId)){warnings.push(`duplicate_transaction_id:${transactionId}`);skippedMovements++;continue}
+    transactionIds.add(transactionId);
+    if(!date){warnings.push(`invalid_financial_date:${transactionId}`);skippedMovements++;continue}
+    if(date>asOf)continue;
+    const effect=core.financialEffect(transaction,{now:asOf});
+    if(effect.temporalState!=='efetivado'||effect.valid===false){
+      warnings.push(...effect.warnings.map(warning=>`${warning}:${transactionId}`));
+      skippedMovements++;continue;
+    }
+    const legs=new Map();
+    const addLeg=(accountId,delta)=>{
+      const key=id(accountId),deltaCents=cents(delta);
+      if(!key||deltaCents===null||deltaCents===0)return;
+      legs.set(key,(legs.get(key)||0)+deltaCents);
+    };
+    addLeg(effect.sourceAccountId,effect.sourceAccountDelta);
+    addLeg(effect.destinationAccountId,effect.destinationAccountDelta);
+    if(!legs.size){skippedMovements++;continue}
+    const targets=[...legs.keys()].map(accountId=>positions.find(account=>id(account.id)===accountId));
+    if(targets.some(account=>!account)){
+      warnings.push(`unknown_transaction_account:${transactionId}`);skippedMovements++;continue;
+    }
+    if(targets.some(account=>account.status!=='READY')||targets.some(account=>!sameOwner(account,transaction,'transaction',warnings))){
+      skippedMovements++;continue;
+    }
+    let applied=false;
+    for(const account of targets){
+      if(date<=account.balanceAsOf)continue;
+      const deltaCents=legs.get(id(account.id));
+      account.movementDelta=money(cents(account.movementDelta)+deltaCents);
+      account.projectedBalance=money(cents(account.projectedBalance)+deltaCents);
+      appliedMovementLegs++;applied=true;
+    }
+    if(!applied)skippedMovements++;
+  }
+
+  const settlementEntryIds=new Set(),settlementOperations=new Set();
+  let appliedSettlements=0,skippedSettlements=0;
+  for(const settlement of options.settlementEffects||[]){
+    const entryId=id(settlement?.settlement_id??settlement?.payment_entry_id??settlement?.id),operationId=id(settlement?.operation_id),identity=entryId||operationId||'unknown';
+    if(!entryId&&!operationId){warnings.push('missing_card_settlement_identity');skippedSettlements++;continue}
+    if((entryId&&settlementEntryIds.has(entryId))||(operationId&&settlementOperations.has(operationId))){warnings.push(`duplicate_card_settlement_effect:${identity}`);skippedSettlements++;continue}
+    const date=accountPositionDate(settlement?.effective_date),accountId=id(settlement?.account_id),deltaCents=strictSignedCents(settlement?.account_delta),consumptionDelta=Number(settlement?.consumption_expense_delta);
+    if(!date){warnings.push(`invalid_card_settlement_effective_date:${identity}`);skippedSettlements++;continue}
+    if(!accountId){warnings.push(`missing_card_settlement_account:${identity}`);skippedSettlements++;continue}
+    if(deltaCents===null||deltaCents===0){warnings.push(`invalid_card_settlement_delta:${identity}`);skippedSettlements++;continue}
+    if(!Number.isFinite(consumptionDelta)||consumptionDelta!==0){warnings.push(`card_settlement_must_be_consumption_neutral:${identity}`);skippedSettlements++;continue}
+    if(settlement?.amount!==undefined){
+      const amountCents=strictSignedCents(settlement.amount);
+      if(amountCents===null||amountCents<0||amountCents!==Math.abs(deltaCents)){warnings.push(`card_settlement_amount_mismatch:${identity}`);skippedSettlements++;continue}
+    }
+    if(settlement?.direction!==undefined&&((settlement.direction==='decrease'&&deltaCents>0)||(settlement.direction==='increase'&&deltaCents<0)||!['decrease','increase'].includes(settlement.direction))){
+      warnings.push(`card_settlement_direction_mismatch:${identity}`);skippedSettlements++;continue;
+    }
+    if(date>asOf){warnings.push(`future_card_settlement_effect:${identity}`);skippedSettlements++;continue}
+    const account=readyAccounts.find(candidate=>id(candidate.id)===accountId);
+    if(!account){warnings.push(`unknown_card_settlement_account:${identity}`);skippedSettlements++;continue}
+    if(!sameOwner(account,settlement,'settlement',warnings)){skippedSettlements++;continue}
+    if(entryId)settlementEntryIds.add(entryId);
+    if(operationId)settlementOperations.add(operationId);
+    if(date<=account.balanceAsOf)continue;
+    account.settlementDelta=money(cents(account.settlementDelta)+deltaCents);
+    account.projectedBalance=money(cents(account.projectedBalance)+deltaCents);
+    appliedSettlements++;
+  }
+
+  const unique=uniqueWarnings(warnings);
+  return Object.freeze({
+    asOf,
+    accounts:positions,
+    valid:positions.every(account=>account.status==='READY')&&unique.every(warning=>warning.startsWith('future_card_settlement_effect:')),
+    appliedMovementLegs,
+    skippedMovements,
+    appliedSettlements,
+    skippedSettlements,
+    warnings:unique
+  });
+}
+
 function legacyNetWorth(accounts,assets,liabilities){
   const sum=(rows,field)=>rows.reduce((total,row)=>total+(cents(row?.[field])||0),0);
   const accountTotal=accounts.reduce((total,row)=>total+(cents(row?.statement_balance??row?.opening_balance)||0),0);
   return money(accountTotal+sum(assets,'current_value')-sum(liabilities,'balance'));
 }
 
-return Object.freeze({projectAccountBalances,projectNetWorth,applyCanonicalMovement,validateTransfer,validateInvestment,validateRescue,legacyNetWorth});
+return Object.freeze({projectAccountBalances,projectAccountPositionsAsOf,projectNetWorth,applyCanonicalMovement,validateTransfer,validateInvestment,validateRescue,legacyNetWorth});
 });
