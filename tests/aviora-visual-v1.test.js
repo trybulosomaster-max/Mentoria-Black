@@ -68,6 +68,23 @@ test('Dashboard usa quatro KPIs primários, alertas e gráficos no mesmo palco',
   ok(css.includes('.aviora-chart-stage'));
   ok(source.includes('Últimos lançamentos do período ·'));
   ok(source.includes("wireAccordion(trigger,panel,false)"));
+  ok(css.includes('.card:not(.aviora-accordion):not(.aviora-chart-stage)'),'collapsed dashboard cards are excluded from desktop minimum height');
+  ok(source.includes('wireTabs(tabs,index=>'),'chart analyses use the shared keyboard tab primitive');
+});
+
+test('foundations, shell e primitives compartilham contratos sem nova paleta',()=>{
+  for(const token of ['--aviora-surface-input','--aviora-space-4','--aviora-touch','--aviora-font-ui','--aviora-focus-ring','--aviora-elevation-card','--aviora-motion-fast'])ok(css.includes(token),`missing ${token}`);
+  ok(css.includes('grid-template-columns: repeat(8,minmax(0,1fr))'),'desktop navigation uses a stable shared grid');
+  ok(css.includes('.aviora-mobile-nav-trigger > span:first-child { min-width: 0; }'),'long mobile titles cannot collide with Menu');
+  ok(!css.includes('backdrop-filter: blur(14px)'),'shell avoids a persistent heavyweight blur');
+  for(const primitive of ['.aviora-surface','.aviora-metric','.aviora-accordion-trigger','.tag,','.modalbox:focus'])ok(css.includes(primitive),`missing primitive ${primitive}`);
+});
+
+test('modal genérico e tabs seguem acessibilidade compartilhada',()=>{
+  ok(index.includes('class="modalbox" role="dialog" aria-modal="true" aria-labelledby="modalTitle" tabindex="-1"'));
+  ok(index.includes('setAttribute("aria-hidden","false")')&&index.includes('setAttribute("aria-hidden","true")'));
+  for(const token of ['wireDialog(root,dialog)','dialogControls(dialog)','event.key===\'Escape\'','event.key!==\'Tab\'','__avioraReturnFocus'])ok(source.includes(token),`missing dialog behavior ${token}`);
+  for(const token of ['ArrowRight','ArrowLeft','Home','End','aria-labelledby'])ok(source.includes(token),`missing tab behavior ${token}`);
 });
 
 test('navegação mobile mantém todos os destinos autorizados acessíveis em menu semântico',()=>{

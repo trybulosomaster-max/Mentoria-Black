@@ -43,7 +43,8 @@ test('gráficos ocultos não renderizam e motion reduzido desliga animação',()
   equal(visual.chartAnimation(true),false);
   const motion=visual.chartAnimation(false);equal(motion.duration,240);ok(Object.isFrozen(motion));
   for(const id of ['dashCat','v15RevenueYear','planChart','reportCat'])ok(index.includes(`chartCanvasIsRenderable("${id}")`),`missing render guard for ${id}`);
-  ok(index.includes('Object.values(CHARTS).forEach')&&index.includes('c.destroy()'),'old charts are destroyed before replacement');
+  ok(index.includes('function chartIsCurrent')&&index.includes('$avioraSignature'),'equivalent chart instances are reused');
+  ok(index.includes('if(!chart?.canvas?.isConnected)'),'only disconnected chart canvases are destroyed globally');
   ok(source.includes('const result=base.apply(this,arguments);apply();return result'),'presentation arranges hidden panels before the chart frame runs');
   ok(source.includes('requestAnimationFrame(()=>root.drawCharts?.())'),'tab activation renders only the newly visible chart');
   ok(!source.includes('chart?.resize?.()'),'hidden chart instances are not kept alive for resize');

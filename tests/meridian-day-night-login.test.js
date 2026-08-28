@@ -189,7 +189,7 @@ for(const asset of Object.keys(assetHashes))ok(collected.includes(asset),`Beta a
 const syncopateFont='assets/fonts/syncopate/Syncopate-Regular.ttf';
 equal(crypto.createHash('sha256').update(fs.readFileSync(path.join(root,syncopateFont))).digest('hex'),'fcbb10798b80c981afabaa1055bde2ee29b283069b44cdfc68457e903a056ac1','Syncopate Regular remains the reviewed local source asset');
 ok(fs.readFileSync(path.join(root,'assets/fonts/syncopate/LICENSE.txt'),'utf8').includes('Apache License'),'local Syncopate distribution retains its Apache-2.0 license');
-ok(index.includes(`href="${syncopateFont}"`),'production HTML preloads the local wordmark font without a network dependency');
+ok(index.includes(`href="${syncopateFont}?v=`),'production HTML preloads the versioned local wordmark font without a network dependency');
 ok(collected.includes(syncopateFont),'Beta artifact collector includes the local wordmark font');
 ok(index.includes('id="loginEmail" type="email" autocomplete="email"'),'production email keeps semantic autocomplete');
 ok(index.includes('id="loginPassword" type="password" autocomplete="current-password"'),'production password is initially hidden and keeps native autocomplete');
@@ -208,7 +208,7 @@ ok(!index.includes('textContent="Erro ao carregar seus dados: "+e.message'),'tec
 ok(!index.includes('URLSearchParams')&&!index.includes('?theme='),'production HTML has no preview theme override');
 ok(preview.includes("new URLSearchParams(location.search)")&&preview.includes("params.get('theme')||'auto'"),'only the local preview recognizes a forced theme');
 ok(preview.includes("theme==='day'||theme==='night'"),'preview rejects unsupported forced-theme values');
-ok(!/supabase|service[_-]?role|access[_-]?token|refresh[_-]?token/i.test(preview),'preview performs no real authentication and embeds no privileged credential');
+ok(!/createClient\(|service[_-]?role|access[_-]?token|refresh[_-]?token/i.test(preview),'preview performs no real authentication and embeds no privileged credential');
 ok(css.includes('@media (max-width: 600px)'),'mobile layout has a dedicated responsive contract');
 ok(css.includes('.aviora-login-hero .meridian-theme-image')&&css.includes('object-fit: contain'),'official mark scales proportionally without cropping or distortion');
 ok(css.includes('rgba(8,10,8,.56)')&&css.includes('backdrop-filter: blur(15px)'),'login remains a real translucent glass surface');

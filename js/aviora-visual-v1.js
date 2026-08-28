@@ -68,6 +68,99 @@
     return reducedMotion?false:Object.freeze({duration:240});
   }
 
+  function wireTabs(tablist,activate){
+    if(!tablist||tablist.dataset.avioraTabsReady==='true')return;
+    const tabs=[...tablist.querySelectorAll('[role="tab"]')];
+    if(!tabs.length)return;
+    tablist.dataset.avioraTabsReady='true';
+    const select=index=>{
+      const normalized=(index+tabs.length)%tabs.length;
+      tabs.forEach((tab,current)=>{
+        const selected=current===normalized;
+        tab.setAttribute('aria-selected',String(selected));
+        tab.setAttribute('tabindex',selected?'0':'-1');
+      });
+      activate(normalized,tabs[normalized]);
+    };
+    tabs.forEach((tab,index)=>tab.addEventListener('click',()=>select(index)));
+    tablist.addEventListener('keydown',event=>{
+      const current=tabs.indexOf(event.target);
+      if(current<0)return;
+      const next=event.key==='ArrowRight'?current+1:event.key==='ArrowLeft'?current-1:event.key==='Home'?0:event.key==='End'?tabs.length-1:null;
+      if(next===null)return;
+      event.preventDefault();
+      const normalized=(next+tabs.length)%tabs.length;
+      tabs[normalized].focus();select(normalized);
+    });
+    const initial=Math.max(0,tabs.findIndex(tab=>tab.getAttribute('aria-selected')==='true'));
+    tabs.forEach((tab,index)=>tab.setAttribute('tabindex',index===initial?'0':'-1'));
+  }
+
+  function visibleDialog(dialog){
+    const host=dialog.closest('.modal,.admin-dialog-backdrop')||dialog;
+    return dialog.isConnected!==false&&!host.hidden&&!host.classList?.contains('hidden');
+  }
+
+  function dialogControls(dialog){
+    return [...dialog.querySelectorAll('button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[href],[tabindex]:not([tabindex="-1"])')]
+      .filter(control=>!control.hidden&&control.getAttribute('aria-hidden')!=='true');
+  }
+
+  function wireDialog(root,dialog){
+    if(!dialog||dialog.dataset.avioraDialogReady==='true')return;
+    dialog.dataset.avioraDialogReady='true';
+    dialog.setAttribute('role','dialog');dialog.setAttribute('aria-modal','true');dialog.setAttribute('tabindex','-1');
+    const restore=()=>{
+      const target=dialog.__avioraReturnFocus;
+      if(target?.isConnected&&typeof target.focus==='function')target.focus();
+      dialog.__avioraReturnFocus=null;
+    };
+    dialog.addEventListener('click',event=>{
+      if(event.target.closest?.('#closeModal,[data-admin-action="dialog-close"]'))setTimeout(restore,0);
+    });
+    dialog.addEventListener('keydown',event=>{
+      if(event.key==='Escape'){
+        event.preventDefault();
+        const close=dialog.querySelector('#closeModal,[data-admin-action="dialog-close"]');
+        if(close)close.click();else root.closeModal?.();
+        restore();return;
+      }
+      if(event.key!=='Tab')return;
+      const controls=dialogControls(dialog),first=controls[0]||dialog,last=controls.at(-1)||dialog;
+      if(event.shiftKey&&root.document.activeElement===first){event.preventDefault();last.focus()}
+      else if(!event.shiftKey&&root.document.activeElement===last){event.preventDefault();first.focus()}
+    });
+  }
+
+  function syncDialogs(root){
+    root.document.querySelectorAll('.modalbox,.admin-dialog').forEach(dialog=>{
+      wireDialog(root,dialog);
+      const visible=visibleDialog(dialog),opened=dialog.dataset.avioraDialogOpen==='true';
+      if(visible&&!opened){
+        const active=root.document.activeElement;
+        dialog.dataset.avioraDialogOpen='true';
+        dialog.__avioraReturnFocus=active&&active!==root.document.body?active:root.__AVIORA_LAST_INTERACTION__;
+        const focus=()=>{const controls=dialogControls(dialog),initial=controls.find(control=>/^(INPUT|SELECT|TEXTAREA)$/.test(control.tagName))||controls[0]||dialog;initial.focus?.()};
+        if(typeof root.requestAnimationFrame==='function')root.requestAnimationFrame(focus);else setTimeout(focus,0);
+      }else if(!visible&&opened){
+        dialog.dataset.avioraDialogOpen='false';
+        const target=dialog.__avioraReturnFocus;dialog.__avioraReturnFocus=null;
+        if(target?.isConnected)target.focus?.();
+      }
+    });
+  }
+
+  function installDialogPrimitive(root){
+    syncDialogs(root);
+    if(typeof root.MutationObserver!=='function'||!root.document.body)return;
+    root.document.addEventListener('click',event=>{
+      const control=event.target.closest?.('button,[href],input,select,textarea,[tabindex]');
+      if(control&&!control.closest?.('[role="dialog"]'))root.__AVIORA_LAST_INTERACTION__=control;
+    },true);
+    const observer=new root.MutationObserver(()=>syncDialogs(root));
+    observer.observe(root.document.body,{subtree:true,childList:true,attributes:true,attributeFilter:['class','hidden']});
+  }
+
   function decorateNavigation(doc){
     const nav=doc.getElementById('nav');
     if(!nav)return;
@@ -327,15 +420,14 @@
     chartCards.forEach((card,index)=>{
       const raw=card.querySelector('h2')?.textContent||`Análise ${index+1}`;
       const label=/categoria/i.test(raw)?'Distribuição':/evolu/i.test(raw)?'Evolução':'Comparação';
-      const button=document.createElement('button');button.type='button';button.role='tab';button.textContent=label;button.setAttribute('aria-selected',String(index===0));
-      const id=`aviora-chart-panel-${index}`;button.setAttribute('aria-controls',id);
-      card.id=id;card.setAttribute('role','tabpanel');card.hidden=index!==0;card.classList.remove('s4','s6','s8','s12');
-      button.addEventListener('click',()=>{
-        [...tabs.children].forEach((tab,i)=>tab.setAttribute('aria-selected',String(i===index)));
-        [...panels.children].forEach((panel,i)=>panel.hidden=i!==index);
-        requestAnimationFrame(()=>root.drawCharts?.());
-      });
+      const button=document.createElement('button');button.type='button';button.setAttribute('role','tab');button.textContent=label;button.setAttribute('aria-selected',String(index===0));
+      const id=`aviora-chart-panel-${index}`,tabId=`aviora-chart-tab-${index}`;button.id=tabId;button.setAttribute('aria-controls',id);
+      card.id=id;card.setAttribute('role','tabpanel');card.setAttribute('aria-labelledby',tabId);card.hidden=index!==0;card.classList.remove('s4','s6','s8','s12');
       tabs.append(button);panels.append(card);
+    });
+    wireTabs(tabs,index=>{
+      [...panels.children].forEach((panel,current)=>panel.hidden=current!==index);
+      requestAnimationFrame(()=>root.drawCharts?.());
     });
     stage.append(tabs,panels);grid.prepend(stage);
   }
@@ -364,15 +456,16 @@
     if(!root?.document||root.__AVIORA_VISUAL_V1_INSTALLED__)return;
     root.__AVIORA_VISUAL_V1_INSTALLED__=true;
     const apply=()=>enhanceCurrentView(root);
+    const installShared=()=>installDialogPrimitive(root);
     if(typeof root.render==='function'){
       const base=root.render;
       root.render=function(){const result=base.apply(this,arguments);apply();return result};
     }
     if(root.document.readyState==='loading'){
       apply();
-      root.document.addEventListener('DOMContentLoaded',apply,{once:true});
-    }else apply();
+      root.document.addEventListener('DOMContentLoaded',()=>{apply();installShared()},{once:true});
+    }else {apply();installShared()}
   }
 
-  return Object.freeze({transactionSummary,parsePtBrCurrency,setExpanded,wireAccordion,chartCanvasIsRenderable,chartAnimation,install});
+  return Object.freeze({transactionSummary,parsePtBrCurrency,setExpanded,wireAccordion,wireTabs,dialogControls,chartCanvasIsRenderable,chartAnimation,install});
 });
