@@ -130,3 +130,9 @@ Gates separados serão necessários para:
 - sincronização de anotações do Reader;
 - Saúde Financeira V2;
 - Reserva cross-device.
+
+## Integração e auditoria operacional
+
+Antes de integração relevante, seguir o gate read-only em [AVIORA_DAILY_AUDIT_GATE.md](./AVIORA_DAILY_AUDIT_GATE.md). O snapshot de 2026-08-28 confirmou produção pública e Pages coerentes com `origin/main`, além de 44 arquivos unitários/contratuais verdes e Playwright com 153 pass, 6 skips condicionais e 0 fail nos três navegadores.
+
+A branch visual permanece sem CI remoto próprio (`REMOTE_BRANCH_CI_ABSENT`), e a aplicação autenticada, o iPhone físico e o preview LAN foram declarados como não verificados nesta execução. Isso não autoriza presumir aprovação dessas superfícies. Integração requer diff e segurança verdes, contratos financeiros preservados, hard stops acima isolados e autorização humana explícita.
