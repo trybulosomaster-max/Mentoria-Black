@@ -233,12 +233,19 @@ test('rollback cobre tudo e falha fechado após uso',()=>{
 
 test('shadow mode continua dormente',()=>{
   includesAll(migration,['create view public.card_billing_shadow_comparison_v1','mutation RPCs deliberately remain non-executable by authenticated','grant execute on function public.get_my_card_billing_summary_v1(uuid) to authenticated']);
-  includesAll(design,['SHADOW','VISUAL_V1_IMPACT = ZERO']);
+  includesAll(design,['CARD_BILLING_BETA_ACTIVATION = APPLIED_VALIDATED','FRONTEND_ACTIVATION = LOCAL_CANDIDATE_NOT_PUBLISHED','Visual V1 permanece']);
 });
 
 test('documentação fecha V1 e isola dívidas V2',()=>{
   const combined=design+'\n'+contract;
   includesAll(combined,['transaction_date','SAFE_NO_BACKFILL','CREDIT_BALANCE_REVIEW_REQUIRED','AVIORA_MANAGED_AVAILABLE_LIMIT','numeric(14,2)','mono-ciclo','append-only','shadow','rollback']);
+  includesAll(combined,['CARD_BILLING_BETA_ACTIVATION = APPLIED_VALIDATED','CARD_BILLING_MUTATOR_UI_BETA_VALIDATED']);
+  for(const stale of [
+    'CARD_BILLING_ACTIVATION_CANDIDATE_PENDING_VALIDATION',
+    'A validação real de concorrência ainda pertence ao gate Beta.',
+    'Esses grants existem apenas no SQL local.',
+    'ainda não existem em Beta'
+  ])ok(!combined.includes(stale),`stale activation claim removed: ${stale}`);
 });
 
 test('harness usa V81 + V82, ativa mutadores só no clone e prova golden',()=>{

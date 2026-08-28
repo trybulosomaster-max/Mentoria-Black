@@ -15,14 +15,28 @@ test.describe('AVIORA — caracterização sintética das áreas secundárias',(
   test.beforeEach(async({page})=>{browserMonitor=await monitorBrowser(page)});
   test.afterEach(()=>browserMonitor.assertClean());
 
-  test('Cartões expõe identidade e compromissos reais enquanto o motor valida a competência sintética',async({page})=>{
+  test('Cartões expõe identidade, competência, busca e totais diários sem fabricar fatura',async({page})=>{
     await openPreview(page,{tab:'cards'});
     const card=page.locator('[data-card-id="card-gold"]');
     await expect(card).toBeVisible();
     for(const text of ['Cartão AVIORA','Banco sintético','Visa','R$ 670,00','esperado no mês'])await expect(card).toContainText(text);
     await card.locator('summary').click();
-    for(const text of ['Limite cadastrado','R$ 8.000,00','Fechamento','dia 22','Vencimento','dia 30','Programado','R$ 670,00','Compromissos futuros','R$ 250,00'])await expect(card).toContainText(text);
+    for(const text of ['Limite cadastrado','R$ 8.000,00','Fechamento','dia 22','Vencimento','dia 30','Programado','R$ 670,00','Compromissos futuros','R$ 250,00','Competência legada'])await expect(card).toContainText(text);
     await expect(page.locator('#view')).not.toContainText('Fatura atual');
+    await expect(card.locator('[data-card-day]')).toHaveCount(2);
+    await expect(card.locator('[data-card-day="2026-08-30"]')).toContainText('Total do dia');
+    await expect(card.locator('[data-card-day="2026-08-30"]')).toContainText(money(420));
+    await expect(card.locator('[data-card-day="2026-08-15"]')).toContainText(money(250));
+    await expect(card.locator('[data-transaction-id="installment-current"]')).toContainText('(1/2)');
+    const totals=await card.locator('[data-card-day]').evaluateAll(days=>days.map(day=>({
+      rows:[...day.querySelectorAll('.aviora-card-line-value>strong')].reduce((sum,node)=>sum+Number(node.textContent.replace(/[^\d,-]/g,'').replace('.','').replace(',','.')),0),
+      total:Number(day.querySelector('footer strong').textContent.replace(/[^\d,-]/g,'').replace('.','').replace(',','.'))
+    })));
+    for(const day of totals)expect(day.rows).toBeCloseTo(day.total,2);
+    await card.locator('[data-card-search]').fill('Notebook');
+    await expect(card.locator('[data-card-billing-line]')).toHaveCount(1);
+    await expect(card.locator('[data-card-billing-line]')).toContainText('Notebook parcelado');
+    await expect(card.locator('.aviora-card-toolbar')).toContainText(`1 de 2 · ${money(250)}`);
     await expect(card.getByRole('button',{name:'Ver em Lançamentos'})).toBeVisible();
     await expect(card.getByRole('button',{name:'Editar cartão'})).toBeVisible();
 
@@ -42,6 +56,19 @@ test.describe('AVIORA — caracterização sintética das áreas secundárias',(
     expect(competence.august.ids).not.toContain('installment-next');
     expect(competence.september).toEqual({ids:['installment-next'],total:250});
   });
+
+  for(const viewport of VIEWPORTS){
+    test(`Cartões mantém hierarquia diária e busca acessível em ${viewport.name}`,async({page})=>{
+      await openPreview(page,{tab:'cards',viewport});
+      const card=page.locator('[data-card-id="card-gold"]');await card.locator('summary').click();
+      await expect(card.locator('[data-card-search]')).toBeVisible();
+      await expect(card.locator('[data-card-day]')).toHaveCount(2);
+      await assertNoHorizontalOverflow(page);
+      if(viewport.width<=900)await assertTouchTargets(page,'[data-card-id="card-gold"] button,[data-card-id="card-gold"] input,[data-card-id="card-gold"] summary');
+      const clipped=await card.locator('[data-card-billing-line]').evaluateAll(lines=>lines.filter(line=>line.scrollWidth>line.clientWidth+1).map(line=>line.textContent));
+      expect(clipped).toEqual([]);
+    });
+  }
 
   test('Categorias mantém nome, cor configurada e ação acessível sem depender só da cor',async({page})=>{
     await openPreview(page,{tab:'categories'});
