@@ -1,12 +1,12 @@
 {
   "name":"AVIORA — Gestão Financeira",
   "short_name":"AVIORA",
-  "start_url":"./?v=aviora-v1-structural-b2",
+  "start_url":"./?v=aviora-v1-structural-b2-smoke2",
   "display":"standalone",
   "background_color":"#070807",
   "theme_color":"#B8944A",
   "icons":[
-    {"src":"assets/branding/aviora-official.jpg?v=aviora-v1-structural-b2","sizes":"1254x1254","type":"image/jpeg","purpose":"any"}
+    {"src":"assets/branding/aviora-official.jpg?v=aviora-v1-structural-b2-smoke2","sizes":"1254x1254","type":"image/jpeg","purpose":"any"}
   ],
   "lang":"pt-BR"
 }

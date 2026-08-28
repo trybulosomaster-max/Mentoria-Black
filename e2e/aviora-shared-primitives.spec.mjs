@@ -1,4 +1,5 @@
 import {test,expect} from '@playwright/test';
+import {readFileSync} from 'node:fs';
 import {monitorBrowser,openPreview,navigateTo,assertNoHorizontalOverflow} from './support/aviora-page.mjs';
 
 test.describe('AVIORA — shell e primitives compartilhados',()=>{
@@ -53,5 +54,29 @@ test.describe('AVIORA — shell e primitives compartilhados',()=>{
     const geometry=await page.locator('.admin-tabs').evaluate(node=>({client:node.clientWidth,scroll:node.scrollWidth,buttons:[...node.querySelectorAll('.btn')].map(button=>button.getBoundingClientRect().height)}));
     expect(geometry.scroll).toBeLessThanOrEqual(geometry.client+1);
     expect(geometry.buttons.every(height=>height>=44)).toBe(true);
+  });
+
+  test('cascata real do index preserva o grid desktop sem rolagem horizontal',async({page})=>{
+    const avioraCss=readFileSync(new URL('../assets/aviora-v82.css',import.meta.url),'utf8');
+    const indexSource=readFileSync(new URL('../index.html',import.meta.url),'utf8');
+    const legacyInline=[...indexSource.matchAll(/<style>([\s\S]*?)<\/style>/g)].map(match=>match[1]).join('\n');
+    const destinations=Array.from({length:15},(_,index)=>`<button class="btn${index===0?' active':''}" data-tab="tab-${index}">Destino ${index+1}</button>`).join('');
+    await page.setViewportSize({width:1200,height:800});
+    await page.setContent(`<style>${avioraCss}</style><style>${legacyInline}</style><nav id="nav" class="nav" aria-label="Navegação principal">${destinations}</nav><main id="view"><article class="kpi"><div class="lab">Reserva</div><div class="val">Sem dados suficientes</div><div class="sub">proteção financeira</div></article></main>`);
+
+    const geometry=await page.locator('#nav').evaluate(nav=>({
+      display:getComputedStyle(nav).display,
+      client:nav.clientWidth,
+      scroll:nav.scrollWidth,
+      visible:[...nav.querySelectorAll(':scope > [data-tab]')].filter(button=>getComputedStyle(button).display!=='none').length,
+      firstWidth:nav.firstElementChild?.getBoundingClientRect().width||0
+    }));
+    expect(geometry.display).toBe('grid');
+    expect(geometry.visible).toBe(15);
+    expect(geometry.scroll).toBeLessThanOrEqual(geometry.client+1);
+    expect(geometry.firstWidth).toBeLessThan(geometry.client/2);
+    const metricValue=page.locator('#view .kpi .val');
+    await expect(metricValue).toHaveCSS('white-space','normal');
+    await expect(metricValue).toHaveCSS('text-overflow','clip');
   });
 });

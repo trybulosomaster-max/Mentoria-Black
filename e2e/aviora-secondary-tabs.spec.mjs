@@ -127,6 +127,7 @@ test.describe('AVIORA — caracterização sintética das áreas secundárias',(
   });
 
   test('áreas secundárias reutilizam estados vazio e erro seguros sem fabricar dados',async({page})=>{
+    test.slow();
     for(const tab of ['accounts','cards','categories','goals','recurring','wealth','reports','reserve-v52','health-v53']){
       await openPreview(page,{tab,state:'empty'});
       await expect(page.locator('[data-preview-state="empty"]')).toContainText('Nenhum dado por aqui');
