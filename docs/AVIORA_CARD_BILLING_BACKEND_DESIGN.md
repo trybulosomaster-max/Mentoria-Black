@@ -264,7 +264,7 @@ O rollback destrutivo é permitido somente com lock exclusivo e quando não exis
 - crédito;
 - transaction vinculada.
 
-Também valida ownership do namespace privado e objetos esperados. Qualquer drift ou uso faz o script falhar fechado.
+Também valida ownership do namespace privado e os objetos, tipos, colunas e constraints estruturais esperados. Drift estrutural coberto ou qualquer uso faz o script falhar fechado; alterações semânticas futuras no corpo de funções exigem revisão de diff, não são inferidas pelo rollback.
 
 ### Depois de uso real
 

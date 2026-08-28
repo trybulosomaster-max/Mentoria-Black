@@ -690,6 +690,12 @@ select throws_ok(
   'P0002',null,'user B cannot structure explicit user A transaction'
 );
 select throws_ok(
+  $$select public.create_my_card_installment_series_v1(
+    gen_random_uuid(),current_setting('aviora_test.victim_card')::uuid,
+    '2028-11-01','Cross-user installment',100,2,'pendente','Conforto',null)$$,
+  '23503',null,'user B cannot create installments on explicit user A card'
+);
+select throws_ok(
   $$select public.credit_my_card_purchase_v1(
     current_setting('aviora_test.victim_transaction')::uuid,1,'2028-11-01',gen_random_uuid(),'cross-user credit')$$,
   'P0002',null,'user B cannot credit explicit user A transaction'
