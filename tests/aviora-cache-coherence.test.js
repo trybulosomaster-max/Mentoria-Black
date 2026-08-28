@@ -15,6 +15,8 @@ function localAssets(source){
 }
 
 const index=read('index.html'),preview=read('aviora-v82.preview.local.html'),sw=read('sw.js');
+assert.match(index,/@supabase\/supabase-js@2\.112\.4" integrity="sha384-/,'external Auth client is immutable and integrity checked');
+assert.doesNotMatch(index,/@supabase\/supabase-js@2"/,'mutable major alias is forbidden');
 for(const [name,source] of [['index',index],['preview',preview]]){
   assert.match(source,new RegExp(`<meta name="aviora-build" content="${BUILD_ID}">`),`${name} exposes one build identity`);
   for(const asset of localAssets(source))assert.equal(new URL(asset,'https://local.invalid/').searchParams.get('v'),BUILD_ID,`${name}: ${asset} uses the build identity`);
