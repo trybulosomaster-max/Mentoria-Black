@@ -43,6 +43,25 @@ test.describe('AVIORA — responsividade e regressão visual estrutural',()=>{
       expect(safeGeometry.titleTop).toBeLessThan(safeGeometry.viewportHeight);
       browserMonitor.assertClean();
     });
+
+    test(`${viewport.name} mantém o resumo da Meta Casamento legível e sem redundância`,async({page})=>{
+      const browserMonitor=await monitorBrowser(page);
+      await openPreview(page,{tab:'goals',viewport});
+      await assertNoHorizontalOverflow(page);
+      const goal=page.locator('.goal-card');
+      await expect(goal.locator('.goal-values .goal-value')).toHaveCount(4);
+      await expect(goal.locator('.goal-values')).not.toContainText('Programado');
+      await expect(goal.locator('.goal-values')).not.toContainText('Projeção adicional');
+      const composition=goal.locator('.goal-coverage-composition');
+      await expect(composition).not.toHaveAttribute('open','');
+      expect(await composition.locator('summary').evaluate(node=>node.getBoundingClientRect().height)).toBeGreaterThanOrEqual(44);
+      await composition.locator('summary').click();
+      await expect(composition).toContainText('R$ 4.400,00');
+      await expect(composition).toContainText('R$ 20.000,00');
+      const columns=await goal.locator('.goal-values').evaluate(node=>getComputedStyle(node).gridTemplateColumns.split(' ').length);
+      expect(columns).toBe(viewport.width<=900?2:4);
+      browserMonitor.assertClean();
+    });
   }
 
   test('rerenders não acumulam menu, accordions, IDs ou trabalho visual oculto',async({page})=>{

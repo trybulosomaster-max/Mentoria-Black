@@ -21,6 +21,36 @@ test.describe('AVIORA — shell e primitives compartilhados',()=>{
     await expect(page.getByRole('tabpanel',{name:'Evolução'})).toBeVisible();
   });
 
+  test('Dashboard concentra a semântica cromática no valor principal',async({page})=>{
+    await openPreview(page,{tab:'dashboard',viewport:{width:1440,height:900}});
+    const cases=[
+      ['Receitas','rgb(116, 167, 132)'],
+      ['Despesas','rgb(194, 118, 114)'],
+      ['Resultado do mês','rgb(116, 167, 132)'],
+      ['Investimentos','rgb(120, 168, 209)'],
+      ['Reserva de emergência','rgb(229, 214, 173)'],
+      ['Patrimônio líquido','rgb(229, 214, 173)']
+    ];
+    for(const [label,color] of cases){
+      const card=page.locator('.aviora-dashboard-kpis .kpi').filter({has:page.locator('.lab',{hasText:label})});
+      await expect(card.locator('.val')).toHaveCSS('color',color);
+      expect(await card.evaluate(node=>getComputedStyle(node,'::before').content)).toBe('none');
+      await expect(card.locator('.lab')).not.toHaveCSS('color',color);
+      const contrast=await card.locator('.val').evaluate(node=>{
+        const channels=getComputedStyle(node).color.match(/\d+/g).slice(0,3).map(Number),surface=[23,24,28];
+        const luminance=rgb=>{const values=rgb.map(value=>value/255).map(value=>value<=.04045?value/12.92:((value+.055)/1.055)**2.4);return .2126*values[0]+.7152*values[1]+.0722*values[2]};
+        const foreground=luminance(channels),background=luminance(surface);
+        return (Math.max(foreground,background)+.05)/(Math.min(foreground,background)+.05);
+      });
+      expect(contrast).toBeGreaterThanOrEqual(4.5);
+    }
+    const result=page.locator('.aviora-dashboard-kpis .kpi').filter({hasText:'Resultado do mês'});
+    await result.evaluate(node=>{node.classList.remove('aviora-kpi-positive');node.classList.add('aviora-kpi-negative')});
+    await expect(result.locator('.val')).toHaveCSS('color','rgb(194, 118, 114)');
+    await result.evaluate(node=>{node.classList.remove('aviora-kpi-negative');node.classList.add('aviora-kpi-neutral')});
+    await expect(result.locator('.val')).toHaveCSS('color','rgb(229, 214, 173)');
+  });
+
   test('modal compartilhado contém foco, fecha com Escape e restaura o acionador',async({page})=>{
     await openPreview(page,{tab:'accounts',viewport:{width:390,height:844}});
     await page.evaluate(()=>{

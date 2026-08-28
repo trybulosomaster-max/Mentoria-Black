@@ -56,11 +56,18 @@ test.describe('AVIORA — caracterização sintética das áreas secundárias',(
   test('Metas expõe valor, progresso, prazo e necessidade mensal sem NaN ou Infinity',async({page})=>{
     await openPreview(page,{tab:'goals'});
     const goal=page.locator('.goal-card');
-    for(const text of ['Reserva de emergência','R$ 18.500,00','R$ 30.000,00','61,7%','31/12/2027','Necessidade mensal','R$ 650,00','Em andamento'])await expect(goal).toContainText(text);
-    await expect(goal.getByRole('button',{name:'Adicionar valor'})).toBeVisible();
+    for(const text of ['Casamento','R$ 50.000,00','Cobertura prevista','R$ 24.400,00','48,8%','Falta realizar','Falta planejar','R$ 25.600,00','Média mensal necessária','R$ 819,67','Conclusão após o prazo'])await expect(goal).toContainText(text);
+    const composition=goal.locator('.goal-coverage-composition');
+    await expect(composition).not.toHaveAttribute('open','');
+    const primary=goal.locator('.goal-values');
+    await expect(primary).not.toContainText('Programado');await expect(primary).not.toContainText('Projeção adicional');
+    await composition.locator('summary').click();
+    await expect(composition).toHaveAttribute('open','');
+    await expect(composition).toContainText('Programado');await expect(composition).toContainText('R$ 4.400,00');
+    await expect(composition).toContainText('Projeção adicional');await expect(composition).toContainText('R$ 20.000,00');
     await expect(goal.getByRole('button',{name:'Editar'})).toBeVisible();
-    const progressWidth=await goal.locator('.bar > i').evaluate(node=>Number.parseFloat(node.style.width));
-    expect(progressWidth).toBeCloseTo(61.6667,3);
+    const progressWidth=await goal.locator('.goal-projected .bar > i').evaluate(node=>Number.parseFloat(node.style.width));
+    expect(progressWidth).toBeCloseTo(48.8,3);
     expect(await goal.textContent()).not.toMatch(/NaN|Infinity/);
   });
 

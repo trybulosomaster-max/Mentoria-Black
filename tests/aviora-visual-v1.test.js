@@ -72,6 +72,25 @@ test('Dashboard usa quatro KPIs primários, alertas e gráficos no mesmo palco',
   ok(source.includes('wireTabs(tabs,index=>'),'chart analyses use the shared keyboard tab primitive');
 });
 
+test('Dashboard usa cor apenas no valor principal e mantém contexto neutro',()=>{
+  ok(css.includes('.aviora-dashboard-kpis .kpi::before { content: none; }'));
+  ok(css.includes('#view .aviora-dashboard-kpis .kpi .val { color: var(--kpi-accent); }'));
+  for(const tone of ['--aviora-success','--aviora-danger','--aviora-investment','--aviora-champagne'])ok(css.includes(tone),`missing semantic tone ${tone}`);
+  ok(index.includes("expected.availableBalanceEffect>0?'aviora-kpi-positive':expected.availableBalanceEffect<0?'aviora-kpi-negative':'aviora-kpi-neutral'"));
+  ok(!index.includes('style="--kpi-accent:${investmentColor}"'));
+  ok(css.includes('.aviora-kpi-breakdown b { color: var(--aviora-text);'));
+});
+
+test('Metas reduz redundância sem recalcular a cobertura na apresentação',()=>{
+  ok(index.includes('<details class="goal-coverage-composition"><summary>Ver composição da cobertura</summary>'));
+  ok(css.includes('.goal-coverage-composition summary'));
+  ok(css.includes('min-height: var(--aviora-touch)'));
+  ok(index.includes('${money(item.projectedCovered)}'));
+  ok(index.includes('${money(item.programmed)}'));
+  ok(index.includes('${money(item.projected)}'));
+  ok(!index.includes('item.programmed+item.projected'));
+});
+
 test('foundations, shell e primitives compartilham contratos sem nova paleta',()=>{
   for(const token of ['--aviora-surface-input','--aviora-space-4','--aviora-touch','--aviora-font-ui','--aviora-focus-ring','--aviora-elevation-card','--aviora-motion-fast'])ok(css.includes(token),`missing ${token}`);
   ok(css.includes('grid-template-columns: repeat(8,minmax(0,1fr))'),'desktop navigation uses a stable shared grid');
