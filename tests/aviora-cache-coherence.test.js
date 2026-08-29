@@ -6,7 +6,7 @@ const path=require('node:path');
 
 const root=path.resolve(__dirname,'..');
 const read=file=>fs.readFileSync(path.join(root,file),'utf8');
-const BUILD_ID='aviora-card-billing-v1';
+const BUILD_ID='aviora-signup-password-policy-v1';
 
 function localAssets(source){
   return [...source.matchAll(/<(?:script|link)\b[^>]*(?:src|href)="([^"]+)"/g)]

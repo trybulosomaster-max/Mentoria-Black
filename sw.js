@@ -11,7 +11,7 @@ const SHELL_PATHS=[
   './knowledge/knowledge-area.css','./knowledge/knowledge-area-premium.css',
   './assets/meridian-black-day-night-login.css','./assets/aviora-v82.css',
   './assets/admin-area.css','./assets/account-security.css',
-  './js/production-environment.js','./js/production-runtime.js','./js/meridian-day-night-login.js','./js/observability.js',
+  './js/production-environment.js','./js/production-runtime.js','./js/meridian-day-night-login.js','./js/signup-password-policy.js','./js/observability.js',
   './js/financial-core.js','./js/recurrence-projection.js','./js/structured-recurring-v82.js','./js/card-billing-financial-adjustments.js','./js/accounts-networth-integration.js','./js/planning-integration.js',
   './js/cards-view-data.js','./js/recurring-view-data.js',
   './js/goal-projection.js','./js/goals-integration.js','./js/reports-integration.js','./js/dashboard-financial-integration.js','./js/health-integration.js',

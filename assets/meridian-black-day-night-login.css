@@ -105,6 +105,12 @@
 .meridian-submit:active { transform: translateY(1px); }
 .meridian-signup-line { margin: 19px 0 0; color: rgba(255, 245, 224, .82); font-size: 13px; text-align: center; }
 .meridian-signup { margin-left: 5px; }
+.meridian-signup-only { display: none; }
+.meridian-day-night-form[data-auth-mode="signup"] .meridian-signup-only { display: block; }
+.meridian-signup-password-help { margin: -4px 0 16px; color: rgba(255, 245, 224, .76); font-size: 12px; line-height: 1.45; }
+.meridian-signup-terms { display: flex; min-height: 44px; align-items: flex-start; gap: 9px; margin: -3px 0 15px; color: rgba(255, 245, 224, .86); font-size: 12px; line-height: 1.4; text-transform: none; letter-spacing: 0; cursor: pointer; }
+.auth.meridian-day-night-login .meridian-signup-terms input { width: 17px; height: 17px; min-height: 0; margin: 1px 0 0; accent-color: var(--meridian-gold); }
+.meridian-signup-terms:focus-within { outline: 2px solid var(--meridian-gold-hover); outline-offset: 3px; border-radius: 4px; }
 .meridian-auth-message { min-height: 0; margin: 15px 0 0; color: #f0d599; font-size: 13px; line-height: 1.4; text-align: center; }
 .meridian-auth-message:empty { display: none; }
 .meridian-auth-message.err { color: #ffd0c9; }
