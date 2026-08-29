@@ -6,7 +6,7 @@ const path=require('node:path');
 
 const root=path.resolve(__dirname,'..');
 const read=file=>fs.readFileSync(path.join(root,file),'utf8');
-const BUILD_ID='aviora-signup-password-policy-v1';
+const BUILD_ID='aviora-legal-v1';
 
 function localAssets(source){
   return [...source.matchAll(/<(?:script|link)\b[^>]*(?:src|href)="([^"]+)"/g)]
@@ -28,6 +28,7 @@ assert.match(sw,/event\.request\.mode==='navigate'/);
 assert.doesNotMatch(sw,/cache\.match\('\.\/index\.html'\)/,'non-navigation requests never fall back to HTML');
 assert.doesNotMatch(sw,/keys\.filter\(k => k !== CACHE_NAME\)/,'activation must not delete unrelated caches');
 assert.match(sw,/k\.startsWith\(CACHE_PREFIX\)/,'activation only removes prior AVIORA builds');
+for(const legalAsset of ['./legal/termos-de-uso.html','./legal/politica-de-privacidade.html','./legal/aviora-legal.css'])assert.ok(sw.includes(`'${legalAsset}'`),`${legalAsset} is cached with the release shell`);
 assert.match(index,/aviora-build-reloaded:\$\{MB_BUILD_ID\}/);
 assert.doesNotMatch(index,/MB_SW_VERSION|mb-v29-reloaded/);
 

@@ -6,6 +6,7 @@ const CACHE_NAME=`${CACHE_PREFIX}${BUILD_ID}`;
 const versioned=path=>`${path}${path.includes('?')?'&':'?'}v=${encodeURIComponent(BUILD_ID)}`;
 const SHELL_PATHS=[
   './index.html','./manifest.webmanifest',
+  './legal/termos-de-uso.html','./legal/politica-de-privacidade.html','./legal/aviora-legal.css',
   './assets/branding/aviora-official.jpg','./assets/branding/aviora-login-hero.jpg',
   './assets/fonts/syncopate/Syncopate-Regular.ttf',
   './knowledge/knowledge-area.css','./knowledge/knowledge-area-premium.css',
