@@ -1,11 +1,11 @@
 import { Redirect, Tabs } from 'expo-router';
-import { StyleSheet, Text } from 'react-native';
+import { type ColorValue, StyleSheet, Text } from 'react-native';
 
 import { useAuth } from '../../src/core/auth/AuthProvider';
 import { Screen, StateView } from '../../src/design-system/components';
 import { colors, spacing, typography } from '../../src/design-system/tokens';
 
-const icon = (glyph: string) => ({ color }: { color: string }) => (
+const icon = (glyph: string) => ({ color }: { color: ColorValue }) => (
   <Text style={[styles.icon, { color }]}>{glyph}</Text>
 );
 

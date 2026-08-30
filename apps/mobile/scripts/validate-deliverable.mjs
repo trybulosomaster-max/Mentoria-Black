@@ -67,7 +67,7 @@ for (const file of required) {
 const packageJson = JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8'));
 if (packageJson.dependencies?.expo === '~57.0.9') ok('stack:expo', packageJson.dependencies.expo);
 else fail('stack:expo', `versão inesperada: ${packageJson.dependencies?.expo}`);
-if (packageJson.dependencies?.['react-native'] === '0.86.2') ok('stack:react-native', packageJson.dependencies['react-native']);
+if (packageJson.dependencies?.['react-native'] === '0.86.3') ok('stack:react-native', packageJson.dependencies['react-native']);
 else fail('stack:react-native', `versão inesperada: ${packageJson.dependencies?.['react-native']}`);
 if (packageJson.dependencies?.['expo-router'] === '~57.0.16') ok('stack:expo-router', packageJson.dependencies['expo-router']);
 else fail('stack:expo-router', `versão inesperada: ${packageJson.dependencies?.['expo-router']}`);

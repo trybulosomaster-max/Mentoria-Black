@@ -4,6 +4,7 @@ import {
   ActivityIndicator,
   type KeyboardTypeOptions,
   Pressable,
+  type RefreshControlProps,
   ScrollView,
   StyleSheet,
   Text,
@@ -20,7 +21,7 @@ import { colors, radius, shadows, spacing, touch, typography } from './tokens';
 
 type ScreenProps = PropsWithChildren<{
   scroll?: boolean;
-  refreshControl?: ReactElement;
+  refreshControl?: ReactElement<RefreshControlProps>;
   contentStyle?: StyleProp<ViewStyle>;
 }>;
 
