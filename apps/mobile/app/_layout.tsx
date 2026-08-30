@@ -21,7 +21,7 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.background }}>
       <SafeAreaProvider>
         <AuthProvider>
-          <StatusBar style="light" translucent />
+          <StatusBar style="light" />
           <Stack
             screenOptions={{
               headerShown: false,

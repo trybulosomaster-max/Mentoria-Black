@@ -53,9 +53,9 @@ export default function AccessScreen() {
       </Card>
 
       <View style={styles.actions}>
-        <AppButton label="Verificar novamente" onPress={refreshEntitlements} />
+        <AppButton label="Verificar novamente" onPress={async () => { await refreshEntitlements(); }} />
         {appEnvironment.enableTrialStart ? (
-          <AppButton label="Ativar teste gratuito" variant="secondary" onPress={startTrial} />
+          <AppButton label="Ativar teste gratuito" variant="secondary" onPress={async () => { await startTrial(); }} />
         ) : null}
         <AppButton label="Sair desta conta" variant="ghost" onPress={signOut} />
       </View>
