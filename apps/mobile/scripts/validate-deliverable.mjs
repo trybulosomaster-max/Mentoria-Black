@@ -119,7 +119,12 @@ if (!forbiddenWrites.length) ok('gate:read-repository-has-no-write');
 else fail('gate:read-repository-has-no-write', forbiddenWrites.join(', '));
 
 const components = await readFile(path.join(root, 'src/design-system/components.tsx'), 'utf8');
-if (/minHeight:\s*48/.test(components)) ok('accessibility:touch-target-48');
+const designTokens = await readFile(path.join(root, 'src/design-system/tokens.ts'), 'utf8');
+if (
+  /touch: Object\.freeze\(\{ minimum: 44, default: 48, comfortable: 52 \}\)/.test(designTokens)
+  && components.includes('minHeight: componentTokens.button.minHeight')
+  && components.includes('minHeight: componentTokens.input.minHeight')
+) ok('accessibility:touch-target-48');
 else fail('accessibility:touch-target-48', 'botão/input sem evidência de 48 pontos');
 
 const authProviderSource = await readFile(path.join(root, 'src/core/auth/AuthProvider.tsx'), 'utf8');

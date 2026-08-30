@@ -6,12 +6,13 @@ import {
   InlineNotice,
   PageHeader,
   Pill,
+  ProgressBar,
   Screen,
   SectionTitle,
   StateView,
   commonStyles,
 } from '../../src/design-system/components';
-import { colors, spacing, typography } from '../../src/design-system/tokens';
+import { colors, primitives, semantic, spacing, textStyles } from '../../src/design-system/tokens';
 import { useMobileSnapshot } from '../../src/features/read-models/use-mobile-snapshot';
 import { formatDate, formatMoney } from '../../src/lib/format';
 
@@ -84,7 +85,7 @@ export default function NetWorthScreen() {
               </View>
               <Text style={styles.value}>{progress.toFixed(0)}%</Text>
             </View>
-            <View style={styles.track}><View style={[styles.fill, { width: `${progress}%` }]} /></View>
+            <ProgressBar value={progress} label={`Progresso da meta ${goal.name}`} />
             <Text style={styles.meta}>{formatMoney(goal.current)} de {formatMoney(goal.target)}</Text>
           </Card>
         );
@@ -95,13 +96,11 @@ export default function NetWorthScreen() {
 
 const styles = StyleSheet.create({
   itemCard: { gap: spacing.sm },
-  copy: { flex: 1, minWidth: 0, gap: spacing.xxs },
-  title: { color: colors.text, fontSize: typography.body, fontWeight: '800' },
-  meta: { color: colors.textMuted, fontSize: typography.caption, lineHeight: 17 },
-  caption: { color: colors.textSubtle, fontSize: typography.caption, textAlign: 'right' },
-  value: { color: colors.goldBright, fontSize: typography.body, fontWeight: '800', textAlign: 'right' },
+  copy: { flex: 1, minWidth: spacing.none, gap: spacing.xxs },
+  title: { ...textStyles.body, color: semantic.text.primary, fontFamily: primitives.typography.family.uiExtraBold },
+  meta: { ...textStyles.caption, color: semantic.text.secondary },
+  caption: { ...textStyles.caption, color: semantic.text.subtle, textAlign: 'right' },
+  value: { ...textStyles.moneyM, color: semantic.text.accent, textAlign: 'right' },
   end: { alignItems: 'flex-end', gap: spacing.xxs },
-  empty: { color: colors.textMuted, textAlign: 'center', padding: spacing.lg },
-  track: { height: 8, borderRadius: 999, backgroundColor: colors.surfacePressed, overflow: 'hidden' },
-  fill: { height: '100%', borderRadius: 999, backgroundColor: colors.gold },
+  empty: { ...textStyles.bodySmall, color: semantic.text.secondary, textAlign: 'center', padding: spacing.lg },
 });

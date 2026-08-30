@@ -1,12 +1,13 @@
 import { Redirect, Tabs } from 'expo-router';
-import { type ColorValue, StyleSheet, Text } from 'react-native';
+import { type ColorValue, StyleSheet } from 'react-native';
 
 import { useAuth } from '../../src/core/auth/AuthProvider';
 import { Screen, StateView } from '../../src/design-system/components';
-import { colors, spacing, typography } from '../../src/design-system/tokens';
+import { AppIcon, type AppIconName } from '../../src/design-system/icons';
+import { colors, componentTokens, textStyles } from '../../src/design-system/tokens';
 
-const icon = (glyph: string) => ({ color }: { color: ColorValue }) => (
-  <Text style={[styles.icon, { color }]}>{glyph}</Text>
+const icon = (name: AppIconName) => ({ color, size }: { color: ColorValue; size: number }) => (
+  <AppIcon name={name} color={color} size={size} />
 );
 
 export default function TabsLayout() {
@@ -34,23 +35,22 @@ export default function TabsLayout() {
         sceneStyle: { backgroundColor: colors.background },
       }}
     >
-      <Tabs.Screen name="index" options={{ title: 'Início', tabBarIcon: icon('⌂') }} />
-      <Tabs.Screen name="lancamentos" options={{ title: 'Lançamentos', tabBarIcon: icon('≡') }} />
-      <Tabs.Screen name="planejamento" options={{ title: 'Planejamento', tabBarIcon: icon('▦') }} />
-      <Tabs.Screen name="patrimonio" options={{ title: 'Patrimônio', tabBarIcon: icon('◇') }} />
-      <Tabs.Screen name="mais" options={{ title: 'Mais', tabBarIcon: icon('•••') }} />
+      <Tabs.Screen name="index" options={{ title: 'Início', tabBarIcon: icon('home') }} />
+      <Tabs.Screen name="lancamentos" options={{ title: 'Lançamentos', tabBarIcon: icon('transactions') }} />
+      <Tabs.Screen name="planejamento" options={{ title: 'Planejamento', tabBarIcon: icon('planning') }} />
+      <Tabs.Screen name="patrimonio" options={{ title: 'Patrimônio', tabBarIcon: icon('patrimony') }} />
+      <Tabs.Screen name="mais" options={{ title: 'Mais', tabBarIcon: icon('more') }} />
     </Tabs>
   );
 }
 
 const styles = StyleSheet.create({
   tabBar: {
-    height: 72,
-    paddingTop: spacing.xs,
-    paddingBottom: spacing.sm,
+    height: componentTokens.tab.height,
+    paddingTop: componentTokens.tab.topPadding,
+    paddingBottom: componentTokens.tab.bottomPadding,
     borderTopColor: colors.border,
     backgroundColor: colors.surface,
   },
-  tabLabel: { fontSize: 10, fontWeight: '700' },
-  icon: { fontSize: typography.section, fontWeight: '800' },
+  tabLabel: textStyles.tabLabel,
 });

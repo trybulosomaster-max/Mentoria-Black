@@ -12,7 +12,7 @@ import {
   Screen,
   TextField,
 } from '../../src/design-system/components';
-import { colors, spacing, typography } from '../../src/design-system/tokens';
+import { componentTokens, semantic, spacing, textStyles } from '../../src/design-system/tokens';
 
 export default function SignInScreen() {
   const { signIn, configurationRequired } = useAuth();
@@ -34,7 +34,7 @@ export default function SignInScreen() {
   };
 
   return (
-    <Screen contentStyle={styles.content}>
+    <Screen variant="auth" contentStyle={styles.content}>
       <View style={styles.brand}><BrandMark compact /></View>
       <PageHeader
         eyebrow="Bem-vindo de volta"
@@ -98,9 +98,9 @@ export default function SignInScreen() {
 }
 
 const styles = StyleSheet.create({
-  content: { justifyContent: 'center', minHeight: '100%', maxWidth: 520, width: '100%', alignSelf: 'center' },
+  content: { justifyContent: 'center', minHeight: '100%', maxWidth: componentTokens.dialog.maxWidth, width: '100%', alignSelf: 'center' },
   brand: { alignItems: 'center', marginBottom: spacing.sm },
   form: { gap: spacing.md },
   bottom: { gap: spacing.sm },
-  bottomText: { color: colors.textMuted, fontSize: typography.bodySmall, textAlign: 'center' },
+  bottomText: { ...textStyles.bodySmall, color: semantic.text.secondary, textAlign: 'center' },
 });

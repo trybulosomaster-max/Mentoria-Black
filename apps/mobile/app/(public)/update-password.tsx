@@ -11,7 +11,7 @@ import {
   Screen,
   TextField,
 } from '../../src/design-system/components';
-import { spacing } from '../../src/design-system/tokens';
+import { componentTokens, spacing } from '../../src/design-system/tokens';
 
 export default function UpdatePasswordScreen() {
   const { updatePassword } = useAuth();
@@ -37,7 +37,7 @@ export default function UpdatePasswordScreen() {
   };
 
   return (
-    <Screen contentStyle={styles.content}>
+    <Screen variant="auth" contentStyle={styles.content}>
       <PageHeader title="Crie uma nova senha" description="Depois da atualização, você voltará à sua conta." />
       <Card style={styles.form}>
         <TextField label="Nova senha" value={password} onChangeText={setPassword} secureTextEntry autoComplete="new-password" />
@@ -50,6 +50,6 @@ export default function UpdatePasswordScreen() {
 }
 
 const styles = StyleSheet.create({
-  content: { justifyContent: 'center', minHeight: '100%', maxWidth: 520, width: '100%', alignSelf: 'center' },
+  content: { justifyContent: 'center', minHeight: '100%', maxWidth: componentTokens.dialog.maxWidth, width: '100%', alignSelf: 'center' },
   form: { gap: spacing.md },
 });

@@ -6,12 +6,13 @@ import {
   MetricCard,
   PageHeader,
   Pill,
+  ProgressBar,
   Screen,
   SectionTitle,
   StateView,
   commonStyles,
 } from '../../src/design-system/components';
-import { colors, spacing, typography } from '../../src/design-system/tokens';
+import { colors, primitives, semantic, spacing, textStyles } from '../../src/design-system/tokens';
 import { useMobileSnapshot } from '../../src/features/read-models/use-mobile-snapshot';
 import { formatMoney } from '../../src/lib/format';
 
@@ -70,9 +71,7 @@ export default function PlanningScreen() {
                     <Text style={styles.categoryTitle}>{label}</Text>
                     <Text style={styles.categoryValue}>{formatMoney(value)}</Text>
                   </View>
-                  <View accessibilityLabel={`${label}: ${Math.round(percentage)}% da receita`} style={styles.track}>
-                    <View style={[styles.fill, { width: `${percentage}%` }]} />
-                  </View>
+                  <ProgressBar value={percentage} label={`${label} da receita planejada`} />
                   <Text style={styles.percentage}>{percentage.toFixed(1).replace('.', ',')}% da receita planejada</Text>
                 </View>
               );
@@ -86,14 +85,12 @@ export default function PlanningScreen() {
 
 const styles = StyleSheet.create({
   emptyCard: { alignItems: 'flex-start', gap: spacing.sm, paddingVertical: spacing.xl },
-  emptyTitle: { color: colors.text, fontSize: typography.section, fontWeight: '800' },
-  emptyText: { color: colors.textMuted, fontSize: typography.bodySmall, lineHeight: 20 },
-  allocationCard: { gap: 0 },
+  emptyTitle: { ...textStyles.section, color: semantic.text.primary },
+  emptyText: { ...textStyles.bodySmall, color: semantic.text.secondary },
+  allocationCard: { gap: spacing.none },
   category: { gap: spacing.xs, paddingVertical: spacing.md },
   categoryBorder: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
-  categoryTitle: { color: colors.text, fontSize: typography.body, fontWeight: '700' },
-  categoryValue: { color: colors.goldBright, fontSize: typography.bodySmall, fontWeight: '800' },
-  track: { height: 8, borderRadius: 999, backgroundColor: colors.surfacePressed, overflow: 'hidden' },
-  fill: { height: '100%', backgroundColor: colors.gold, borderRadius: 999 },
-  percentage: { color: colors.textSubtle, fontSize: typography.caption },
+  categoryTitle: { ...textStyles.body, color: semantic.text.primary, fontFamily: primitives.typography.family.uiBold },
+  categoryValue: { ...textStyles.moneyM, color: semantic.text.accent },
+  percentage: { ...textStyles.caption, color: semantic.text.subtle },
 });

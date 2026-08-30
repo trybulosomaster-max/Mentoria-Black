@@ -4,17 +4,20 @@ import { useAuth } from '../../src/core/auth/AuthProvider';
 import { appEnvironment } from '../../src/core/config/env';
 import type { TransactionRow } from '../../src/core/supabase/database.types';
 import {
+  AppButton,
   Card,
+  Divider,
   InlineNotice,
   MetricCard,
   PageHeader,
   Pill,
+  ProgressBar,
   Screen,
   SectionTitle,
   StateView,
   commonStyles,
 } from '../../src/design-system/components';
-import { colors, spacing, typography } from '../../src/design-system/tokens';
+import { colors, primitives, semantic, spacing, textStyles } from '../../src/design-system/tokens';
 import { useMobileSnapshot } from '../../src/features/read-models/use-mobile-snapshot';
 import { signedAmount, transactionStatus } from '../../src/features/transactions/transaction-presentation';
 import { formatDate, formatMoney } from '../../src/lib/format';
@@ -45,7 +48,7 @@ export default function DashboardScreen() {
     return <Screen scroll={false}><StateView loading title="Montando seu panorama" message="Carregando seus dados sob as regras de acesso da conta." /></Screen>;
   }
   if (error && !data) {
-    return <Screen scroll={false}><StateView title="Não foi possível carregar" message={error} action={<Text onPress={() => { void refresh(); }} style={styles.retry}>Tentar novamente</Text>} /></Screen>;
+    return <Screen scroll={false}><StateView tone="error" title="Não foi possível carregar" message={error} action={<AppButton label="Tentar novamente" onPress={refresh} />} /></Screen>;
   }
   if (!data) return null;
 
@@ -103,7 +106,7 @@ export default function DashboardScreen() {
         {latest.length ? latest.map((transaction, index) => (
           <View key={transaction.id}>
             <TransactionRowView transaction={transaction} />
-            {index < latest.length - 1 ? <View style={styles.divider} /> : null}
+            {index < latest.length - 1 ? <Divider /> : null}
           </View>
         )) : (
           <Text style={styles.empty}>Nenhum lançamento encontrado neste mês.</Text>
@@ -119,9 +122,7 @@ export default function DashboardScreen() {
           </View>
           <Text style={styles.goalValue}>{formatMoney(data.metrics.goalsSaved)}</Text>
         </View>
-        <View accessibilityLabel={`Cobertura das metas: ${Math.round(goalsCoverage)}%`} style={styles.progressTrack}>
-          <View style={[styles.progressFill, { width: `${goalsCoverage}%` }]} />
-        </View>
+        <ProgressBar value={goalsCoverage} label="Cobertura das metas" />
         <Text style={styles.listMeta}>Objetivo total: {formatMoney(data.metrics.goalsTarget)}</Text>
       </Card>
     </Screen>
@@ -129,19 +130,15 @@ export default function DashboardScreen() {
 }
 
 const styles = StyleSheet.create({
-  retry: { color: colors.goldBright, fontSize: typography.body, fontWeight: '800', padding: spacing.md },
   listCard: { paddingVertical: spacing.xs },
-  listRow: { minHeight: 64, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, paddingVertical: spacing.sm },
-  listCopy: { flex: 1, minWidth: 0, gap: 3 },
-  listTitle: { color: colors.text, fontSize: typography.body, fontWeight: '700' },
-  listMeta: { color: colors.textMuted, fontSize: typography.caption, lineHeight: 16 },
+  listRow: { minHeight: spacing.huge + spacing.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, paddingVertical: spacing.sm },
+  listCopy: { flex: 1, minWidth: spacing.none, gap: spacing.xxs },
+  listTitle: { ...textStyles.body, color: semantic.text.primary, fontFamily: primitives.typography.family.uiBold },
+  listMeta: { ...textStyles.caption, color: semantic.text.secondary },
   listEnd: { alignItems: 'flex-end', gap: spacing.xs },
-  amount: { fontSize: typography.bodySmall, fontWeight: '800' },
-  divider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border },
-  empty: { color: colors.textMuted, textAlign: 'center', padding: spacing.xl, fontSize: typography.bodySmall },
+  amount: textStyles.moneyM,
+  empty: { ...textStyles.bodySmall, color: semantic.text.secondary, textAlign: 'center', padding: spacing.xl },
   goalCard: { gap: spacing.md },
-  goalTitle: { color: colors.text, fontSize: typography.body, fontWeight: '800' },
-  goalValue: { color: colors.goldBright, fontSize: typography.section, fontWeight: '800' },
-  progressTrack: { height: 9, backgroundColor: colors.surfacePressed, borderRadius: 999, overflow: 'hidden' },
-  progressFill: { height: '100%', backgroundColor: colors.gold, borderRadius: 999 },
+  goalTitle: { ...textStyles.body, color: semantic.text.primary, fontFamily: primitives.typography.family.uiExtraBold },
+  goalValue: { ...textStyles.moneyL, color: semantic.text.accent },
 });

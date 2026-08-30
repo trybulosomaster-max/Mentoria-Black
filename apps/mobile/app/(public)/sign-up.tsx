@@ -12,7 +12,8 @@ import {
   Screen,
   TextField,
 } from '../../src/design-system/components';
-import { colors, radius, spacing, touch, typography } from '../../src/design-system/tokens';
+import { AppIcon } from '../../src/design-system/icons';
+import { componentTokens, primitives, semantic, spacing, textStyles, touch } from '../../src/design-system/tokens';
 
 export default function SignUpScreen() {
   const { signUp, configurationRequired } = useAuth();
@@ -37,7 +38,7 @@ export default function SignUpScreen() {
   };
 
   return (
-    <Screen contentStyle={styles.content}>
+    <Screen variant="auth" contentStyle={styles.content}>
       <PageHeader
         eyebrow="Fase beta"
         title="Crie sua conta"
@@ -81,7 +82,7 @@ export default function SignUpScreen() {
           style={({ pressed }) => [styles.terms, pressed && styles.pressed]}
         >
           <View style={[styles.checkbox, termsAccepted && styles.checkboxChecked]}>
-            <Text style={styles.checkmark}>{termsAccepted ? '✓' : ''}</Text>
+            {termsAccepted ? <AppIcon name="success" size={primitives.size.icon.sm} color={semantic.text.inverse} /> : null}
           </View>
           <Text style={styles.termsText}>
             Li e concordo com os Termos de Uso e a Política de Privacidade vigentes.
@@ -108,12 +109,11 @@ export default function SignUpScreen() {
 }
 
 const styles = StyleSheet.create({
-  content: { maxWidth: 560, width: '100%', alignSelf: 'center' },
+  content: { maxWidth: componentTokens.screen.readableMaxWidth, width: '100%', alignSelf: 'center' },
   form: { gap: spacing.md },
   terms: { minHeight: touch.comfortable, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.xs },
-  pressed: { opacity: 0.75 },
-  checkbox: { width: 24, height: 24, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.borderStrong, alignItems: 'center', justifyContent: 'center' },
-  checkboxChecked: { backgroundColor: colors.gold, borderColor: colors.gold },
-  checkmark: { color: colors.background, fontWeight: '900' },
-  termsText: { flex: 1, color: colors.textMuted, fontSize: typography.bodySmall, lineHeight: 19 },
+  pressed: { opacity: primitives.opacity.pressed },
+  checkbox: { width: primitives.size.icon.md, height: primitives.size.icon.md, borderRadius: primitives.radius.sm, borderWidth: primitives.size.border.thin, borderColor: semantic.border.strong, alignItems: 'center', justifyContent: 'center' },
+  checkboxChecked: { backgroundColor: semantic.action.primary, borderColor: semantic.action.primary },
+  termsText: { ...textStyles.bodySmall, flex: 1, color: semantic.text.secondary },
 });

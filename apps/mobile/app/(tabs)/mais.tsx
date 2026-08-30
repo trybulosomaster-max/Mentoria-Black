@@ -12,7 +12,7 @@ import {
   SectionTitle,
   commonStyles,
 } from '../../src/design-system/components';
-import { colors, spacing, typography } from '../../src/design-system/tokens';
+import { componentTokens, primitives, semantic, spacing, textStyles } from '../../src/design-system/tokens';
 
 const modules = [
   ['Metas', 'Acompanhamento detalhado na próxima onda'],
@@ -70,15 +70,15 @@ export default function MoreScreen() {
 
 const styles = StyleSheet.create({
   accountCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  avatar: { width: 56, height: 56, borderRadius: 28, backgroundColor: '#1A170C', borderWidth: 1, borderColor: colors.goldDark, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { color: colors.goldBright, fontSize: 23, fontWeight: '800' },
-  accountCopy: { flex: 1, minWidth: 0, gap: spacing.xs },
-  accountName: { color: colors.text, fontSize: typography.section, fontWeight: '800' },
-  accountEmail: { color: colors.textMuted, fontSize: typography.bodySmall },
-  moduleCard: { minHeight: 82, justifyContent: 'center' },
-  moduleTitle: { color: colors.text, fontSize: typography.body, fontWeight: '800' },
-  moduleDescription: { color: colors.textMuted, fontSize: typography.caption, lineHeight: 17 },
+  avatar: { width: componentTokens.avatar.size, height: componentTokens.avatar.size, borderRadius: primitives.radius.pill, backgroundColor: primitives.color.gold[900], borderWidth: primitives.size.border.thin, borderColor: semantic.action.primaryPressed, alignItems: 'center', justifyContent: 'center' },
+  avatarText: { ...textStyles.section, color: semantic.text.accent },
+  accountCopy: { flex: 1, minWidth: spacing.none, gap: spacing.xs },
+  accountName: { ...textStyles.section, color: semantic.text.primary },
+  accountEmail: { ...textStyles.bodySmall, color: semantic.text.secondary },
+  moduleCard: { minHeight: componentTokens.avatar.size + spacing.xl, justifyContent: 'center' },
+  moduleTitle: { ...textStyles.body, color: semantic.text.primary, fontFamily: primitives.typography.family.uiExtraBold },
+  moduleDescription: { ...textStyles.caption, color: semantic.text.secondary },
   infoCard: { gap: spacing.md },
-  infoLabel: { color: colors.textMuted, fontSize: typography.bodySmall },
-  infoValue: { color: colors.text, fontSize: typography.bodySmall, fontWeight: '700', textAlign: 'right' },
+  infoLabel: { ...textStyles.bodySmall, color: semantic.text.secondary },
+  infoValue: { ...textStyles.bodySmall, color: semantic.text.primary, fontFamily: primitives.typography.family.uiBold, textAlign: 'right' },
 });
