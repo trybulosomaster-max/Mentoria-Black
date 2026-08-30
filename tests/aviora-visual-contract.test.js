@@ -67,8 +67,8 @@ test('cache frontend referencia a nova camada visual e o asset oficial',()=>{
  ok(sw.includes('./js/aviora-visual-v1.js'));
  ok(sw.includes('./assets/branding/aviora-official.jpg'));
  ok(sw.includes('./assets/branding/aviora-login-hero.jpg'));
- ok(index.includes('<meta name="aviora-build" content="aviora-card-billing-v1">'));
- ok(index.includes('<link rel="stylesheet" href="assets/aviora-v82.css?v=aviora-card-billing-v1">'));
+ ok(index.includes('<meta name="aviora-build" content="aviora-legal-v1">'));
+ ok(index.includes('<link rel="stylesheet" href="assets/aviora-v82.css?v=aviora-legal-v1">'));
  ok(index.includes('aviora-build-reloaded:${MB_BUILD_ID}'));
 });
 
