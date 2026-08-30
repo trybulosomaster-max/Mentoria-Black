@@ -2,7 +2,10 @@ import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
   type KeyboardTypeOptions,
+  Modal,
+  Platform,
   Pressable,
   type RefreshControlProps,
   ScrollView,
@@ -14,65 +17,126 @@ import {
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import type { PropsWithChildren, ReactElement, ReactNode } from 'react';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+  forwardRef,
+  type PropsWithChildren,
+  type ReactElement,
+  type ReactNode,
+  useId,
+} from 'react';
 
-import { colors, radius, shadows, spacing, touch, typography } from './tokens';
+import { AppIcon, type AppIconName } from './icons';
+import { useResponsiveLayout } from './responsive';
+import { useReducedMotion } from './system';
+import {
+  colors,
+  componentTokens,
+  dynamicType,
+  primitives,
+  semantic,
+  shadows,
+  spacing,
+  textStyles,
+} from './tokens';
+
+export type ScreenVariant = 'tab' | 'stack' | 'modal' | 'auth';
 
 type ScreenProps = PropsWithChildren<{
+  variant?: ScreenVariant;
   scroll?: boolean;
+  keyboardAware?: boolean;
   refreshControl?: ReactElement<RefreshControlProps>;
   contentStyle?: StyleProp<ViewStyle>;
+  testID?: string;
 }>;
 
-export function Screen({ children, scroll = true, refreshControl, contentStyle }: ScreenProps) {
+export function Screen({
+  children,
+  variant = 'tab',
+  scroll = true,
+  keyboardAware = variant === 'auth' || variant === 'modal',
+  refreshControl,
+  contentStyle,
+  testID,
+}: ScreenProps) {
+  const insets = useSafeAreaInsets();
+  const layout = useResponsiveLayout();
+  const bottomPadding = componentTokens.screen.bottomPadding + insets.bottom;
+  const containerStyle = [
+    styles.screenContent,
+    {
+      paddingHorizontal: layout.horizontalPadding,
+      paddingBottom: bottomPadding,
+      maxWidth: layout.contentMaxWidth,
+    },
+    variant === 'auth' && styles.authContent,
+    contentStyle,
+  ];
+  const content = scroll ? (
+    <ScrollView
+      style={styles.flex}
+      contentContainerStyle={containerStyle}
+      keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+      keyboardShouldPersistTaps="handled"
+      showsVerticalScrollIndicator={false}
+      refreshControl={refreshControl}
+      contentInsetAdjustmentBehavior="never"
+    >
+      {children}
+    </ScrollView>
+  ) : (
+    <View style={[containerStyle, styles.flex]}>{children}</View>
+  );
+
   return (
-    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
-      {scroll ? (
-        <ScrollView
+    <SafeAreaView testID={testID} style={styles.safe} edges={['top', 'left', 'right']}>
+      {keyboardAware ? (
+        <KeyboardAvoidingView
           style={styles.flex}
-          contentContainerStyle={[styles.screenContent, contentStyle]}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-          refreshControl={refreshControl}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          keyboardVerticalOffset={variant === 'modal' ? insets.top : primitives.space.none}
         >
-          {children}
-        </ScrollView>
-      ) : (
-        <View style={[styles.screenContent, styles.flex, contentStyle]}>{children}</View>
-      )}
+          {content}
+        </KeyboardAvoidingView>
+      ) : content}
     </SafeAreaView>
   );
 }
 
 export function BrandMark({ compact = false }: { compact?: boolean }) {
+  const crestSize = compact ? componentTokens.brand.crestCompact : componentTokens.brand.crest;
   return (
     <View accessibilityLabel="AVIORA Gestão Financeira" style={[styles.brand, compact && styles.brandCompact]}>
-      <LinearGradient colors={[colors.goldBright, colors.goldDark]} style={[styles.brandCrest, compact && styles.brandCrestCompact]}>
+      <LinearGradient
+        colors={[semantic.text.accent, semantic.action.primaryPressed]}
+        style={[styles.brandCrest, { width: crestSize, height: crestSize, borderRadius: crestSize / 2 }]}
+      >
         <View style={styles.brandInner}>
-          <Text style={[styles.brandLetter, compact && styles.brandLetterCompact]}>A</Text>
+          <Text maxFontSizeMultiplier={dynamicType.moneyMaxFontSizeMultiplier} style={[styles.brandLetter, compact && styles.brandLetterCompact]}>A</Text>
         </View>
       </LinearGradient>
-      {!compact && (
+      {!compact ? (
         <View style={styles.brandCopy}>
-          <Text style={styles.brandName}>AVIORA</Text>
+          <Text maxFontSizeMultiplier={dynamicType.moneyMaxFontSizeMultiplier} style={styles.brandName}>AVIORA</Text>
           <Text style={styles.brandSubtitle}>GESTÃO FINANCEIRA</Text>
         </View>
-      )}
+      ) : null}
     </View>
   );
 }
 
 type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
 
-type ButtonProps = {
+type ButtonProps = Readonly<{
   label: string;
   onPress(): void | Promise<void>;
   variant?: ButtonVariant;
   disabled?: boolean;
   loading?: boolean;
+  icon?: AppIconName;
   accessibilityHint?: string;
-};
+}>;
 
 export function AppButton({
   label,
@@ -80,6 +144,7 @@ export function AppButton({
   variant = 'primary',
   disabled = false,
   loading = false,
+  icon,
   accessibilityHint,
 }: ButtonProps) {
   const blocked = disabled || loading;
@@ -88,6 +153,7 @@ export function AppButton({
     await Haptics.selectionAsync().catch(() => undefined);
     await onPress();
   };
+  const foreground = variant === 'primary' ? semantic.text.inverse : variant === 'danger' ? semantic.status.negative : variant === 'ghost' ? semantic.text.accent : semantic.text.primary;
 
   return (
     <Pressable
@@ -97,66 +163,131 @@ export function AppButton({
       accessibilityState={{ disabled: blocked, busy: loading }}
       disabled={blocked}
       onPress={() => { void press(); }}
-      style={({ pressed }) => [
-        styles.button,
-        styles[`button_${variant}`],
-        pressed && !blocked && styles.buttonPressed,
-        blocked && styles.buttonDisabled,
-      ]}
+      style={({ pressed }) => [styles.button, styles[`button_${variant}`], pressed && !blocked && styles.buttonPressed, blocked && styles.buttonDisabled]}
     >
       {loading ? (
-        <ActivityIndicator color={variant === 'primary' ? colors.background : colors.goldBright} />
+        <ActivityIndicator color={foreground} />
       ) : (
-        <Text style={[styles.buttonText, styles[`buttonText_${variant}`]]}>{label}</Text>
+        <View style={styles.buttonContent}>
+          {icon ? <AppIcon name={icon} size={primitives.size.icon.sm} color={foreground} /> : null}
+          <Text style={[styles.buttonText, { color: foreground }]}>{label}</Text>
+        </View>
       )}
     </Pressable>
   );
 }
 
-type FieldProps = TextInputProps & {
+type IconButtonProps = Readonly<{
+  icon: AppIconName;
+  label: string;
+  onPress(): void | Promise<void>;
+  variant?: 'default' | 'ghost' | 'danger';
+  disabled?: boolean;
+}>;
+
+export function IconButton({ icon, label, onPress, variant = 'default', disabled = false }: IconButtonProps) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled }}
+      disabled={disabled}
+      onPress={() => { void onPress(); }}
+      hitSlop={spacing.xxs}
+      style={({ pressed }) => [styles.iconButton, styles[`iconButton_${variant}`], pressed && !disabled && styles.buttonPressed, disabled && styles.buttonDisabled]}
+    >
+      <AppIcon name={icon} color={variant === 'danger' ? semantic.status.negative : semantic.text.secondary} />
+    </Pressable>
+  );
+}
+
+type FieldProps = TextInputProps & Readonly<{
   label: string;
   helper?: string;
   error?: string;
   keyboardType?: KeyboardTypeOptions;
-};
+}>;
 
-export function TextField({ label, helper, error, ...inputProps }: FieldProps) {
+export const TextField = forwardRef<TextInput, FieldProps>(function TextField({ label, helper, error, ...inputProps }, ref) {
+  const id = useId();
+  const descriptionId = `${id}-description`;
   return (
     <View style={styles.field}>
-      <Text style={styles.fieldLabel}>{label}</Text>
+      <Text nativeID={`${id}-label`} style={styles.fieldLabel}>{label}</Text>
       <TextInput
         {...inputProps}
+        ref={ref}
         accessibilityLabel={label}
-        placeholderTextColor={colors.textSubtle}
-        selectionColor={colors.gold}
-        style={[styles.input, inputProps.multiline && styles.inputMultiline, Boolean(error) && styles.inputError]}
+        accessibilityHint={error || helper}
+        aria-describedby={error || helper ? descriptionId : undefined}
+        aria-invalid={Boolean(error)}
+        allowFontScaling={dynamicType.enabled}
+        maxFontSizeMultiplier={dynamicType.maxFontSizeMultiplier}
+        placeholderTextColor={semantic.text.subtle}
+        selectionColor={semantic.action.primary}
+        style={[styles.input, inputProps.multiline && styles.inputMultiline, Boolean(error) && styles.inputError, inputProps.style]}
       />
-      {Boolean(error || helper) && (
-        <Text style={[styles.fieldHelp, Boolean(error) && styles.fieldHelpError]}>{error || helper}</Text>
-      )}
+      {error || helper ? (
+        <Text
+          nativeID={descriptionId}
+          accessibilityLiveRegion={error ? 'polite' : 'none'}
+          style={[styles.fieldHelp, Boolean(error) && styles.fieldHelpError]}
+        >
+          {error || helper}
+        </Text>
+      ) : null}
     </View>
   );
-}
+});
 
-export function Card({ children, style }: PropsWithChildren<{ style?: StyleProp<ViewStyle> }>) {
-  return <View style={[styles.card, style]}>{children}</View>;
+type SearchFieldProps = Omit<FieldProps, 'label'> & Readonly<{ label?: string }>;
+
+export const SearchField = forwardRef<TextInput, SearchFieldProps>(function SearchField({ label = 'Buscar', ...inputProps }, ref) {
+  return (
+    <View style={styles.searchField}>
+      <AppIcon name="search" size={primitives.size.icon.sm} color={semantic.text.subtle} />
+      <TextInput
+        {...inputProps}
+        ref={ref}
+        accessibilityLabel={label}
+        allowFontScaling={dynamicType.enabled}
+        maxFontSizeMultiplier={dynamicType.maxFontSizeMultiplier}
+        placeholderTextColor={semantic.text.subtle}
+        selectionColor={semantic.action.primary}
+        style={[styles.searchInput, inputProps.style]}
+      />
+    </View>
+  );
+});
+
+type CardProps = PropsWithChildren<{
+  style?: StyleProp<ViewStyle>;
+  tone?: 'default' | 'raised';
+  accessibilityLabel?: string;
+}>;
+
+export function Card({ children, style, tone = 'default', accessibilityLabel }: CardProps) {
+  return <View accessibilityLabel={accessibilityLabel} style={[styles.card, tone === 'raised' && styles.cardRaised, style]}>{children}</View>;
 }
 
 export function MetricCard({ label, value, helper }: { label: string; value: string; helper?: string }) {
   return (
     <Card style={styles.metricCard}>
       <Text style={styles.metricLabel}>{label}</Text>
-      <Text adjustsFontSizeToFit numberOfLines={1} style={styles.metricValue}>{value}</Text>
+      <Text adjustsFontSizeToFit maxFontSizeMultiplier={dynamicType.moneyMaxFontSizeMultiplier} numberOfLines={1} style={styles.metricValue}>{value}</Text>
       {helper ? <Text style={styles.metricHelper}>{helper}</Text> : null}
     </Card>
   );
 }
 
-export function PageHeader({ eyebrow, title, description }: { eyebrow?: string; title: string; description?: string }) {
+export function PageHeader({ eyebrow, title, description, action }: { eyebrow?: string; title: string; description?: string; action?: ReactNode }) {
   return (
     <View style={styles.pageHeader}>
       {eyebrow ? <Text style={styles.eyebrow}>{eyebrow}</Text> : null}
-      <Text accessibilityRole="header" style={styles.pageTitle}>{title}</Text>
+      <View style={styles.pageTitleRow}>
+        <Text accessibilityRole="header" style={styles.pageTitle}>{title}</Text>
+        {action}
+      </View>
       {description ? <Text style={styles.pageDescription}>{description}</Text> : null}
     </View>
   );
@@ -171,37 +302,55 @@ export function SectionTitle({ title, action }: { title: string; action?: ReactN
   );
 }
 
-export function Pill({ label, tone = 'neutral' }: { label: string; tone?: 'neutral' | 'positive' | 'warning' | 'negative' | 'gold' }) {
+export type StatusTone = 'neutral' | 'positive' | 'warning' | 'negative' | 'gold' | 'info';
+
+export function StatusPill({ label, tone = 'neutral' }: { label: string; tone?: StatusTone }) {
   return (
-    <View style={[styles.pill, styles[`pill_${tone}`]]}>
+    <View accessibilityLabel={`${label}, estado`} style={[styles.pill, styles[`pill_${tone}`]]}>
       <Text style={[styles.pillText, styles[`pillText_${tone}`]]}>{label}</Text>
     </View>
   );
 }
 
-export function InlineNotice({ title, message, tone = 'info' }: { title: string; message: string; tone?: 'info' | 'warning' | 'error' }) {
+/** @deprecated Use StatusPill in new code. */
+export const Pill = StatusPill;
+
+export function FilterChip({ label, selected, onPress, disabled = false }: { label: string; selected: boolean; onPress(): void; disabled?: boolean }) {
   return (
-    <View accessibilityRole="alert" style={[styles.notice, styles[`notice_${tone}`]]}>
-      <Text style={styles.noticeTitle}>{title}</Text>
-      <Text style={styles.noticeMessage}>{message}</Text>
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ selected, disabled }}
+      disabled={disabled}
+      onPress={onPress}
+      style={({ pressed }) => [styles.filterChip, selected && styles.filterChipSelected, pressed && !disabled && styles.buttonPressed, disabled && styles.buttonDisabled]}
+    >
+      <Text style={[styles.filterChipText, selected && styles.filterChipTextSelected]}>{label}</Text>
+    </Pressable>
+  );
+}
+
+type NoticeTone = 'info' | 'warning' | 'error' | 'success';
+const noticeIcon: Readonly<Record<NoticeTone, AppIconName>> = { info: 'info', warning: 'warning', error: 'error', success: 'success' };
+
+export function InlineNotice({ title, message, tone = 'info' }: { title: string; message: string; tone?: NoticeTone }) {
+  return (
+    <View accessibilityRole={tone === 'error' ? 'alert' : 'summary'} style={[styles.notice, styles[`notice_${tone}`]]}>
+      <AppIcon name={noticeIcon[tone]} size={componentTokens.notice.iconSize} color={styles[`noticeIcon_${tone}`].color} />
+      <View style={styles.noticeCopy}>
+        <Text style={styles.noticeTitle}>{title}</Text>
+        <Text style={styles.noticeMessage}>{message}</Text>
+      </View>
     </View>
   );
 }
 
-export function StateView({
-  title,
-  message,
-  action,
-  loading = false,
-}: {
-  title: string;
-  message: string;
-  action?: ReactNode;
-  loading?: boolean;
-}) {
+type StateTone = 'empty' | 'error' | 'offline';
+
+export function StateView({ title, message, action, loading = false, tone = 'empty' }: { title: string; message: string; action?: ReactNode; loading?: boolean; tone?: StateTone }) {
+  const stateIcon: AppIconName = tone === 'error' ? 'error' : tone === 'offline' ? 'warning' : 'info';
   return (
-    <View style={styles.stateView}>
-      {loading ? <ActivityIndicator size="large" color={colors.gold} /> : <BrandMark compact />}
+    <View accessibilityLiveRegion="polite" style={styles.stateView}>
+      {loading ? <ActivityIndicator size="large" color={semantic.action.primary} /> : <AppIcon name={stateIcon} size={primitives.size.icon.xl} color={semantic.text.accent} accessibilityLabel={tone} />}
       <Text accessibilityRole="header" style={styles.stateTitle}>{title}</Text>
       <Text style={styles.stateMessage}>{message}</Text>
       {action ? <View style={styles.stateAction}>{action}</View> : null}
@@ -209,126 +358,169 @@ export function StateView({
   );
 }
 
+export function ProgressBar({ value, label, showValue = false }: { value: number; label: string; showValue?: boolean }) {
+  const normalized = Math.max(0, Math.min(100, value));
+  return (
+    <View style={styles.progressGroup}>
+      <View accessibilityRole="progressbar" accessibilityLabel={label} accessibilityValue={{ min: 0, max: 100, now: Math.round(normalized) }} style={styles.progressTrack}>
+        <View style={[styles.progressFill, { width: `${normalized}%` }]} />
+      </View>
+      {showValue ? <Text style={styles.progressLabel}>{normalized.toFixed(0)}%</Text> : null}
+    </View>
+  );
+}
+
+type OverlayProps = PropsWithChildren<{ visible: boolean; title: string; onClose(): void; actions?: ReactNode }>;
+
+export function BottomSheet({ visible, title, onClose, actions, children }: OverlayProps) {
+  const insets = useSafeAreaInsets();
+  const reducedMotion = useReducedMotion();
+  return (
+    <Modal visible={visible} transparent animationType={reducedMotion ? 'none' : 'slide'} onRequestClose={onClose} statusBarTranslucent>
+      <View style={styles.overlay}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Fechar painel" onPress={onClose} style={StyleSheet.absoluteFill} />
+        <View accessibilityViewIsModal style={[styles.sheet, { paddingBottom: componentTokens.sheet.padding + insets.bottom }]}>
+          <View style={styles.overlayHeader}>
+            <Text accessibilityRole="header" style={styles.overlayTitle}>{title}</Text>
+            <IconButton icon="close" label="Fechar" variant="ghost" onPress={onClose} />
+          </View>
+          <View style={styles.overlayBody}>{children}</View>
+          {actions ? <View style={styles.overlayActions}>{actions}</View> : null}
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+export function Dialog({ visible, title, onClose, actions, children }: OverlayProps) {
+  const reducedMotion = useReducedMotion();
+  return (
+    <Modal visible={visible} transparent animationType={reducedMotion ? 'none' : 'fade'} onRequestClose={onClose} statusBarTranslucent>
+      <View style={[styles.overlay, styles.dialogAlignment]}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Fechar diálogo" onPress={onClose} style={StyleSheet.absoluteFill} />
+        <View accessibilityViewIsModal style={styles.dialog}>
+          <View style={styles.overlayHeader}>
+            <Text accessibilityRole="header" style={styles.overlayTitle}>{title}</Text>
+            <IconButton icon="close" label="Fechar" variant="ghost" onPress={onClose} />
+          </View>
+          <View style={styles.overlayBody}>{children}</View>
+          {actions ? <View style={styles.overlayActions}>{actions}</View> : null}
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 export function Divider() {
-  return <View style={styles.divider} />;
+  return <View accessibilityElementsHidden style={styles.divider} />;
 }
 
 export const commonStyles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center' },
   between: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
   wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  muted: { color: colors.textMuted },
-  positive: { color: colors.positive },
-  negative: { color: colors.negative },
+  muted: { color: semantic.text.secondary },
+  positive: { color: semantic.status.positive },
+  negative: { color: semantic.status.negative },
+  money: textStyles.moneyM,
 });
+
+const borderWidth = primitives.size.border.thin;
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  safe: { flex: 1, backgroundColor: colors.background },
-  screenContent: {
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.xxxl,
-    gap: spacing.md,
-  },
+  safe: { flex: 1, backgroundColor: semantic.bg.base },
+  screenContent: { width: '100%', alignSelf: 'center', paddingTop: spacing.md, gap: spacing.md },
+  authContent: { justifyContent: 'center' },
   brand: { alignItems: 'center', gap: spacing.sm },
-  brandCompact: { gap: 0 },
-  brandCrest: {
-    width: 92,
-    height: 92,
-    borderRadius: 46,
-    padding: 2,
-    ...shadows.card,
-  },
-  brandCrestCompact: { width: 54, height: 54, borderRadius: 27 },
-  brandInner: {
-    flex: 1,
-    borderRadius: 999,
-    backgroundColor: colors.background,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: colors.goldDark,
-  },
-  brandLetter: { color: colors.goldBright, fontSize: 42, fontWeight: '800', letterSpacing: 1 },
-  brandLetterCompact: { fontSize: 25 },
+  brandCompact: { gap: spacing.none },
+  brandCrest: { padding: componentTokens.brand.crestBorder, ...shadows.card },
+  brandInner: { flex: 1, borderRadius: primitives.radius.pill, backgroundColor: semantic.bg.base, alignItems: 'center', justifyContent: 'center', borderWidth, borderColor: semantic.action.primaryPressed },
+  brandLetter: { color: semantic.text.accent, fontFamily: primitives.typography.family.brandBold, fontSize: componentTokens.brand.letter },
+  brandLetterCompact: { fontSize: componentTokens.brand.letterCompact },
   brandCopy: { alignItems: 'center', gap: spacing.xxs },
-  brandName: { color: colors.goldBright, fontSize: 28, fontWeight: '700', letterSpacing: 4 },
-  brandSubtitle: { color: colors.text, fontSize: 10, fontWeight: '600', letterSpacing: 3 },
-  button: {
-    minHeight: 48,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-  },
-  button_primary: { backgroundColor: colors.gold, borderColor: colors.gold },
-  button_secondary: { backgroundColor: colors.surfaceRaised, borderColor: colors.borderStrong },
-  button_ghost: { backgroundColor: colors.transparent, borderColor: colors.transparent },
-  button_danger: { backgroundColor: '#1A1111', borderColor: '#653737' },
-  buttonPressed: { opacity: 0.78, transform: [{ scale: 0.995 }] },
-  buttonDisabled: { opacity: 0.5 },
-  buttonText: { fontSize: typography.body, fontWeight: '800', textAlign: 'center' },
-  buttonText_primary: { color: colors.background },
-  buttonText_secondary: { color: colors.text },
-  buttonText_ghost: { color: colors.goldBright },
-  buttonText_danger: { color: colors.negative },
+  brandName: { ...textStyles.brand, color: semantic.text.accent },
+  brandSubtitle: { color: semantic.text.primary, fontFamily: primitives.typography.family.uiSemiBold, fontSize: componentTokens.brand.subtitle, letterSpacing: primitives.typography.letterSpacing.brand },
+  button: { minHeight: componentTokens.button.minHeight, borderRadius: componentTokens.button.radius, paddingHorizontal: componentTokens.button.horizontalPadding, alignItems: 'center', justifyContent: 'center', borderWidth },
+  button_primary: { backgroundColor: semantic.action.primary, borderColor: semantic.action.primary },
+  button_secondary: { backgroundColor: semantic.action.secondary, borderColor: semantic.border.strong },
+  button_ghost: { backgroundColor: primitives.color.transparent, borderColor: primitives.color.transparent },
+  button_danger: { backgroundColor: semantic.status.negativeSurface, borderColor: semantic.status.negativeBorder },
+  buttonPressed: { opacity: primitives.opacity.pressed, transform: [{ scale: primitives.motion.pressedScale }] },
+  buttonDisabled: { opacity: primitives.opacity.disabled },
+  buttonContent: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs },
+  buttonText: { ...textStyles.buttonLabel, textAlign: 'center' },
+  iconButton: { width: componentTokens.iconButton.size, height: componentTokens.iconButton.size, borderRadius: componentTokens.iconButton.radius, alignItems: 'center', justifyContent: 'center', borderWidth },
+  iconButton_default: { backgroundColor: semantic.surface.raised, borderColor: semantic.border.default },
+  iconButton_ghost: { backgroundColor: primitives.color.transparent, borderColor: primitives.color.transparent },
+  iconButton_danger: { backgroundColor: semantic.status.negativeSurface, borderColor: semantic.status.negativeBorder },
   field: { gap: spacing.xs },
-  fieldLabel: { color: colors.textMuted, fontSize: typography.caption, fontWeight: '700', letterSpacing: 1.2, textTransform: 'uppercase' },
-  input: {
-    minHeight: 48,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
-    backgroundColor: colors.backgroundElevated,
-    color: colors.text,
-    paddingHorizontal: spacing.md,
-    fontSize: typography.body,
-  },
-  inputMultiline: { minHeight: 112, paddingTop: spacing.md, textAlignVertical: 'top' },
-  inputError: { borderColor: colors.negative },
-  fieldHelp: { color: colors.textMuted, fontSize: typography.caption, lineHeight: 16 },
-  fieldHelpError: { color: colors.negative },
-  card: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.lg,
-    padding: spacing.md,
-    ...shadows.card,
-  },
-  metricCard: { minWidth: 158, flexGrow: 1, flexBasis: 158, gap: spacing.xs },
-  metricLabel: { color: colors.textMuted, fontSize: typography.caption, fontWeight: '700', letterSpacing: 0.7, textTransform: 'uppercase' },
-  metricValue: { color: colors.text, fontSize: 22, fontWeight: '800' },
-  metricHelper: { color: colors.textSubtle, fontSize: typography.caption, lineHeight: 16 },
+  fieldLabel: { ...textStyles.caption, color: semantic.text.secondary, fontFamily: primitives.typography.family.uiBold, letterSpacing: primitives.typography.letterSpacing.label },
+  input: { minHeight: componentTokens.input.minHeight, borderRadius: componentTokens.input.radius, borderWidth, borderColor: semantic.border.strong, backgroundColor: semantic.bg.elevated, color: semantic.text.primary, paddingHorizontal: spacing.md, ...textStyles.body },
+  inputMultiline: { minHeight: componentTokens.input.multilineMinHeight, paddingTop: spacing.md, textAlignVertical: 'top' },
+  inputError: { borderColor: semantic.status.negative },
+  fieldHelp: { ...textStyles.caption, color: semantic.text.secondary },
+  fieldHelpError: { color: semantic.status.negative },
+  searchField: { minHeight: componentTokens.input.minHeight, flexDirection: 'row', alignItems: 'center', gap: spacing.xs, borderRadius: componentTokens.input.radius, borderWidth, borderColor: semantic.border.strong, backgroundColor: semantic.bg.elevated, paddingHorizontal: spacing.md },
+  searchInput: { flex: 1, minWidth: spacing.none, color: semantic.text.primary, paddingVertical: spacing.xs, ...textStyles.body },
+  card: { backgroundColor: semantic.surface.default, borderWidth, borderColor: semantic.border.default, borderRadius: componentTokens.card.radius, padding: componentTokens.card.padding, ...shadows.card },
+  cardRaised: { backgroundColor: semantic.surface.raised, borderColor: semantic.border.strong },
+  metricCard: { minWidth: componentTokens.card.metricMinWidth, flexGrow: 1, flexBasis: componentTokens.card.metricMinWidth, gap: spacing.xs },
+  metricLabel: { ...textStyles.caption, color: semantic.text.secondary, fontFamily: primitives.typography.family.uiBold, letterSpacing: primitives.typography.letterSpacing.label },
+  metricValue: { ...textStyles.moneyL, color: semantic.text.primary },
+  metricHelper: { ...textStyles.caption, color: semantic.text.subtle },
   pageHeader: { gap: spacing.xs, marginBottom: spacing.xs },
-  eyebrow: { color: colors.goldBright, fontSize: typography.caption, fontWeight: '800', letterSpacing: 1.5, textTransform: 'uppercase' },
-  pageTitle: { color: colors.text, fontSize: typography.title, lineHeight: 31, fontWeight: '800' },
-  pageDescription: { color: colors.textMuted, fontSize: typography.body, lineHeight: typography.lineHeightBody },
+  pageTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
+  eyebrow: { ...textStyles.caption, color: semantic.text.accent, fontFamily: primitives.typography.family.uiExtraBold, letterSpacing: primitives.typography.letterSpacing.eyebrow },
+  pageTitle: { ...textStyles.title, flexShrink: 1, color: semantic.text.primary },
+  pageDescription: { ...textStyles.body, color: semantic.text.secondary },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
-  sectionTitle: { color: colors.text, fontSize: typography.section, fontWeight: '800' },
-  pill: { alignSelf: 'flex-start', borderRadius: radius.pill, borderWidth: 1, paddingHorizontal: spacing.sm, paddingVertical: 5 },
-  pill_neutral: { borderColor: colors.borderStrong, backgroundColor: colors.surfaceRaised },
-  pill_positive: { borderColor: '#3C5B42', backgroundColor: '#102015' },
-  pill_warning: { borderColor: '#5A4927', backgroundColor: '#18150C' },
-  pill_negative: { borderColor: '#6A3333', backgroundColor: '#1A1111' },
-  pill_gold: { borderColor: colors.goldDark, backgroundColor: '#1A170C' },
-  pillText: { fontSize: typography.caption, fontWeight: '700' },
-  pillText_neutral: { color: colors.textMuted },
-  pillText_positive: { color: colors.positive },
-  pillText_warning: { color: colors.warning },
-  pillText_negative: { color: colors.negative },
-  pillText_gold: { color: colors.goldBright },
-  notice: { borderRadius: radius.md, borderWidth: 1, padding: spacing.md, gap: spacing.xs },
-  notice_info: { borderColor: '#33445A', backgroundColor: '#0C121A' },
-  notice_warning: { borderColor: '#5A4927', backgroundColor: '#18150C' },
-  notice_error: { borderColor: '#6A3333', backgroundColor: '#1A1111' },
-  noticeTitle: { color: colors.text, fontSize: typography.bodySmall, fontWeight: '800' },
-  noticeMessage: { color: colors.textMuted, fontSize: typography.bodySmall, lineHeight: 19 },
-  stateView: { flex: 1, minHeight: 420, alignItems: 'center', justifyContent: 'center', gap: spacing.md, padding: spacing.xl },
-  stateTitle: { color: colors.text, fontSize: typography.section, fontWeight: '800', textAlign: 'center' },
-  stateMessage: { color: colors.textMuted, fontSize: typography.body, lineHeight: typography.lineHeightBody, textAlign: 'center', maxWidth: 420 },
-  stateAction: { width: '100%', maxWidth: 360, gap: spacing.sm },
-  divider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border, width: '100%' },
+  sectionTitle: { ...textStyles.section, flexShrink: 1, color: semantic.text.primary },
+  pill: { alignSelf: 'flex-start', borderRadius: componentTokens.chip.radius, borderWidth, paddingHorizontal: componentTokens.chip.horizontalPadding, paddingVertical: spacing.xxs },
+  pill_neutral: { borderColor: semantic.border.strong, backgroundColor: semantic.surface.raised },
+  pill_positive: { borderColor: semantic.status.positiveBorder, backgroundColor: semantic.status.positiveSurface },
+  pill_warning: { borderColor: semantic.status.warningBorder, backgroundColor: semantic.status.warningSurface },
+  pill_negative: { borderColor: semantic.status.negativeBorder, backgroundColor: semantic.status.negativeSurface },
+  pill_gold: { borderColor: semantic.action.primaryPressed, backgroundColor: primitives.color.gold[900] },
+  pill_info: { borderColor: semantic.status.infoBorder, backgroundColor: semantic.status.infoSurface },
+  pillText: { ...textStyles.caption, fontFamily: primitives.typography.family.uiBold },
+  pillText_neutral: { color: semantic.text.secondary },
+  pillText_positive: { color: semantic.status.positive },
+  pillText_warning: { color: semantic.status.warning },
+  pillText_negative: { color: semantic.status.negative },
+  pillText_gold: { color: semantic.text.accent },
+  pillText_info: { color: semantic.status.info },
+  filterChip: { minHeight: componentTokens.chip.minHeight, justifyContent: 'center', borderRadius: componentTokens.chip.radius, borderWidth, borderColor: semantic.border.default, backgroundColor: semantic.surface.default, paddingHorizontal: componentTokens.chip.horizontalPadding },
+  filterChipSelected: { borderColor: semantic.border.focus, backgroundColor: primitives.color.gold[900] },
+  filterChipText: { ...textStyles.bodySmall, color: semantic.text.secondary, fontFamily: primitives.typography.family.uiSemiBold },
+  filterChipTextSelected: { color: semantic.text.accent },
+  notice: { flexDirection: 'row', alignItems: 'flex-start', borderRadius: componentTokens.notice.radius, borderWidth, padding: componentTokens.notice.padding, gap: spacing.sm },
+  notice_info: { borderColor: semantic.status.infoBorder, backgroundColor: semantic.status.infoSurface },
+  notice_warning: { borderColor: semantic.status.warningBorder, backgroundColor: semantic.status.warningSurface },
+  notice_error: { borderColor: semantic.status.negativeBorder, backgroundColor: semantic.status.negativeSurface },
+  notice_success: { borderColor: semantic.status.positiveBorder, backgroundColor: semantic.status.positiveSurface },
+  noticeIcon_info: { color: semantic.status.info },
+  noticeIcon_warning: { color: semantic.status.warning },
+  noticeIcon_error: { color: semantic.status.negative },
+  noticeIcon_success: { color: semantic.status.positive },
+  noticeCopy: { flex: 1, gap: spacing.xs },
+  noticeTitle: { ...textStyles.bodySmall, color: semantic.text.primary, fontFamily: primitives.typography.family.uiExtraBold },
+  noticeMessage: { ...textStyles.bodySmall, color: semantic.text.secondary },
+  stateView: { flex: 1, minHeight: componentTokens.screen.stateMinHeight, alignItems: 'center', justifyContent: 'center', gap: spacing.md, padding: spacing.xl },
+  stateTitle: { ...textStyles.section, color: semantic.text.primary, textAlign: 'center' },
+  stateMessage: { ...textStyles.body, color: semantic.text.secondary, textAlign: 'center', maxWidth: componentTokens.dialog.maxWidth },
+  stateAction: { width: '100%', maxWidth: componentTokens.dialog.maxWidth, gap: spacing.sm },
+  progressGroup: { gap: spacing.xs },
+  progressTrack: { height: componentTokens.progress.height, borderRadius: componentTokens.progress.radius, backgroundColor: semantic.surface.pressed, overflow: 'hidden' },
+  progressFill: { height: '100%', borderRadius: componentTokens.progress.radius, backgroundColor: semantic.action.primary },
+  progressLabel: { ...textStyles.caption, color: semantic.text.secondary, textAlign: 'right' },
+  overlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: semantic.overlay.default },
+  dialogAlignment: { justifyContent: 'center', padding: spacing.md },
+  sheet: { width: '100%', maxWidth: componentTokens.sheet.maxWidth, alignSelf: 'center', borderTopLeftRadius: componentTokens.sheet.radius, borderTopRightRadius: componentTokens.sheet.radius, borderWidth, borderColor: semantic.border.strong, backgroundColor: semantic.surface.raised, padding: componentTokens.sheet.padding, gap: spacing.md, ...shadows.overlay },
+  dialog: { width: '100%', maxWidth: componentTokens.dialog.maxWidth, alignSelf: 'center', borderRadius: componentTokens.dialog.radius, borderWidth, borderColor: semantic.border.strong, backgroundColor: semantic.surface.raised, padding: componentTokens.dialog.padding, gap: spacing.md, ...shadows.overlay },
+  overlayHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
+  overlayTitle: { ...textStyles.section, flex: 1, color: semantic.text.primary },
+  overlayBody: { gap: spacing.md },
+  overlayActions: { gap: spacing.sm },
+  divider: { height: StyleSheet.hairlineWidth, backgroundColor: semantic.border.default, width: '100%' },
 });

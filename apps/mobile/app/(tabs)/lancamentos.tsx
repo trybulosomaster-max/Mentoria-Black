@@ -1,18 +1,19 @@
 import { useMemo, useState } from 'react';
-import { Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { RefreshControl, StyleSheet, Text, View } from 'react-native';
 
 import { useAuth } from '../../src/core/auth/AuthProvider';
 import type { TransactionRow } from '../../src/core/supabase/database.types';
 import {
   Card,
+  FilterChip,
   PageHeader,
   Pill,
   Screen,
   StateView,
-  TextField,
+  SearchField,
   commonStyles,
 } from '../../src/design-system/components';
-import { colors, radius, spacing, touch, typography } from '../../src/design-system/tokens';
+import { colors, primitives, semantic, spacing, textStyles } from '../../src/design-system/tokens';
 import { useMobileSnapshot } from '../../src/features/read-models/use-mobile-snapshot';
 import {
   signedAmount,
@@ -64,27 +65,24 @@ export default function TransactionsScreen() {
         title="Lançamentos"
         description="Consulte os movimentos sem confundir status, data financeira ou tipo."
       />
-      <TextField
-        label="Buscar"
+      <SearchField
+        label="Buscar lançamentos"
         value={query}
         onChangeText={setQuery}
         placeholder="Descrição ou categoria"
         autoCorrect={false}
         clearButtonMode="while-editing"
       />
-      <View accessibilityRole="tablist" style={styles.filters}>
+      <View style={styles.filters}>
         {filters.map((item) => {
           const active = item.key === filter;
           return (
-            <Pressable
+            <FilterChip
               key={item.key}
-              accessibilityRole="tab"
-              accessibilityState={{ selected: active }}
+              label={item.label}
+              selected={active}
               onPress={() => setFilter(item.key)}
-              style={({ pressed }) => [styles.filter, active && styles.filterActive, pressed && styles.pressed]}
-            >
-              <Text style={[styles.filterText, active && styles.filterTextActive]}>{item.label}</Text>
-            </Pressable>
+            />
           );
         })}
       </View>
@@ -119,16 +117,11 @@ export default function TransactionsScreen() {
 
 const styles = StyleSheet.create({
   filters: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
-  filter: { minHeight: touch.minimum, justifyContent: 'center', paddingHorizontal: spacing.md, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
-  filterActive: { borderColor: colors.gold, backgroundColor: '#1A170C' },
-  pressed: { opacity: 0.75 },
-  filterText: { color: colors.textMuted, fontSize: typography.bodySmall, fontWeight: '700' },
-  filterTextActive: { color: colors.goldBright },
-  count: { color: colors.textSubtle, fontSize: typography.caption },
+  count: { ...textStyles.caption, color: semantic.text.subtle },
   transactionCard: { gap: spacing.sm },
-  copy: { flex: 1, minWidth: 0, gap: spacing.xxs },
-  title: { color: colors.text, fontSize: typography.body, fontWeight: '800' },
-  meta: { color: colors.textMuted, fontSize: typography.caption, lineHeight: 16 },
-  amount: { fontSize: typography.body, fontWeight: '800' },
-  empty: { color: colors.textMuted, textAlign: 'center', padding: spacing.lg },
+  copy: { flex: 1, minWidth: spacing.none, gap: spacing.xxs },
+  title: { ...textStyles.body, color: semantic.text.primary, fontFamily: primitives.typography.family.uiExtraBold },
+  meta: { ...textStyles.caption, color: semantic.text.secondary },
+  amount: textStyles.moneyM,
+  empty: { ...textStyles.bodySmall, color: semantic.text.secondary, textAlign: 'center', padding: spacing.lg },
 });

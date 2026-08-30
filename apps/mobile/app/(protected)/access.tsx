@@ -12,7 +12,7 @@ import {
   PageHeader,
   Screen,
 } from '../../src/design-system/components';
-import { colors, spacing, typography } from '../../src/design-system/tokens';
+import { componentTokens, primitives, semantic, spacing, textStyles } from '../../src/design-system/tokens';
 
 export default function AccessScreen() {
   const {
@@ -38,7 +38,7 @@ export default function AccessScreen() {
       : 'Não encontramos uma licença APP ativa para esta conta.';
 
   return (
-    <Screen contentStyle={styles.content}>
+    <Screen variant="stack" contentStyle={styles.content}>
       <View style={styles.brand}><BrandMark compact /></View>
       <PageHeader eyebrow="Conta protegida" title={title} description={description} />
 
@@ -64,10 +64,10 @@ export default function AccessScreen() {
 }
 
 const styles = StyleSheet.create({
-  content: { justifyContent: 'center', minHeight: '100%', maxWidth: 540, width: '100%', alignSelf: 'center' },
+  content: { justifyContent: 'center', minHeight: '100%', maxWidth: componentTokens.screen.readableMaxWidth, width: '100%', alignSelf: 'center' },
   brand: { alignItems: 'center' },
   card: { gap: spacing.xs },
-  cardTitle: { color: colors.text, fontSize: typography.body, fontWeight: '800' },
-  cardText: { color: colors.textMuted, fontSize: typography.bodySmall, lineHeight: 20 },
+  cardTitle: { ...textStyles.body, color: semantic.text.primary, fontFamily: primitives.typography.family.uiExtraBold },
+  cardText: { ...textStyles.bodySmall, color: semantic.text.secondary },
   actions: { gap: spacing.sm },
 });

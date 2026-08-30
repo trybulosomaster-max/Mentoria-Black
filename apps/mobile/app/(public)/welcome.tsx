@@ -9,7 +9,7 @@ import {
   InlineNotice,
   Screen,
 } from '../../src/design-system/components';
-import { colors, spacing, typography } from '../../src/design-system/tokens';
+import { componentTokens, primitives, semantic, spacing, textStyles } from '../../src/design-system/tokens';
 
 const benefits = [
   ['Visão clara', 'Realizado, programado e patrimônio sem misturar conceitos.'],
@@ -19,7 +19,7 @@ const benefits = [
 
 export default function WelcomeScreen() {
   return (
-    <Screen contentStyle={styles.content}>
+    <Screen variant="auth" contentStyle={styles.content}>
       <View style={styles.hero}>
         <BrandMark />
         <Text accessibilityRole="header" style={styles.title}>Sua vida financeira, com direção.</Text>
@@ -69,14 +69,14 @@ export default function WelcomeScreen() {
 const styles = StyleSheet.create({
   content: { justifyContent: 'center', minHeight: '100%' },
   hero: { alignItems: 'center', gap: spacing.md, paddingVertical: spacing.lg },
-  title: { color: colors.text, fontSize: 28, lineHeight: 36, fontWeight: '800', textAlign: 'center', maxWidth: 420 },
-  subtitle: { color: colors.textMuted, fontSize: typography.body, lineHeight: 23, textAlign: 'center', maxWidth: 380 },
+  title: { ...textStyles.title, color: semantic.text.primary, textAlign: 'center', maxWidth: componentTokens.screen.stateMinHeight },
+  subtitle: { ...textStyles.body, color: semantic.text.secondary, textAlign: 'center', maxWidth: componentTokens.dialog.maxWidth },
   benefitsCard: { gap: spacing.md },
   benefit: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
-  bullet: { width: 9, height: 9, borderRadius: 5, backgroundColor: colors.gold, marginTop: 6 },
+  bullet: { width: spacing.xs, height: spacing.xs, borderRadius: primitives.radius.pill, backgroundColor: semantic.action.primary, marginTop: primitives.radius.xs },
   benefitCopy: { flex: 1, gap: spacing.xxs },
-  benefitTitle: { color: colors.text, fontSize: typography.body, fontWeight: '800' },
-  benefitDescription: { color: colors.textMuted, fontSize: typography.bodySmall, lineHeight: 19 },
+  benefitTitle: { ...textStyles.body, color: semantic.text.primary, fontFamily: primitives.typography.family.uiExtraBold },
+  benefitDescription: { ...textStyles.bodySmall, color: semantic.text.secondary },
   actions: { gap: spacing.sm },
-  footnote: { color: colors.textSubtle, fontSize: typography.caption, textAlign: 'center', lineHeight: 16 },
+  footnote: { ...textStyles.caption, color: semantic.text.subtle, textAlign: 'center' },
 });

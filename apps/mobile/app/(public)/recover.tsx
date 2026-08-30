@@ -11,7 +11,7 @@ import {
   Screen,
   TextField,
 } from '../../src/design-system/components';
-import { spacing } from '../../src/design-system/tokens';
+import { componentTokens, spacing } from '../../src/design-system/tokens';
 
 export default function RecoverScreen() {
   const { requestPasswordReset, configurationRequired } = useAuth();
@@ -28,7 +28,7 @@ export default function RecoverScreen() {
   };
 
   return (
-    <Screen contentStyle={styles.content}>
+    <Screen variant="auth" contentStyle={styles.content}>
       <PageHeader
         eyebrow="Recuperação segura"
         title="Redefina sua senha"
@@ -63,6 +63,6 @@ export default function RecoverScreen() {
 }
 
 const styles = StyleSheet.create({
-  content: { justifyContent: 'center', minHeight: '100%', maxWidth: 520, width: '100%', alignSelf: 'center' },
+  content: { justifyContent: 'center', minHeight: '100%', maxWidth: componentTokens.dialog.maxWidth, width: '100%', alignSelf: 'center' },
   form: { gap: spacing.md },
 });
