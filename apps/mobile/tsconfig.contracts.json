@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "useUnknownInCatchVariables": true,
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "lib": ["ES2022"]
+  },
+  "include": [
+    "src/domain/access/access-contract.ts",
+    "src/domain/finance/foundation-financial-read-model.ts",
+    "src/features/auth/password-policy.ts",
+    "src/design-system/tokens.ts"
+  ]
+}
