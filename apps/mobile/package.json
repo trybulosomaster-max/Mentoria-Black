@@ -1,0 +1,48 @@
+{
+  "name": "@aviora/mobile",
+  "version": "0.1.0",
+  "private": true,
+  "main": "expo-router/entry",
+  "type": "module",
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "start": "expo start --dev-client",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
+    "web:unsupported": "node -e \"console.error('A fundação V1 é destinada a iOS e Android.'); process.exit(1)\"",
+    "typecheck": "tsc --noEmit",
+    "typecheck:contracts": "tsc -p tsconfig.contracts.json --noEmit",
+    "test:contracts": "node --experimental-strip-types --test tests/contracts.test.ts",
+    "validate:source": "node scripts/validate-deliverable.mjs",
+    "check": "npm run validate:source && npm run typecheck:contracts && npm run test:contracts && npm run test:parity && npm run typecheck",
+    "test:parity": "node --experimental-strip-types --test tests/web-financial-parity.test.ts tests/web-contract-parity.test.ts"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "2.112.4",
+    "expo": "~57.0.9",
+    "expo-constants": "~57.0.8",
+    "expo-dev-client": "~57.0.16",
+    "expo-haptics": "~57.0.2",
+    "expo-linear-gradient": "~57.0.1",
+    "expo-linking": "~57.0.4",
+    "expo-router": "~57.0.16",
+    "expo-splash-screen": "~57.0.8",
+    "expo-sqlite": "~57.0.2",
+    "expo-status-bar": "~57.0.1",
+    "expo-system-ui": "~57.0.2",
+    "react": "19.2.3",
+    "react-native": "0.86.2",
+    "react-native-gesture-handler": "~3.1.0",
+    "react-native-reanimated": "~4.5.1",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-screens": "~4.26.0",
+    "react-native-url-polyfill": "2.0.0",
+    "react-native-worklets": "~0.10.1"
+  },
+  "devDependencies": {
+    "@types/react": "~19.2.2",
+    "typescript": "~6.0.3"
+  }
+}
