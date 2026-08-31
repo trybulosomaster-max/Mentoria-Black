@@ -11,10 +11,13 @@ import { primitives, spacing, textStyles, type ThemeTokens } from '../../src/des
 const modules = ['Metas', 'Saúde financeira', 'Relatórios', 'Conhecimento'] as const;
 
 const appearanceOptions = [
-  { value: 'system', label: 'Sistema', helper: 'Usa a preferência do dispositivo.' },
-  { value: 'light', label: 'Claro', helper: 'Patrimônio Sereno.' },
+  { value: 'system', label: 'Sistema', helper: 'Automático. Usa a preferência do dispositivo.' },
+  { value: 'serene', label: 'Sereno', helper: 'Patrimônio Sereno.' },
+  { value: 'white', label: 'Branco', helper: 'Branco Executivo.' },
   { value: 'dark', label: 'Escuro', helper: 'Noite Executiva.' },
 ] as const;
+
+const resolvedThemeLabels = { serene: 'Patrimônio Sereno', white: 'Branco Executivo', dark: 'Noite Executiva' } as const;
 
 export default function MoreScreen() {
   const { user, entitlements, signOut } = useAuth();
@@ -42,7 +45,7 @@ export default function MoreScreen() {
       <View accessibilityRole="radiogroup" accessibilityLabel="Aparência" style={styles.appearanceGroup}>
         {appearanceOptions.map((option) => <ThemeRadioRow key={option.value} label={option.label} helper={option.helper} selected={preference === option.value} onPress={() => setPreference(option.value)} />)}
       </View>
-      <Text style={styles.resolved}>Aparência atual: {resolvedTheme === 'light' ? 'Patrimônio Sereno' : 'Noite Executiva'}.</Text>
+      <Text style={styles.resolved}>Aparência atual: {resolvedThemeLabels[resolvedTheme]}.</Text>
 
       <SectionTitle title="Outras áreas" />
       <Card style={styles.moduleGroup}>{modules.map((title, index) => <View key={title} style={[styles.moduleRow, index < modules.length - 1 && styles.moduleDivider]}><Text style={styles.moduleTitle}>{title}</Text><StatusPill label="Em breve" /></View>)}</Card>

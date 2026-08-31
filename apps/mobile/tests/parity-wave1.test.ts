@@ -31,11 +31,13 @@ test('Lançamentos, Planejamento e Patrimônio reutilizam primitives da Wave 1',
   assert.match(await source('patrimonio.tsx'), /<AssetRow\b/);
 });
 
-test('Mais expõe somente System, Light e Dark com seleção acessível', async () => {
+test('Mais expõe System, Sereno, Branco e Escuro com seleção acessível', async () => {
   const content = await source('mais.tsx');
   assert.match(content, /accessibilityRole="radiogroup"/);
   assert.match(content, /Sistema/);
+  assert.match(content, /Sereno/);
   assert.match(content, /Patrimônio Sereno/);
+  assert.match(content, /Branco Executivo/);
   assert.match(content, /Noite Executiva/);
   assert.doesNotMatch(content, /Editorial Claro/);
 });

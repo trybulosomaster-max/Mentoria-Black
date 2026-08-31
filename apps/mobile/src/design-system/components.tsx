@@ -457,7 +457,7 @@ function useStyles() {
 }
 
 function createStyles(tokens: import('./tokens').ThemeTokens) {
-  const surfaceBorderWidth = tokens.id === 'aviora-dark-c' ? StyleSheet.hairlineWidth : borderWidth;
+  const surfaceBorderWidth = tokens.id === 'aviora-light-a' ? borderWidth : StyleSheet.hairlineWidth;
   return StyleSheet.create({
   flex: { flex: 1 },
   safe: { flex: 1, backgroundColor: tokens.background.canvas },

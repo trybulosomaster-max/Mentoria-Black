@@ -2,7 +2,7 @@ import 'expo-sqlite/localStorage/install';
 import * as SystemUI from 'expo-system-ui';
 import { createContext, type PropsWithChildren, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useColorScheme } from 'react-native';
-import { isThemePreference, resolveTheme, THEME_PREFERENCE_STORAGE_KEY, type ThemePreference } from './theme-contract';
+import { LEGACY_THEME_PREFERENCE_STORAGE_KEY, migrateThemePreference, resolveTheme, THEME_PREFERENCE_STORAGE_KEY, type ThemePreference } from './theme-contract';
 import { themeTokens, type ResolvedTheme, type ThemeTokens } from './tokens';
 
 type ThemeContextValue = Readonly<{ preference: ThemePreference; resolvedTheme: ResolvedTheme; tokens: ThemeTokens; ready: boolean; setPreference(preference: ThemePreference): void }>;
@@ -13,7 +13,17 @@ function supportedScheme(value: ReturnType<typeof useColorScheme>): 'light' | 'd
 }
 
 function storedPreference(): ThemePreference {
-  try { const value = globalThis.localStorage?.getItem(THEME_PREFERENCE_STORAGE_KEY); return isThemePreference(value) ? value : 'system'; } catch { return 'system'; }
+  try {
+    const storage = globalThis.localStorage;
+    const current = migrateThemePreference(storage?.getItem(THEME_PREFERENCE_STORAGE_KEY));
+    if (current) return current;
+    const legacy = migrateThemePreference(storage?.getItem(LEGACY_THEME_PREFERENCE_STORAGE_KEY));
+    if (!legacy) return 'system';
+    storage?.setItem(THEME_PREFERENCE_STORAGE_KEY, legacy);
+    return legacy;
+  } catch {
+    return 'system';
+  }
 }
 
 export function ThemeProvider({ children }: PropsWithChildren) {

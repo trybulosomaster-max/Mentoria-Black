@@ -56,7 +56,7 @@ function createStyles(tokens: ThemeTokens) {
   return StyleSheet.create({
     filters: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
     count: { ...textStyles.caption, color: tokens.text.secondary },
-    emptyCard: { alignItems: 'center', gap: spacing.xs, paddingHorizontal: spacing.md, paddingVertical: spacing.lg, borderRadius: primitives.radius.lg, borderWidth: tokens.id === 'aviora-dark-c' ? StyleSheet.hairlineWidth : primitives.size.border.thin, borderColor: tokens.border.default, backgroundColor: tokens.background.surface },
+    emptyCard: { alignItems: 'center', gap: spacing.xs, paddingHorizontal: spacing.md, paddingVertical: spacing.lg, borderRadius: primitives.radius.lg, borderWidth: tokens.id === 'aviora-light-a' ? primitives.size.border.thin : StyleSheet.hairlineWidth, borderColor: tokens.border.default, backgroundColor: tokens.background.surface },
     emptyTitle: { ...textStyles.section, color: tokens.text.primary, textAlign: 'center' },
     empty: { ...textStyles.bodySmall, color: tokens.text.secondary, textAlign: 'center' },
   });
