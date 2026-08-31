@@ -2,35 +2,19 @@ import { useMemo, useState } from 'react';
 import { RefreshControl, StyleSheet, Text, View } from 'react-native';
 
 import { useAuth } from '../../src/core/auth/AuthProvider';
-import type { TransactionRow } from '../../src/core/supabase/database.types';
-import {
-  Card,
-  FilterChip,
-  PageHeader,
-  Pill,
-  Screen,
-  StateView,
-  SearchField,
-  commonStyles,
-} from '../../src/design-system/components';
-import { colors, primitives, semantic, spacing, textStyles } from '../../src/design-system/tokens';
+import type { TransactionRow as TransactionData } from '../../src/core/supabase/database.types';
+import { FilterChip, PageHeader, Screen, SearchField, StateView } from '../../src/design-system/components';
+import { TransactionRow } from '../../src/design-system/financial-components';
+import { useAvioraTheme } from '../../src/design-system/theme-provider';
+import { primitives, spacing, textStyles, type ThemeTokens } from '../../src/design-system/tokens';
 import { useMobileSnapshot } from '../../src/features/read-models/use-mobile-snapshot';
-import {
-  signedAmount,
-  transactionStatus,
-  transactionTypeLabel,
-} from '../../src/features/transactions/transaction-presentation';
+import { signedAmount, transactionStatus, transactionTypeLabel } from '../../src/features/transactions/transaction-presentation';
 import { formatDate, formatMoney } from '../../src/lib/format';
 
 type Filter = 'todos' | 'realizado' | 'programado' | 'cancelado';
-const filters: readonly { key: Filter; label: string }[] = [
-  { key: 'todos', label: 'Todos' },
-  { key: 'realizado', label: 'Realizados' },
-  { key: 'programado', label: 'Programados' },
-  { key: 'cancelado', label: 'Cancelados' },
-];
+const filters: readonly { key: Filter; label: string }[] = [{ key: 'todos', label: 'Todos' }, { key: 'realizado', label: 'Realizados' }, { key: 'programado', label: 'Programados' }, { key: 'cancelado', label: 'Cancelados' }];
 
-function matchesFilter(transaction: TransactionRow, filter: Filter) {
+function matchesFilter(transaction: TransactionData, filter: Filter) {
   if (filter === 'todos') return true;
   const status = transactionStatus(transaction).label.toLocaleLowerCase('pt-BR');
   if (filter === 'realizado') return status === 'realizado';
@@ -41,87 +25,39 @@ function matchesFilter(transaction: TransactionRow, filter: Filter) {
 export default function TransactionsScreen() {
   const { accessContext } = useAuth();
   const { data, loading, refreshing, error, refresh } = useMobileSnapshot(accessContext);
+  const { tokens } = useAvioraTheme();
+  const styles = useMemo(() => createStyles(tokens), [tokens]);
   const [filter, setFilter] = useState<Filter>('todos');
   const [query, setQuery] = useState('');
-
   const visible = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase('pt-BR');
-    return (data?.transactions ?? []).filter((transaction) => {
-      if (!matchesFilter(transaction, filter)) return false;
-      if (!normalized) return true;
-      return [transaction.description, transaction.category, transaction.subcategory]
-        .some((value) => String(value ?? '').toLocaleLowerCase('pt-BR').includes(normalized));
-    });
+    return (data?.transactions ?? []).filter((transaction) => matchesFilter(transaction, filter) && (!normalized || [transaction.description, transaction.category, transaction.subcategory].some((value) => String(value ?? '').toLocaleLowerCase('pt-BR').includes(normalized))));
   }, [data?.transactions, filter, query]);
 
-  if (loading && !data) return <Screen scroll={false}><StateView loading title="Carregando lançamentos" message="Buscando o período sob RLS." /></Screen>;
-  if (error && !data) return <Screen scroll={false}><StateView title="Falha ao carregar" message={error} /></Screen>;
+  if (loading && !data) return <Screen scroll={false}><StateView loading title="Carregando lançamentos" message="Buscando o período sob as regras de acesso da conta." /></Screen>;
+  if (error && !data) return <Screen scroll={false}><StateView tone="error" title="Falha ao carregar" message={error} /></Screen>;
   if (!data) return null;
 
   return (
-    <Screen refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { void refresh(); }} tintColor={colors.gold} />}>
-      <PageHeader
-        eyebrow={data.period.label}
-        title="Lançamentos"
-        description="Consulte os movimentos sem confundir status, data financeira ou tipo."
-      />
-      <SearchField
-        label="Buscar lançamentos"
-        value={query}
-        onChangeText={setQuery}
-        placeholder="Descrição ou categoria"
-        autoCorrect={false}
-        clearButtonMode="while-editing"
-      />
-      <View style={styles.filters}>
-        {filters.map((item) => {
-          const active = item.key === filter;
-          return (
-            <FilterChip
-              key={item.key}
-              label={item.label}
-              selected={active}
-              onPress={() => setFilter(item.key)}
-            />
-          );
-        })}
-      </View>
-
+    <Screen refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { void refresh(); }} tintColor={tokens.brand.accent} />}>
+      <PageHeader eyebrow={data.period.label} title="Lançamentos" description="Consulte movimentos reais sem confundir status, competência ou natureza financeira." />
+      <SearchField label="Buscar lançamentos" value={query} onChangeText={setQuery} placeholder="Descrição ou categoria" autoCorrect={false} clearButtonMode="while-editing" />
+      <View accessibilityRole="toolbar" accessibilityLabel="Filtros de lançamentos" style={styles.filters}>{filters.map((item) => <FilterChip key={item.key} label={item.label} selected={item.key === filter} onPress={() => setFilter(item.key)} />)}</View>
       <Text style={styles.count}>{visible.length} de {data.transactions.length} lançamentos no período</Text>
-
       {visible.length ? visible.map((transaction) => {
         const status = transactionStatus(transaction);
-        const amount = signedAmount(transaction);
-        return (
-          <Card key={transaction.id} style={styles.transactionCard}>
-            <View style={commonStyles.between}>
-              <View style={styles.copy}>
-                <Text numberOfLines={2} style={styles.title}>{transaction.description}</Text>
-                <Text style={styles.meta}>{transactionTypeLabel(transaction.transaction_type)} • {formatDate(transaction.transaction_date)}</Text>
-              </View>
-              <Text style={[styles.amount, amount < 0 ? commonStyles.negative : commonStyles.positive]}>{formatMoney(amount)}</Text>
-            </View>
-            <View style={commonStyles.wrap}>
-              <Pill label={status.label} tone={status.tone} />
-              <Pill label={transaction.category || 'Sem categoria'} />
-              {transaction.installment_total ? <Pill label={`${transaction.installment_number ?? 0}/${transaction.installment_total} parcelas`} tone="gold" /> : null}
-            </View>
-          </Card>
-        );
-      }) : (
-        <Card><Text style={styles.empty}>Nenhum lançamento corresponde aos filtros.</Text></Card>
-      )}
+        return <TransactionRow key={transaction.id} title={transaction.description} meta={`${transactionTypeLabel(transaction.transaction_type)} • ${formatDate(transaction.transaction_date)}${transaction.installment_total ? ` • Parcela ${transaction.installment_number ?? 0}/${transaction.installment_total}` : ''}`} amount={formatMoney(signedAmount(transaction))} status={status.label} tone={status.tone} category={transaction.category || 'Sem categoria'} />;
+      }) : <View accessibilityLiveRegion="polite" style={styles.emptyCard}><Text style={styles.emptyTitle}>Nenhum lançamento encontrado</Text><Text style={styles.empty}>Não há dados reais que correspondam à busca e aos filtros atuais.</Text></View>}
     </Screen>
   );
 }
 
-const styles = StyleSheet.create({
-  filters: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
-  count: { ...textStyles.caption, color: semantic.text.subtle },
-  transactionCard: { gap: spacing.sm },
-  copy: { flex: 1, minWidth: spacing.none, gap: spacing.xxs },
-  title: { ...textStyles.body, color: semantic.text.primary, fontFamily: primitives.typography.family.uiExtraBold },
-  meta: { ...textStyles.caption, color: semantic.text.secondary },
-  amount: textStyles.moneyM,
-  empty: { ...textStyles.bodySmall, color: semantic.text.secondary, textAlign: 'center', padding: spacing.lg },
-});
+function createStyles(tokens: ThemeTokens) {
+  return StyleSheet.create({
+    filters: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
+    count: { ...textStyles.caption, color: tokens.text.secondary },
+    emptyCard: { alignItems: 'center', gap: spacing.xs, padding: spacing.xl, borderRadius: primitives.radius.lg, borderWidth: primitives.size.border.thin, borderColor: tokens.border.default, backgroundColor: tokens.background.surface },
+    emptyTitle: { ...textStyles.section, color: tokens.text.primary, textAlign: 'center' },
+    empty: { ...textStyles.bodySmall, color: tokens.text.secondary, textAlign: 'center' },
+  });
+}
