@@ -6,6 +6,7 @@ import {
   FOUNDATION_SCHEMA_VERSION,
   MOBILE_APP_VERSION,
 } from '../../domain/foundation/api-compatibility';
+import { assertPublicClientCredential } from './public-client-credential';
 
 function clean(value: string | undefined): string {
   return String(value ?? '').trim();
@@ -35,10 +36,7 @@ export const appEnvironment = Object.freeze({
 });
 
 export function assertSafeClientEnvironment(): void {
-  const key = appEnvironment.supabasePublishableKey.toLowerCase();
-  if (key.includes('service_role') || key.startsWith('sb_secret_')) {
-    throw new Error('Uma chave secreta do Supabase nunca pode ser usada no aplicativo móvel.');
-  }
+  assertPublicClientCredential(appEnvironment.supabasePublishableKey);
 
   if (appEnvironment.supabaseUrl && !/^https:\/\/[a-z0-9-]+\.supabase\.co\/?$/i.test(appEnvironment.supabaseUrl)) {
     throw new Error('EXPO_PUBLIC_SUPABASE_URL não possui o formato esperado.');

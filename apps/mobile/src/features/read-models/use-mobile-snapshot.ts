@@ -1,16 +1,25 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { AccessContext } from '../../domain/foundation/access-context';
-import { mobileFinancialReadRepository, type MobileSnapshot } from './mobile-read.repository';
+import { mobileFinancialReadRepository, type MobileSnapshot } from './mobile-read.repository.ts';
+
+type SnapshotState = Readonly<{
+  identityKey: string | null;
+  data: MobileSnapshot | null;
+  loading: boolean;
+  refreshing: boolean;
+  error: string;
+}>;
+
+function emptyState(identityKey: string | null, loading: boolean): SnapshotState {
+  return { identityKey, data: null, loading, refreshing: false, error: '' };
+}
 
 export function useMobileSnapshot(context: AccessContext | null | undefined) {
   const identityKey = context
     ? `${context.environment}:${context.actingUserId}:${context.resourceOwnerId}:${context.generation}`
     : null;
-  const [data, setData] = useState<MobileSnapshot | null>(null);
-  const [loading, setLoading] = useState(Boolean(context));
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState('');
+  const [state, setState] = useState<SnapshotState>(() => emptyState(identityKey, Boolean(context)));
   const activeIdentity = useRef<string | null>(identityKey);
   const requestGeneration = useRef(0);
 
@@ -24,26 +33,28 @@ export function useMobileSnapshot(context: AccessContext | null | undefined) {
 
     if (!context || !expectedIdentity) {
       if (requestIsCurrent()) {
-        setData(null);
-        setLoading(false);
-        setRefreshing(false);
+        setState(emptyState(expectedIdentity, false));
       }
       return;
     }
 
-    manual ? setRefreshing(true) : setLoading(true);
-    setError('');
+    setState((current) => current.identityKey === expectedIdentity
+      ? { ...current, loading: manual ? current.loading : true, refreshing: manual, error: '' }
+      : emptyState(expectedIdentity, true));
     try {
       const snapshot = await mobileFinancialReadRepository.loadSnapshot(context);
-      if (requestIsCurrent()) setData(snapshot);
+      if (requestIsCurrent()) {
+        setState({ identityKey: expectedIdentity, data: snapshot, loading: false, refreshing: false, error: '' });
+      }
     } catch (cause) {
       if (requestIsCurrent()) {
-        setError(cause instanceof Error ? cause.message : 'Não foi possível carregar os dados.');
-      }
-    } finally {
-      if (requestIsCurrent()) {
-        setLoading(false);
-        setRefreshing(false);
+        setState({
+          identityKey: expectedIdentity,
+          data: null,
+          loading: false,
+          refreshing: false,
+          error: cause instanceof Error ? cause.message : 'Não foi possível carregar os dados.',
+        });
       }
     }
   }, [context, identityKey]);
@@ -51,8 +62,7 @@ export function useMobileSnapshot(context: AccessContext | null | undefined) {
   useEffect(() => {
     activeIdentity.current = identityKey;
     requestGeneration.current += 1;
-    setData(null);
-    setError('');
+    setState(emptyState(identityKey, Boolean(context)));
     void load(false);
     return () => {
       requestGeneration.current += 1;
@@ -60,5 +70,8 @@ export function useMobileSnapshot(context: AccessContext | null | undefined) {
   }, [identityKey, load]);
 
   const refresh = useCallback(() => load(true), [load]);
-  return { data, loading, refreshing, error, refresh } as const;
+  const visibleState = state.identityKey === identityKey
+    ? state
+    : emptyState(identityKey, Boolean(context));
+  return { ...visibleState, refresh } as const;
 }

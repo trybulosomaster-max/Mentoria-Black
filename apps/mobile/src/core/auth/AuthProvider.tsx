@@ -29,6 +29,11 @@ import {
   type BootstrapSignal,
   type BootstrapState,
 } from '../../domain/bootstrap/app-bootstrap';
+import {
+  bindValueToIdentity,
+  valueForActiveIdentity,
+  type IdentityBoundValue,
+} from '../../domain/foundation/identity-bound-value';
 
 type AuthPhase = BootstrapSignal;
 
@@ -67,7 +72,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const client = useMemo(() => getSupabaseClient(), []);
   const [phase, setPhase] = useState<AuthPhase>(client ? 'booting' : 'configuration-required');
   const [session, setSession] = useState<Session | null>(null);
-  const [entitlements, setEntitlements] = useState<NormalizedEntitlements | null>(null);
+  const [boundEntitlements, setBoundEntitlements] = useState<IdentityBoundValue<NormalizedEntitlements> | null>(null);
   const [errorMessage, setErrorMessage] = useState(client ? '' : configurationMessage());
   const mounted = useRef(true);
   const activeUserId = useRef<string | null>(null);
@@ -84,7 +89,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
     if (!client || !nextSession) {
       if (requestIsCurrent()) {
-        setEntitlements(null);
+        setBoundEntitlements(null);
         setPhase(client ? 'anonymous' : 'configuration-required');
       }
       return { ok: false, message: client ? 'Entre para continuar.' : configurationMessage() };
@@ -99,7 +104,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     if (!requestIsCurrent()) return { ok: false, message: 'A sessão mudou durante a atualização do acesso.' };
 
     if (error) {
-      setEntitlements(null);
+      setBoundEntitlements(null);
       setErrorMessage('Não foi possível carregar seu acesso. Tente novamente.');
       setPhase('error');
       return { ok: false, message: 'Não foi possível carregar seu acesso. Tente novamente.' };
@@ -108,12 +113,12 @@ export function AuthProvider({ children }: PropsWithChildren) {
     try {
       const normalized = normalizeEntitlements(data);
       if (!requestIsCurrent()) return { ok: false, message: 'A sessão mudou durante a atualização do acesso.' };
-      setEntitlements(normalized);
+      setBoundEntitlements(bindValueToIdentity(expectedUserId!, normalized));
       setPhase(hasFinancialAppAccess(normalized) ? 'granted' : 'denied');
       return { ok: true };
     } catch {
       if (requestIsCurrent()) {
-        setEntitlements(null);
+        setBoundEntitlements(null);
         setErrorMessage('O servidor retornou um contrato de acesso inválido.');
         setPhase('error');
       }
@@ -128,10 +133,16 @@ export function AuthProvider({ children }: PropsWithChildren) {
       return { ok: false, message: configurationMessage() };
     }
 
+    const restoreGeneration = ++entitlementGeneration.current;
+    activeUserId.current = null;
+    const restoreIsCurrent = () => (
+      mounted.current && restoreGeneration === entitlementGeneration.current
+    );
     setPhase('booting');
+    setBoundEntitlements(null);
     setErrorMessage('');
     const { data, error } = await client.auth.getSession();
-    if (!mounted.current) return { ok: false, message: 'A inicialização foi interrompida.' };
+    if (!restoreIsCurrent()) return { ok: false, message: 'A inicialização foi interrompida.' };
     if (error) {
       activeUserId.current = null;
       setSession(null);
@@ -155,6 +166,8 @@ export function AuthProvider({ children }: PropsWithChildren) {
       if (!mounted.current) return;
       activeUserId.current = nextSession?.user.id ?? null;
       entitlementGeneration.current += 1;
+      setBoundEntitlements(null);
+      setPhase(nextSession ? 'loading-access' : 'anonymous');
       setSession(nextSession);
       queueMicrotask(() => { void loadEntitlements(nextSession); });
     });
@@ -250,15 +263,22 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const signOut = useCallback(async () => {
     activeUserId.current = null;
     entitlementGeneration.current += 1;
-    setEntitlements(null);
+    setBoundEntitlements(null);
     setSession(null);
     setErrorMessage('');
     if (client) await client.auth.signOut({ scope: 'local' });
     setPhase(client ? 'anonymous' : 'configuration-required');
   }, [client]);
 
+  const entitlements = valueForActiveIdentity(boundEntitlements, session?.user.id ?? null);
+  const effectivePhase: AuthPhase = session
+    && !entitlements
+    && (phase === 'granted' || phase === 'denied')
+    ? 'loading-access'
+    : phase;
+
   const accessContext = useMemo(() => {
-    if (!session || !entitlements || phase !== 'granted') return null;
+    if (!session || !entitlements || effectivePhase !== 'granted') return null;
     if (Platform.OS !== 'ios' && Platform.OS !== 'android') return null;
     const expiresAt = Number(session.expires_at) * 1000;
     if (!Number.isFinite(expiresAt)) return null;
@@ -271,11 +291,11 @@ export function AuthProvider({ children }: PropsWithChildren) {
       appVersion: appEnvironment.appVersion,
       generation: Math.max(1, entitlementGeneration.current),
     });
-  }, [entitlements, phase, session]);
+  }, [effectivePhase, entitlements, session]);
 
   const value = useMemo<AuthContextValue>(() => ({
-    phase,
-    bootstrapState: resolveBootstrapState(phase),
+    phase: effectivePhase,
+    bootstrapState: resolveBootstrapState(effectivePhase),
     session,
     user: session?.user ?? null,
     entitlements,
@@ -298,7 +318,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     entitlements,
     errorMessage,
     exchangeCode,
-    phase,
+    effectivePhase,
     refreshEntitlements,
     retryBootstrap,
     requestPasswordReset,

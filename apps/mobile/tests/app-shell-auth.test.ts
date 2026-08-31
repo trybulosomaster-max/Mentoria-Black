@@ -106,9 +106,17 @@ test('troca A→B limpa a apresentação antes de carregar a nova identidade', a
   ]);
   assert.match(auth, /entitlementGeneration/);
   assert.match(auth, /activeUserId/);
+  assert.match(auth, /bindValueToIdentity/);
+  assert.match(auth, /valueForActiveIdentity/);
+  assert.match(auth, /setBoundEntitlements\(null\)/);
+  assert.match(auth, /effectivePhase/);
+  assert.match(auth, /resolveBootstrapState\(effectivePhase\)/);
+  assert.match(auth, /restoreGeneration/);
+  assert.match(auth, /restoreGeneration === entitlementGeneration\.current/);
   assert.match(snapshot, /activeIdentity/);
   assert.match(snapshot, /requestGeneration/);
-  assert.match(snapshot, /setData\(null\)/);
+  assert.match(snapshot, /state\.identityKey === identityKey/);
+  assert.match(snapshot, /visibleState/);
 });
 
 test('development mantém adapter transitório e production continua fail-closed', async () => {

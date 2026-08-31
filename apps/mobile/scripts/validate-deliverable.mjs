@@ -51,6 +51,7 @@ const required = [
   'app/(tabs)/patrimonio.tsx',
   'app/(tabs)/mais.tsx',
   'src/core/auth/AuthProvider.tsx',
+  'src/core/config/public-client-credential.ts',
   'src/core/supabase/client.ts',
   'src/domain/access/access-contract.ts',
   'src/domain/finance/foundation-financial-read-model.ts',
@@ -58,6 +59,7 @@ const required = [
   'tests/web-financial-parity.test.ts',
   'tests/web-contract-parity.test.ts',
   'src/domain/foundation/access-context.ts',
+  'src/domain/foundation/identity-bound-value.ts',
   'src/domain/foundation/capability-registry.ts',
   'src/ports/foundation-ports.ts',
   'src/application/foundation/identity-runtime.ts',
@@ -68,6 +70,8 @@ const required = [
   'src/presentation/bootstrap/BootstrapExperience.tsx',
   'src/presentation/navigation/AppRouteGate.tsx',
   'tests/app-shell-auth.test.ts',
+  'tests/security-guards.test.ts',
+  'tests/use-mobile-snapshot.integration.test.ts',
 ];
 
 for (const file of required) {
@@ -140,11 +144,20 @@ else fail('accessibility:touch-target-48', 'botão/input sem evidência de 48 po
 
 const authProviderSource = await readFile(path.join(root, 'src/core/auth/AuthProvider.tsx'), 'utf8');
 const snapshotHookSource = await readFile(path.join(root, 'src/features/read-models/use-mobile-snapshot.ts'), 'utf8');
+const credentialGuardSource = await readFile(path.join(root, 'src/core/config/public-client-credential.ts'), 'utf8');
+
+if (
+  credentialGuardSource.includes('assertPublicClientCredential')
+  && credentialGuardSource.includes('PUBLISHABLE_KEY_PATTERN')
+  && credentialGuardSource.includes('legacyJwtRole')
+) ok('security:public-client-credential-guard');
+else fail('security:public-client-credential-guard', 'classificação pública/legada ausente');
 
 if (
   authProviderSource.includes('entitlementGeneration')
   && authProviderSource.includes('activeUserId')
   && authProviderSource.includes('requestIsCurrent')
+  && authProviderSource.includes('valueForActiveIdentity')
 ) ok('isolation:entitlement-generation-guard');
 else fail('isolation:entitlement-generation-guard', 'entitlement antigo pode atualizar sessão nova');
 
@@ -153,6 +166,7 @@ if (
   && snapshotHookSource.includes('activeIdentity')
   && snapshotHookSource.includes('identityKey')
   && snapshotHookSource.includes('requestIsCurrent')
+  && snapshotHookSource.includes('state.identityKey === identityKey')
 ) ok('isolation:snapshot-generation-guard');
 else fail('isolation:snapshot-generation-guard', 'snapshot antigo pode atualizar usuário novo');
 
