@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 import { isThemePreference, migrateThemePreference, resolveTheme, THEME_PREFERENCES } from '../src/design-system/theme-contract.ts';
-import { textStyles, themeTokens } from '../src/design-system/tokens.ts';
+import { dynamicType, textStyles, themeTokens } from '../src/design-system/tokens.ts';
 
 function relativeLuminance(hex: string) {
   assert.match(hex, /^#[0-9A-F]{6}$/i, `cor hexadecimal inválida: ${hex}`);
@@ -157,13 +157,18 @@ test('títulos, valores e linhas financeiras fazem reflow sem truncamento fixo',
   assert.match(components, /pageTitleRow: \{[^\n]*flexWrap: 'wrap'/);
   assert.match(components, /sectionHeader: \{[^\n]*flexWrap: 'wrap'/);
   assert.match(financial, /rowTop: \{[^\n]*flexWrap: 'wrap'/);
-  assert.match(financial, /fontScale >= 1\.4 && styles\.metricGroupReflow/);
+  assert.match(financial, /fontScale >= dynamicType\.metricReflowFontScale && styles\.metricGroupReflow/);
   assert.match(financial, /metricGroupReflow: \{[^\n]*flexDirection: 'column', flexWrap: 'nowrap'/);
   assert.equal('lineHeight' in textStyles.body, false);
   assert.equal('lineHeight' in textStyles.title, false);
   assert.equal('lineHeight' in textStyles.moneyM, false);
-  assert.match(tabs, /maxFontSizeMultiplier=\{1\}/);
+  assert.match(tabs, /maxFontSizeMultiplier=\{dynamicType\.tabLabelMaxFontSizeMultiplier\}/);
+  assert.doesNotMatch(tabs, /maxFontSizeMultiplier=\{1\}/);
+  assert.match(tabs, /scaledLabelAllowance/);
   assert.match(tabs, /numberOfLines=\{2\}/);
+  assert.ok(dynamicType.tabLabelMaxFontSizeMultiplier > 1);
+  assert.ok(dynamicType.tabLabelMaxFontSizeMultiplier <= dynamicType.headingMaxFontSizeMultiplier);
+  assert.ok(dynamicType.metricReflowFontScale <= 1.3);
 });
 
 test('Reduce Motion governa navegação, overlays e feedback de pressão', async () => {

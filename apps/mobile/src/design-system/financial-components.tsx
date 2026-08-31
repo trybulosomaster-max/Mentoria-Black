@@ -23,7 +23,7 @@ export function FinancialMetric({ label, value, helper, tone = 'neutral', emphas
 export function MetricGroup({ children }: PropsWithChildren) {
   const styles = useFinancialStyles();
   const { fontScale } = useWindowDimensions();
-  return <View style={[styles.metricGroup, fontScale >= 1.4 && styles.metricGroupReflow]}>{children}</View>;
+  return <View style={[styles.metricGroup, fontScale >= dynamicType.metricReflowFontScale && styles.metricGroupReflow]}>{children}</View>;
 }
 
 export function TransactionRow({ title, meta, amount, status, tone, category }: { title: string; meta: string; amount: string; status: string; tone: StatusTone; category?: string }) {

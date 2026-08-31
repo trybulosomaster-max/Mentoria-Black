@@ -103,7 +103,7 @@ export const textStyles = Object.freeze({
   brand: textStyle({ fontFamily: type.family.brandRegular, fontSize: componentTokens.brand.wordmark, letterSpacing: type.letterSpacing.brand }),
 } as const);
 
-export const dynamicType = Object.freeze({ enabled: true, maxFontSizeMultiplier: 2, headingMaxFontSizeMultiplier: 1.4, moneyMaxFontSizeMultiplier: 1.6 });
+export const dynamicType = Object.freeze({ enabled: true, maxFontSizeMultiplier: 2, headingMaxFontSizeMultiplier: 1.4, moneyMaxFontSizeMultiplier: 1.6, tabLabelMaxFontSizeMultiplier: 1.2, metricReflowFontScale: 1.3 });
 export const breakpoints = Object.freeze({ compactMin: 320, mediumMin: 600, expandedMin: 840 });
 export const colors = Object.freeze({ background: semantic.bg.base, backgroundElevated: semantic.bg.elevated, surface: semantic.surface.default, surfaceRaised: semantic.surface.raised, surfacePressed: semantic.surface.pressed, border: semantic.border.default, borderStrong: semantic.border.strong, text: semantic.text.primary, textMuted: semantic.text.secondary, textSubtle: semantic.text.subtle, gold: semantic.action.primary, goldBright: semantic.text.accent, goldDark: semantic.action.primaryPressed, positive: semantic.status.positive, negative: semantic.status.negative, warning: semantic.status.warning, info: semantic.status.info, overlay: semantic.overlay.default, transparent: primitives.color.transparent } as const);
 export const spacing = primitives.space;

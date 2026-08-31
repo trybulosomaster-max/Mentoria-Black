@@ -1,9 +1,9 @@
 import { Tabs } from 'expo-router';
-import { type ColorValue, StyleSheet, Text } from 'react-native';
+import { type ColorValue, StyleSheet, Text, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppIcon, type AppIconName } from '../../src/design-system/icons';
-import { componentTokens, textStyles } from '../../src/design-system/tokens';
+import { componentTokens, dynamicType, textStyles } from '../../src/design-system/tokens';
 import { useAvioraTheme } from '../../src/design-system/theme-provider';
 import { AppRouteGate } from '../../src/presentation/navigation/AppRouteGate';
 
@@ -12,12 +12,15 @@ const icon = (name: AppIconName) => ({ color, size }: { color: ColorValue; size:
 );
 
 const label = (title: string) => ({ color }: { color: ColorValue }) => (
-  <Text maxFontSizeMultiplier={1} numberOfLines={2} style={[styles.tabLabel, { color }]}>{title}</Text>
+  <Text maxFontSizeMultiplier={dynamicType.tabLabelMaxFontSizeMultiplier} numberOfLines={2} style={[styles.tabLabel, { color }]}>{title}</Text>
 );
 
 export default function TabsLayout() {
   const insets = useSafeAreaInsets();
+  const { fontScale } = useWindowDimensions();
   const { tokens } = useAvioraTheme();
+  const tabLabelScale = Math.min(fontScale, dynamicType.tabLabelMaxFontSizeMultiplier);
+  const scaledLabelAllowance = Math.ceil(Math.max(0, tabLabelScale - 1) * 20);
 
   return (
     <AppRouteGate scope="shell">
@@ -28,7 +31,7 @@ export default function TabsLayout() {
           tabBarActiveTintColor: tokens.navigation.selected,
           tabBarInactiveTintColor: tokens.navigation.unselected,
           tabBarStyle: [styles.tabBar, {
-            height: componentTokens.tab.height + insets.bottom,
+            height: componentTokens.tab.height + scaledLabelAllowance + insets.bottom,
             paddingBottom: componentTokens.tab.bottomPadding + insets.bottom,
             borderTopColor: tokens.border.default,
             backgroundColor: tokens.navigation.background,
