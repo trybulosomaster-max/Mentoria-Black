@@ -5,6 +5,7 @@ import { Card, ProgressBar, StatusPill, type StatusTone } from './components';
 import { AppIcon, type AppIconName } from './icons';
 import { useAvioraTheme } from './theme-provider';
 import { componentTokens, dynamicType, primitives, spacing, textStyles, type ThemeTokens } from './tokens';
+import type { AnalyticsStateName, FinancialSeriesKind } from '../domain/analytics/analytics-contracts';
 
 type MetricTone = 'neutral' | 'positive' | 'risk' | 'brand';
 
@@ -72,19 +73,38 @@ export function AssetRow({ icon = 'wallet', title, subtitle, value, status, stat
   );
 }
 
-export function ChartCard({ title, period, summary, hasData = false, children }: PropsWithChildren<{ title: string; period: string; summary: string; hasData?: boolean }>) {
+type ChartLegendItem = Readonly<{ label: string; kind: FinancialSeriesKind }>;
+type ChartCardProps = PropsWithChildren<{
+  title: string;
+  question: string;
+  period: string;
+  summary: string;
+  state: AnalyticsStateName;
+  accessibilityEquivalent: string;
+  legend?: readonly ChartLegendItem[];
+}>;
+
+const chartStateLabels: Readonly<Record<AnalyticsStateName, string>> = Object.freeze({
+  loading: 'Carregando análise', empty: 'Sem dados para este período', partial: 'Dados parciais', stale: 'Dados aguardando atualização', error: 'Não foi possível carregar a análise', unauthorized: 'Análise indisponível para este acesso', success: 'Dados atualizados',
+});
+
+export function ChartCard({ title, question, period, summary, state, accessibilityEquivalent, legend = [], children }: ChartCardProps) {
   const styles = useFinancialStyles();
   const { tokens } = useAvioraTheme();
+  const showsPlot = state === 'success' || state === 'partial' || state === 'stale';
   return (
-    <Card accessibilityLabel={`${title}. ${period}. ${summary}`} style={styles.chartCard}>
+    <Card accessibilityLabel={`${title}. Pergunta: ${question}. ${period}. ${summary}. ${chartStateLabels[state]}. ${accessibilityEquivalent}`} style={styles.chartCard}>
       <View style={styles.rowTop}><View style={styles.rowCopy}><Text style={styles.rowTitle}>{title}</Text><Text style={styles.rowMeta}>{period}</Text></View><AppIcon name="report" color={tokens.brand.accent} /></View>
-      {hasData ? children : (
+      <Text style={styles.chartQuestion}>{question}</Text>
+      {state === 'partial' || state === 'stale' ? <StatusPill label={chartStateLabels[state]} tone="warning" /> : null}
+      {showsPlot ? children : (
         <View style={styles.chartEmpty}>
-          <View style={styles.chartGuide}><View style={styles.chartActual} /><View style={styles.chartProjected} /></View>
-          <Text style={styles.chartEmptyTitle}>Série temporal indisponível</Text>
+          <Text style={styles.chartEmptyTitle}>{chartStateLabels[state]}</Text>
           <Text style={styles.rowMeta}>{summary}</Text>
         </View>
       )}
+      {legend.length ? <View style={styles.chartLegend}>{legend.map((item) => <View key={`${item.kind}:${item.label}`} style={styles.chartLegendItem}><View style={item.kind === 'realized' ? styles.chartActual : styles.chartProjected} /><Text style={styles.rowMeta}>{item.label}</Text></View>)}</View> : null}
+      <Text style={styles.chartEquivalent}>{accessibilityEquivalent}</Text>
     </Card>
   );
 }
@@ -110,7 +130,7 @@ function useFinancialStyles() {
 }
 
 function createStyles(tokens: ThemeTokens) {
-  const surfaceBorderWidth = tokens.id === 'aviora-dark-c' ? StyleSheet.hairlineWidth : primitives.size.border.thin;
+  const surfaceBorderWidth = tokens.id === 'aviora-light-a' ? primitives.size.border.thin : StyleSheet.hairlineWidth;
   return StyleSheet.create({
     metric: { minWidth: componentTokens.card.metricMinWidth, flexGrow: 1, flexBasis: componentTokens.card.metricMinWidth, gap: spacing.xs, padding: spacing.sm, borderWidth: surfaceBorderWidth, borderColor: tokens.border.default, borderRadius: primitives.radius.lg, backgroundColor: tokens.background.surface },
     metricEmphasized: { flexBasis: '100%', minHeight: 120, justifyContent: 'center', padding: spacing.lg, backgroundColor: tokens.background.surface, borderColor: tokens.border.default, ...tokens.elevation.card },
@@ -121,7 +141,7 @@ function createStyles(tokens: ThemeTokens) {
     rowCard: { gap: spacing.sm }, rowTop: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.sm }, rowCopy: { flex: 1, minWidth: 0, gap: spacing.xxs }, rowTitle: { ...textStyles.body, color: tokens.text.primary, fontFamily: primitives.typography.family.uiBold }, rowMeta: { ...textStyles.caption, color: tokens.text.secondary }, rowAmount: { ...textStyles.moneyM, textAlign: 'right' }, amountPositive: { color: tokens.status.positiveText }, amountRisk: { color: tokens.status.riskText }, badges: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
     planningRow: { gap: spacing.xs, paddingVertical: spacing.md, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: tokens.border.default }, planningValue: { ...textStyles.moneyM, color: tokens.text.primary },
     assetCard: { gap: spacing.sm }, assetIdentity: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: spacing.sm }, assetIcon: { width: primitives.size.touch.minimum, height: primitives.size.touch.minimum, borderRadius: primitives.radius.md, backgroundColor: tokens.background.surfaceMuted, alignItems: 'center', justifyContent: 'center' }, assetValue: { ...textStyles.moneyM, color: tokens.text.primary, textAlign: 'right' },
-    chartCard: { gap: spacing.md }, chartEmpty: { minHeight: 148, alignItems: 'center', justifyContent: 'center', gap: spacing.sm, padding: spacing.md, borderRadius: primitives.radius.md, backgroundColor: tokens.background.surfaceMuted }, chartGuide: { width: '100%', gap: spacing.xs }, chartActual: { height: primitives.size.border.strong, backgroundColor: tokens.chart.actual }, chartProjected: { height: primitives.size.border.strong, borderTopWidth: primitives.size.border.strong, borderStyle: 'dashed', borderColor: tokens.chart.projected }, chartEmptyTitle: { ...textStyles.bodySmall, color: tokens.text.primary, fontFamily: primitives.typography.family.uiBold },
+    chartCard: { gap: spacing.md }, chartQuestion: { ...textStyles.bodySmall, color: tokens.text.primary, fontFamily: primitives.typography.family.uiBold }, chartEmpty: { minHeight: 148, alignItems: 'center', justifyContent: 'center', gap: spacing.sm, padding: spacing.md, borderRadius: primitives.radius.md, backgroundColor: tokens.background.surfaceMuted }, chartLegend: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md }, chartLegendItem: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs }, chartActual: { width: spacing.xl, height: primitives.size.border.strong, backgroundColor: tokens.chart.actual }, chartProjected: { width: spacing.xl, height: primitives.size.border.strong, borderTopWidth: primitives.size.border.strong, borderStyle: 'dashed', borderColor: tokens.chart.projected }, chartEmptyTitle: { ...textStyles.bodySmall, color: tokens.text.primary, fontFamily: primitives.typography.family.uiBold }, chartEquivalent: { ...textStyles.caption, color: tokens.text.secondary },
     themeRow: { minHeight: primitives.size.touch.default, flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderWidth: surfaceBorderWidth, borderColor: tokens.border.default, borderRadius: primitives.radius.md, backgroundColor: tokens.background.surface }, themeRowSelected: { borderColor: tokens.brand.accent, backgroundColor: tokens.background.surfaceMuted }, themeRowPressed: { opacity: primitives.opacity.pressed }, radio: { width: primitives.size.icon.md, height: primitives.size.icon.md, borderRadius: primitives.radius.pill, borderWidth: primitives.size.border.strong, borderColor: tokens.border.strong, alignItems: 'center', justifyContent: 'center' }, radioSelected: { backgroundColor: tokens.brand.accent, borderColor: tokens.brand.accent },
   });
 }
