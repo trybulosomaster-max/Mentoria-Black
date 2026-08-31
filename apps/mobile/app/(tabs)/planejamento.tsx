@@ -26,8 +26,8 @@ const categories = [
 ] as const;
 
 export default function PlanningScreen() {
-  const { user } = useAuth();
-  const { data, loading, refreshing, error, refresh } = useMobileSnapshot(user?.id);
+  const { accessContext } = useAuth();
+  const { data, loading, refreshing, error, refresh } = useMobileSnapshot(accessContext);
   if (loading && !data) return <Screen scroll={false}><StateView loading title="Carregando planejamento" message="Consultando o plano mensal." /></Screen>;
   if (error && !data) return <Screen scroll={false}><StateView title="Falha ao carregar" message={error} /></Screen>;
   if (!data) return null;

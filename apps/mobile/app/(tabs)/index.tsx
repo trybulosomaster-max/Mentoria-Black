@@ -40,8 +40,8 @@ function TransactionRowView({ transaction }: { transaction: TransactionRow }) {
 }
 
 export default function DashboardScreen() {
-  const { user } = useAuth();
-  const { data, loading, refreshing, error, refresh } = useMobileSnapshot(user?.id);
+  const { accessContext, user } = useAuth();
+  const { data, loading, refreshing, error, refresh } = useMobileSnapshot(accessContext);
   const firstName = String(user?.user_metadata?.full_name ?? user?.email ?? 'você').split(/[\s@]/)[0];
 
   if (loading && !data) {

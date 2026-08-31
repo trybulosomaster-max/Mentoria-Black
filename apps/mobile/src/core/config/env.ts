@@ -1,4 +1,11 @@
-type EnvironmentName = 'local' | 'development' | 'preview' | 'production';
+import {
+  normalizeEnvironment,
+  type AppEnvironmentName,
+} from '../../domain/foundation/environment';
+import {
+  FOUNDATION_SCHEMA_VERSION,
+  MOBILE_APP_VERSION,
+} from '../../domain/foundation/api-compatibility';
 
 function clean(value: string | undefined): string {
   return String(value ?? '').trim();
@@ -12,18 +19,13 @@ function flag(value: string | undefined, fallback: boolean): boolean {
   return fallback;
 }
 
-function environment(value: string | undefined): EnvironmentName {
-  const normalized = clean(value).toLowerCase();
-  return ['local', 'development', 'preview', 'production'].includes(normalized)
-    ? normalized as EnvironmentName
-    : 'local';
-}
-
 const supabaseUrl = clean(process.env.EXPO_PUBLIC_SUPABASE_URL);
 const supabasePublishableKey = clean(process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY);
 
 export const appEnvironment = Object.freeze({
-  name: environment(process.env.EXPO_PUBLIC_AVIORA_ENV),
+  name: normalizeEnvironment(process.env.EXPO_PUBLIC_AVIORA_ENV) satisfies AppEnvironmentName,
+  appVersion: MOBILE_APP_VERSION,
+  schemaVersion: FOUNDATION_SCHEMA_VERSION,
   supabaseUrl,
   supabasePublishableKey,
   readOnly: flag(process.env.EXPO_PUBLIC_AVIORA_READ_ONLY, true),
@@ -44,6 +46,10 @@ export function assertSafeClientEnvironment(): void {
 
   if (appEnvironment.name !== 'production' && appEnvironment.readOnly !== true) {
     throw new Error('Ambientes de fundação devem permanecer em modo financeiro somente leitura.');
+  }
+
+  if (appEnvironment.name === 'production') {
+    throw new Error('Storage de sessão nativo seguro é obrigatório antes de executar em produção.');
   }
 }
 

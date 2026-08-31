@@ -1,24 +1,28 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { loadMobileSnapshot, type MobileSnapshot } from './mobile-read.repository';
+import type { AccessContext } from '../../domain/foundation/access-context';
+import { mobileFinancialReadRepository, type MobileSnapshot } from './mobile-read.repository';
 
-export function useMobileSnapshot(userId: string | null | undefined) {
+export function useMobileSnapshot(context: AccessContext | null | undefined) {
+  const identityKey = context
+    ? `${context.environment}:${context.actingUserId}:${context.resourceOwnerId}:${context.generation}`
+    : null;
   const [data, setData] = useState<MobileSnapshot | null>(null);
-  const [loading, setLoading] = useState(Boolean(userId));
+  const [loading, setLoading] = useState(Boolean(context));
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
-  const activeUserId = useRef<string | null>(userId ?? null);
+  const activeIdentity = useRef<string | null>(identityKey);
   const requestGeneration = useRef(0);
 
   const load = useCallback(async (manual = false) => {
-    const expectedUserId = userId ?? null;
+    const expectedIdentity = identityKey;
     const generation = ++requestGeneration.current;
     const requestIsCurrent = () => (
       generation === requestGeneration.current
-      && activeUserId.current === expectedUserId
+      && activeIdentity.current === expectedIdentity
     );
 
-    if (!expectedUserId) {
+    if (!context || !expectedIdentity) {
       if (requestIsCurrent()) {
         setData(null);
         setLoading(false);
@@ -30,7 +34,7 @@ export function useMobileSnapshot(userId: string | null | undefined) {
     manual ? setRefreshing(true) : setLoading(true);
     setError('');
     try {
-      const snapshot = await loadMobileSnapshot(expectedUserId);
+      const snapshot = await mobileFinancialReadRepository.loadSnapshot(context);
       if (requestIsCurrent()) setData(snapshot);
     } catch (cause) {
       if (requestIsCurrent()) {
@@ -42,10 +46,10 @@ export function useMobileSnapshot(userId: string | null | undefined) {
         setRefreshing(false);
       }
     }
-  }, [userId]);
+  }, [context, identityKey]);
 
   useEffect(() => {
-    activeUserId.current = userId ?? null;
+    activeIdentity.current = identityKey;
     requestGeneration.current += 1;
     setData(null);
     setError('');
@@ -53,7 +57,7 @@ export function useMobileSnapshot(userId: string | null | undefined) {
     return () => {
       requestGeneration.current += 1;
     };
-  }, [load, userId]);
+  }, [identityKey, load]);
 
   const refresh = useCallback(() => load(true), [load]);
   return { data, loading, refreshing, error, refresh } as const;

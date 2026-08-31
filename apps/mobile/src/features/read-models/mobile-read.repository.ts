@@ -11,6 +11,8 @@ import type {
 } from '../../core/supabase/database.types';
 import { summarizeRealized } from '../../domain/finance/foundation-financial-read-model';
 import { currentMonthWindow, saoPauloCalendar } from '../../lib/format';
+import type { AccessContext } from '../../domain/foundation/access-context';
+import type { FinancialReadRepositoryPort } from '../../ports/foundation-ports';
 
 export type MobileSnapshot = Readonly<{
   generatedAt: string;
@@ -134,3 +136,18 @@ export async function loadMobileSnapshot(userId: string): Promise<MobileSnapshot
     monthlyPlan,
   });
 }
+
+export const mobileFinancialReadRepository: FinancialReadRepositoryPort<MobileSnapshot> = Object.freeze({
+  async loadSnapshot(context: AccessContext) {
+    if (Date.parse(context.sessionExpiresAt) <= Date.now()) {
+      throw new Error('Sessão expirada. Entre novamente.');
+    }
+    if (
+      context.actingUserId !== context.subjectUserId
+      || context.actingUserId !== context.resourceOwnerId
+    ) {
+      throw new Error('Acesso compartilhado ainda não está habilitado no Mobile.');
+    }
+    return loadMobileSnapshot(context.resourceOwnerId);
+  },
+});

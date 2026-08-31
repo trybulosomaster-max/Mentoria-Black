@@ -14,8 +14,11 @@
     "lib": ["ES2022"]
   },
   "include": [
-    "src/domain/access/access-contract.ts",
-    "src/domain/finance/foundation-financial-read-model.ts",
+    "src/domain/**/*.ts",
+    "src/ports/**/*.ts",
+    "src/application/foundation/**/*.ts",
+    "src/infrastructure/cache/**/*.ts",
+    "src/infrastructure/observability/**/*.ts",
     "src/features/auth/password-policy.ts",
     "src/design-system/tokens.ts"
   ]

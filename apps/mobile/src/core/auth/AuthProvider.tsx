@@ -1,5 +1,3 @@
-import { AppState } from 'react-native';
-import * as Linking from 'expo-linking';
 import {
   createContext,
   type PropsWithChildren,
@@ -11,6 +9,7 @@ import {
   useState,
 } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
+import { Platform } from 'react-native';
 
 import { appEnvironment, configurationMessage } from '../config/env';
 import { getSupabaseClient } from '../supabase/client';
@@ -21,6 +20,10 @@ import {
   type NormalizedEntitlements,
 } from '../../domain/access/access-contract';
 import { PASSWORD_MESSAGE, passwordIsValid, validateSignup } from '../../features/auth/password-policy';
+import { expoAuthDeepLinks } from '../../infrastructure/native/expo-auth-deep-links';
+import { reactNativeLifecycle } from '../../infrastructure/native/react-native-lifecycle';
+import { createSelfAccessContext } from '../../application/foundation/access-context-factory';
+import type { AccessContext } from '../../domain/foundation/access-context';
 
 type AuthPhase =
   | 'booting'
@@ -38,6 +41,7 @@ type AuthContextValue = Readonly<{
   session: Session | null;
   user: User | null;
   entitlements: NormalizedEntitlements | null;
+  accessContext: AccessContext | null;
   errorMessage: string;
   configurationRequired: boolean;
   financialAccess: boolean;
@@ -144,17 +148,17 @@ export function AuthProvider({ children }: PropsWithChildren) {
       queueMicrotask(() => { void loadEntitlements(nextSession); });
     });
 
-    const syncAutoRefresh = (state: string) => {
-      if (state === 'active') client.auth.startAutoRefresh();
+    const syncAutoRefresh = (state: 'foreground' | 'background') => {
+      if (state === 'foreground') client.auth.startAutoRefresh();
       else client.auth.stopAutoRefresh();
     };
-    syncAutoRefresh(AppState.currentState);
-    const appState = AppState.addEventListener('change', syncAutoRefresh);
+    syncAutoRefresh(reactNativeLifecycle.current());
+    const removeLifecycleListener = reactNativeLifecycle.subscribe(syncAutoRefresh);
 
     return () => {
       mounted.current = false;
       listener.subscription.unsubscribe();
-      appState.remove();
+      removeLifecycleListener();
       client.auth.stopAutoRefresh();
     };
   }, [client, loadEntitlements]);
@@ -177,7 +181,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     const validation = validateSignup(input);
     if (!validation.ok) return { ok: false, message: validation.message };
 
-    const emailRedirectTo = Linking.createURL('/auth/callback');
+    const emailRedirectTo = expoAuthDeepLinks.callback();
     const { data, error } = await client.auth.signUp({
       email: input.email.trim(),
       password: input.password,
@@ -193,7 +197,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   const requestPasswordReset = useCallback(async (email: string): Promise<ActionResult> => {
     if (!client) return { ok: false, message: configurationMessage() };
-    const redirectTo = Linking.createURL('/auth/callback', { queryParams: { next: 'update-password' } });
+    const redirectTo = expoAuthDeepLinks.passwordRecovery();
     const { error } = await client.auth.resetPasswordForEmail(email.trim(), { redirectTo });
     return error
       ? { ok: false, message: 'Não foi possível enviar o link de recuperação.' }
@@ -239,11 +243,28 @@ export function AuthProvider({ children }: PropsWithChildren) {
     setPhase(client ? 'anonymous' : 'configuration-required');
   }, [client]);
 
+  const accessContext = useMemo(() => {
+    if (!session || !entitlements || phase !== 'granted') return null;
+    if (Platform.OS !== 'ios' && Platform.OS !== 'android') return null;
+    const expiresAt = Number(session.expires_at) * 1000;
+    if (!Number.isFinite(expiresAt)) return null;
+    return createSelfAccessContext({
+      userId: session.user.id,
+      sessionExpiresAt: new Date(expiresAt).toISOString(),
+      entitlements,
+      environment: appEnvironment.name,
+      platform: Platform.OS,
+      appVersion: appEnvironment.appVersion,
+      generation: Math.max(1, entitlementGeneration.current),
+    });
+  }, [entitlements, phase, session]);
+
   const value = useMemo<AuthContextValue>(() => ({
     phase,
     session,
     user: session?.user ?? null,
     entitlements,
+    accessContext,
     errorMessage,
     configurationRequired: !client,
     financialAccess: hasFinancialAppAccess(entitlements),
@@ -256,6 +277,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     startTrial,
     signOut,
   }), [
+    accessContext,
     client,
     entitlements,
     errorMessage,

@@ -39,8 +39,8 @@ function matchesFilter(transaction: TransactionRow, filter: Filter) {
 }
 
 export default function TransactionsScreen() {
-  const { user } = useAuth();
-  const { data, loading, refreshing, error, refresh } = useMobileSnapshot(user?.id);
+  const { accessContext } = useAuth();
+  const { data, loading, refreshing, error, refresh } = useMobileSnapshot(accessContext);
   const [filter, setFilter] = useState<Filter>('todos');
   const [query, setQuery] = useState('');
 

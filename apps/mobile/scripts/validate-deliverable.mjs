@@ -57,6 +57,13 @@ const required = [
   'tests/contracts.test.ts',
   'tests/web-financial-parity.test.ts',
   'tests/web-contract-parity.test.ts',
+  'src/domain/foundation/access-context.ts',
+  'src/domain/foundation/capability-registry.ts',
+  'src/ports/foundation-ports.ts',
+  'src/application/foundation/identity-runtime.ts',
+  'src/infrastructure/cache/memory-private-cache.ts',
+  'src/infrastructure/observability/redacted-observability.ts',
+  'tests/foundation-core.test.ts',
 ];
 
 for (const file of required) {
@@ -139,7 +146,8 @@ else fail('isolation:entitlement-generation-guard', 'entitlement antigo pode atu
 
 if (
   snapshotHookSource.includes('requestGeneration')
-  && snapshotHookSource.includes('activeUserId')
+  && snapshotHookSource.includes('activeIdentity')
+  && snapshotHookSource.includes('identityKey')
   && snapshotHookSource.includes('requestIsCurrent')
 ) ok('isolation:snapshot-generation-guard');
 else fail('isolation:snapshot-generation-guard', 'snapshot antigo pode atualizar usuário novo');

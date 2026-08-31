@@ -17,8 +17,8 @@ import { useMobileSnapshot } from '../../src/features/read-models/use-mobile-sna
 import { formatDate, formatMoney } from '../../src/lib/format';
 
 export default function NetWorthScreen() {
-  const { user } = useAuth();
-  const { data, loading, refreshing, error, refresh } = useMobileSnapshot(user?.id);
+  const { accessContext } = useAuth();
+  const { data, loading, refreshing, error, refresh } = useMobileSnapshot(accessContext);
   if (loading && !data) return <Screen scroll={false}><StateView loading title="Carregando patrimônio" message="Consultando contas, cartões e metas." /></Screen>;
   if (error && !data) return <Screen scroll={false}><StateView title="Falha ao carregar" message={error} /></Screen>;
   if (!data) return null;
