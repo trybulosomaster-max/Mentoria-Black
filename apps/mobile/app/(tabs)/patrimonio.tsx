@@ -19,7 +19,7 @@ export default function NetWorthScreen() {
   if (!data) return null;
 
   return (
-    <Screen refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { void refresh(); }} tintColor={tokens.brand.accent} />}>
+    <Screen refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { void refresh(); }} tintColor={tokens.action.primary} />}>
       <PageHeader eyebrow={data.period.label} title="Patrimônio" description="Contas, cartões e metas em uma visão clara." />
       <Text style={styles.contextNote}><Text style={styles.contextNoteStrong}>Visão atual. </Text>Apenas saldos confirmados entram no total; limites de cartão aparecem separadamente.</Text>
 

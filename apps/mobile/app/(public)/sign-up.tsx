@@ -25,6 +25,7 @@ export default function SignUpScreen() {
   const [password, setPassword] = useState('');
   const [confirmation, setConfirmation] = useState('');
   const [termsAccepted, setTermsAccepted] = useState(false);
+  const [termsFocused, setTermsFocused] = useState(false);
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState<{ tone: 'info' | 'error'; title: string; message: string } | null>(null);
 
@@ -81,11 +82,13 @@ export default function SignUpScreen() {
         <Pressable
           accessibilityRole="checkbox"
           accessibilityState={{ checked: termsAccepted }}
+          onBlur={() => setTermsFocused(false)}
+          onFocus={() => setTermsFocused(true)}
           onPress={() => setTermsAccepted((value) => !value)}
           style={({ pressed }) => [styles.terms, pressed && styles.pressed]}
         >
-          <View style={[styles.checkbox, termsAccepted && styles.checkboxChecked]}>
-            {termsAccepted ? <AppIcon name="success" size={primitives.size.icon.sm} color={tokens.text.inverse} /> : null}
+          <View style={[styles.checkbox, termsAccepted && styles.checkboxChecked, termsFocused && styles.checkboxFocused]}>
+            {termsAccepted ? <AppIcon name="success" size={primitives.size.icon.sm} color={tokens.action.onPrimary} /> : null}
           </View>
           <Text style={styles.termsText}>
             Li e concordo com os Termos de Uso e a Política de Privacidade vigentes.
@@ -114,9 +117,10 @@ export default function SignUpScreen() {
 function createStyles(tokens: ThemeTokens) { return StyleSheet.create({
   content: { maxWidth: componentTokens.screen.readableMaxWidth, width: '100%', alignSelf: 'center' },
   form: { gap: spacing.md },
-  terms: { minHeight: touch.comfortable, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.xs },
+  terms: { minHeight: touch.comfortable, flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, paddingVertical: spacing.xs },
   pressed: { opacity: primitives.opacity.pressed },
   checkbox: { width: primitives.size.icon.md, height: primitives.size.icon.md, borderRadius: primitives.radius.sm, borderWidth: primitives.size.border.thin, borderColor: tokens.border.strong, alignItems: 'center', justifyContent: 'center' },
-  checkboxChecked: { backgroundColor: tokens.brand.accent, borderColor: tokens.brand.accent },
+  checkboxChecked: { backgroundColor: tokens.action.primary, borderColor: tokens.action.primary },
+  checkboxFocused: { borderColor: tokens.focus.ring, borderWidth: primitives.size.border.strong },
   termsText: { ...textStyles.bodySmall, flex: 1, color: tokens.text.secondary },
 }); }

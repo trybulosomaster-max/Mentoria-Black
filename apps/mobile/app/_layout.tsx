@@ -16,6 +16,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AuthProvider, useAuth } from '../src/core/auth/AuthProvider';
+import { ReducedMotionProvider, useReducedMotion } from '../src/design-system/system';
 import { ThemeProvider, useAvioraTheme } from '../src/design-system/theme-provider';
 import { bootstrapIsPending } from '../src/domain/bootstrap/app-bootstrap';
 
@@ -35,13 +36,14 @@ function BootstrapGate({ fontsReady }: { fontsReady: boolean }) {
 
 function ThemedApplication({ fontsReady }: { fontsReady: boolean }) {
   const { resolvedTheme, tokens } = useAvioraTheme();
+  const reducedMotion = useReducedMotion();
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: tokens.background.canvas }}>
       <SafeAreaProvider>
         <AuthProvider>
           <BootstrapGate fontsReady={fontsReady} />
           <StatusBar style={resolvedTheme === 'dark' ? 'light' : 'dark'} />
-          <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: tokens.background.canvas }, animation: 'fade' }} />
+          <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: tokens.background.canvas }, animation: reducedMotion ? 'none' : 'fade' }} />
         </AuthProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
@@ -59,5 +61,5 @@ export default function RootLayout() {
   });
   const fontsReady = fontsLoaded || Boolean(fontError);
 
-  return <ThemeProvider><ThemedApplication fontsReady={fontsReady} /></ThemeProvider>;
+  return <ThemeProvider><ReducedMotionProvider><ThemedApplication fontsReady={fontsReady} /></ReducedMotionProvider></ThemeProvider>;
 }

@@ -25,6 +25,7 @@ import {
   type ReactNode,
   useId,
   useMemo,
+  useState,
 } from 'react';
 
 import { AppIcon, type AppIconName } from './icons';
@@ -153,13 +154,15 @@ export function AppButton({
 }: ButtonProps) {
   const styles = useStyles();
   const { tokens } = useAvioraTheme();
+  const reducedMotion = useReducedMotion();
+  const [focused, setFocused] = useState(false);
   const blocked = disabled || loading;
   const press = async () => {
     if (blocked) return;
     await Haptics.selectionAsync().catch(() => undefined);
     await onPress();
   };
-  const foreground = variant === 'primary' ? tokens.text.inverse : variant === 'danger' ? tokens.status.riskText : variant === 'ghost' ? tokens.brand.accent : tokens.text.primary;
+  const foreground = variant === 'primary' ? tokens.action.onPrimary : variant === 'danger' ? tokens.status.riskText : variant === 'ghost' ? tokens.action.text : tokens.text.primary;
 
   return (
     <Pressable
@@ -168,8 +171,10 @@ export function AppButton({
       accessibilityHint={accessibilityHint}
       accessibilityState={{ disabled: blocked, busy: loading }}
       disabled={blocked}
+      onBlur={() => setFocused(false)}
+      onFocus={() => setFocused(true)}
       onPress={() => { void press(); }}
-      style={({ pressed }) => [styles.button, styles[`button_${variant}`], pressed && !blocked && styles.buttonPressed, blocked && styles.buttonDisabled]}
+      style={({ pressed }) => [styles.button, styles[`button_${variant}`], focused && styles.controlFocused, pressed && !blocked && (reducedMotion ? styles.buttonPressedReduced : styles.buttonPressed), blocked && styles.buttonDisabled]}
     >
       {loading ? (
         <ActivityIndicator color={foreground} />
@@ -194,15 +199,19 @@ type IconButtonProps = Readonly<{
 export function IconButton({ icon, label, onPress, variant = 'default', disabled = false }: IconButtonProps) {
   const styles = useStyles();
   const { tokens } = useAvioraTheme();
+  const reducedMotion = useReducedMotion();
+  const [focused, setFocused] = useState(false);
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={{ disabled }}
       disabled={disabled}
+      onBlur={() => setFocused(false)}
+      onFocus={() => setFocused(true)}
       onPress={() => { void onPress(); }}
       hitSlop={spacing.xxs}
-      style={({ pressed }) => [styles.iconButton, styles[`iconButton_${variant}`], pressed && !disabled && styles.buttonPressed, disabled && styles.buttonDisabled]}
+      style={({ pressed }) => [styles.iconButton, styles[`iconButton_${variant}`], focused && styles.controlFocused, pressed && !disabled && (reducedMotion ? styles.buttonPressedReduced : styles.buttonPressed), disabled && styles.buttonDisabled]}
     >
       <AppIcon name={icon} color={variant === 'danger' ? tokens.status.riskText : tokens.text.secondary} />
     </Pressable>
@@ -216,9 +225,10 @@ type FieldProps = TextInputProps & Readonly<{
   keyboardType?: KeyboardTypeOptions;
 }>;
 
-export const TextField = forwardRef<TextInput, FieldProps>(function TextField({ label, helper, error, ...inputProps }, ref) {
+export const TextField = forwardRef<TextInput, FieldProps>(function TextField({ label, helper, error, onBlur, onFocus, ...inputProps }, ref) {
   const styles = useStyles();
   const { tokens } = useAvioraTheme();
+  const [focused, setFocused] = useState(false);
   const id = useId();
   const descriptionId = `${id}-description`;
   return (
@@ -233,9 +243,11 @@ export const TextField = forwardRef<TextInput, FieldProps>(function TextField({ 
         aria-invalid={Boolean(error)}
         allowFontScaling={dynamicType.enabled}
         maxFontSizeMultiplier={dynamicType.maxFontSizeMultiplier}
+        onBlur={(event) => { setFocused(false); onBlur?.(event); }}
+        onFocus={(event) => { setFocused(true); onFocus?.(event); }}
         placeholderTextColor={tokens.text.secondary}
-        selectionColor={tokens.brand.accent}
-        style={[styles.input, inputProps.multiline && styles.inputMultiline, Boolean(error) && styles.inputError, inputProps.style]}
+        selectionColor={tokens.action.primary}
+        style={[styles.input, inputProps.multiline && styles.inputMultiline, Boolean(error) && styles.inputError, inputProps.style, focused && styles.controlFocused]}
       />
       {error || helper ? (
         <Text
@@ -252,9 +264,10 @@ export const TextField = forwardRef<TextInput, FieldProps>(function TextField({ 
 
 type SearchFieldProps = Omit<FieldProps, 'label'> & Readonly<{ label?: string }>;
 
-export const SearchField = forwardRef<TextInput, SearchFieldProps>(function SearchField({ label = 'Buscar', ...inputProps }, ref) {
+export const SearchField = forwardRef<TextInput, SearchFieldProps>(function SearchField({ label = 'Buscar', onBlur, onFocus, ...inputProps }, ref) {
   const styles = useStyles();
   const { tokens } = useAvioraTheme();
+  const [focused, setFocused] = useState(false);
   return (
     <View style={styles.searchField}>
       <AppIcon name="search" size={primitives.size.icon.sm} color={tokens.text.secondary} />
@@ -264,10 +277,13 @@ export const SearchField = forwardRef<TextInput, SearchFieldProps>(function Sear
         accessibilityLabel={label}
         allowFontScaling={dynamicType.enabled}
         maxFontSizeMultiplier={dynamicType.maxFontSizeMultiplier}
+        onBlur={(event) => { setFocused(false); onBlur?.(event); }}
+        onFocus={(event) => { setFocused(true); onFocus?.(event); }}
         placeholderTextColor={tokens.text.secondary}
-        selectionColor={tokens.brand.accent}
+        selectionColor={tokens.action.primary}
         style={[styles.searchInput, inputProps.style]}
       />
+      {focused ? <View accessibilityElementsHidden pointerEvents="none" style={styles.searchFocusRing} /> : null}
     </View>
   );
 });
@@ -280,7 +296,7 @@ type CardProps = PropsWithChildren<{
 
 export function Card({ children, style, tone = 'default', accessibilityLabel }: CardProps) {
   const styles = useStyles();
-  return <View accessibilityLabel={accessibilityLabel} style={[styles.card, tone === 'raised' && styles.cardRaised, style]}>{children}</View>;
+  return <View accessible={Boolean(accessibilityLabel)} accessibilityLabel={accessibilityLabel} style={[styles.card, tone === 'raised' && styles.cardRaised, style]}>{children}</View>;
 }
 
 export function MetricCard({ label, value, helper }: { label: string; value: string; helper?: string }) {
@@ -288,7 +304,7 @@ export function MetricCard({ label, value, helper }: { label: string; value: str
   return (
     <Card style={styles.metricCard}>
       <Text style={styles.metricLabel}>{label}</Text>
-      <Text adjustsFontSizeToFit maxFontSizeMultiplier={dynamicType.moneyMaxFontSizeMultiplier} numberOfLines={1} style={styles.metricValue}>{value}</Text>
+      <Text maxFontSizeMultiplier={dynamicType.moneyMaxFontSizeMultiplier} style={styles.metricValue}>{value}</Text>
       {helper ? <Text style={styles.metricHelper}>{helper}</Text> : null}
     </Card>
   );
@@ -300,7 +316,7 @@ export function PageHeader({ eyebrow, title, description, action }: { eyebrow?: 
     <View style={styles.pageHeader}>
       {eyebrow ? <Text maxFontSizeMultiplier={dynamicType.maxFontSizeMultiplier} style={styles.eyebrow}>{eyebrow}</Text> : null}
       <View style={styles.pageTitleRow}>
-        <Text accessibilityRole="header" adjustsFontSizeToFit maxFontSizeMultiplier={dynamicType.headingMaxFontSizeMultiplier} minimumFontScale={0.75} numberOfLines={1} style={styles.pageTitle}>{title}</Text>
+        <Text accessibilityRole="header" maxFontSizeMultiplier={dynamicType.headingMaxFontSizeMultiplier} style={styles.pageTitle}>{title}</Text>
         {action}
       </View>
       {description ? <Text maxFontSizeMultiplier={dynamicType.maxFontSizeMultiplier} style={styles.pageDescription}>{description}</Text> : null}
@@ -312,7 +328,7 @@ export function SectionTitle({ title, action }: { title: string; action?: ReactN
   const styles = useStyles();
   return (
     <View style={styles.sectionHeader}>
-      <Text accessibilityRole="header" adjustsFontSizeToFit maxFontSizeMultiplier={dynamicType.headingMaxFontSizeMultiplier} minimumFontScale={0.8} numberOfLines={1} style={styles.sectionTitle}>{title}</Text>
+      <Text accessibilityRole="header" maxFontSizeMultiplier={dynamicType.headingMaxFontSizeMultiplier} style={styles.sectionTitle}>{title}</Text>
       {action}
     </View>
   );
@@ -334,13 +350,17 @@ export const Pill = StatusPill;
 
 export function FilterChip({ label, selected, onPress, disabled = false }: { label: string; selected: boolean; onPress(): void; disabled?: boolean }) {
   const styles = useStyles();
+  const reducedMotion = useReducedMotion();
+  const [focused, setFocused] = useState(false);
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityState={{ selected, disabled }}
       disabled={disabled}
+      onBlur={() => setFocused(false)}
+      onFocus={() => setFocused(true)}
       onPress={onPress}
-      style={({ pressed }) => [styles.filterChip, selected && styles.filterChipSelected, pressed && !disabled && styles.buttonPressed, disabled && styles.buttonDisabled]}
+      style={({ pressed }) => [styles.filterChip, selected && styles.filterChipSelected, focused && styles.controlFocused, pressed && !disabled && (reducedMotion ? styles.buttonPressedReduced : styles.buttonPressed), disabled && styles.buttonDisabled]}
     >
       <Text style={[styles.filterChipText, selected && styles.filterChipTextSelected]}>{label}</Text>
     </Pressable>
@@ -371,8 +391,8 @@ export function StateView({ title, message, action, loading = false, tone = 'emp
   const stateIcon: AppIconName = tone === 'error' ? 'error' : tone === 'offline' ? 'warning' : 'info';
   return (
     <View accessibilityLiveRegion="polite" style={styles.stateView}>
-      {loading ? <ActivityIndicator size="large" color={tokens.brand.accent} /> : <AppIcon name={stateIcon} size={primitives.size.icon.xl} color={tokens.brand.accent} />}
-      <Text accessibilityRole="header" adjustsFontSizeToFit maxFontSizeMultiplier={dynamicType.headingMaxFontSizeMultiplier} minimumFontScale={0.75} numberOfLines={2} style={styles.stateTitle}>{title}</Text>
+      {loading ? <ActivityIndicator size="large" color={tokens.action.primary} /> : <AppIcon name={stateIcon} size={primitives.size.icon.xl} color={tokens.action.text} />}
+      <Text accessibilityRole="header" maxFontSizeMultiplier={dynamicType.headingMaxFontSizeMultiplier} style={styles.stateTitle}>{title}</Text>
       <Text maxFontSizeMultiplier={dynamicType.maxFontSizeMultiplier} style={styles.stateMessage}>{message}</Text>
       {action ? <View style={styles.stateAction}>{action}</View> : null}
     </View>
@@ -468,22 +488,24 @@ function createStyles(tokens: import('./tokens').ThemeTokens) {
   brandCompact: { gap: spacing.none },
   brandCrest: { padding: componentTokens.brand.crestBorder, ...tokens.elevation.card },
   brandInner: { flex: 1, borderRadius: primitives.radius.pill, backgroundColor: tokens.background.canvas, alignItems: 'center', justifyContent: 'center', borderWidth, borderColor: tokens.brand.accent },
-  brandLetter: { color: tokens.brand.accent, fontFamily: primitives.typography.family.brandBold, fontSize: componentTokens.brand.letter },
+  brandLetter: { color: tokens.action.text, fontFamily: primitives.typography.family.brandBold, fontSize: componentTokens.brand.letter },
   brandLetterCompact: { fontSize: componentTokens.brand.letterCompact },
   brandCopy: { alignItems: 'center', gap: spacing.xxs },
-  brandName: { ...textStyles.brand, color: tokens.brand.accent },
+  brandName: { ...textStyles.brand, color: tokens.action.text },
   brandSubtitle: { color: tokens.text.primary, fontFamily: primitives.typography.family.uiSemiBold, fontSize: componentTokens.brand.subtitle, letterSpacing: primitives.typography.letterSpacing.brand },
   button: { minHeight: componentTokens.button.minHeight, borderRadius: componentTokens.button.radius, paddingHorizontal: componentTokens.button.horizontalPadding, alignItems: 'center', justifyContent: 'center', borderWidth },
-  button_primary: { backgroundColor: tokens.brand.accent, borderColor: tokens.brand.accent },
+  button_primary: { backgroundColor: tokens.action.primary, borderColor: tokens.action.primary },
   button_secondary: { backgroundColor: tokens.background.surfaceMuted, borderColor: tokens.border.strong },
   button_ghost: { backgroundColor: primitives.color.transparent, borderColor: primitives.color.transparent },
   button_danger: { backgroundColor: tokens.background.surfaceMuted, borderColor: tokens.status.risk },
   buttonPressed: { opacity: primitives.opacity.pressed, transform: [{ scale: primitives.motion.pressedScale }] },
+  buttonPressedReduced: { opacity: primitives.opacity.pressed },
   buttonDisabled: { opacity: primitives.opacity.disabled },
+  controlFocused: { borderColor: tokens.focus.ring, borderWidth: primitives.size.border.strong },
   buttonContent: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs },
   buttonText: { ...textStyles.buttonLabel, textAlign: 'center' },
   iconButton: { width: componentTokens.iconButton.size, height: componentTokens.iconButton.size, borderRadius: componentTokens.iconButton.radius, alignItems: 'center', justifyContent: 'center', borderWidth },
-  iconButton_default: { backgroundColor: tokens.background.surfaceMuted, borderColor: tokens.border.default },
+  iconButton_default: { backgroundColor: tokens.background.surfaceMuted, borderColor: tokens.border.strong },
   iconButton_ghost: { backgroundColor: primitives.color.transparent, borderColor: primitives.color.transparent },
   iconButton_danger: { backgroundColor: tokens.background.surfaceMuted, borderColor: tokens.status.risk },
   field: { gap: spacing.xs },
@@ -493,32 +515,33 @@ function createStyles(tokens: import('./tokens').ThemeTokens) {
   inputError: { borderColor: tokens.status.risk },
   fieldHelp: { ...textStyles.caption, color: tokens.text.secondary },
   fieldHelpError: { color: tokens.status.riskText },
-  searchField: { minHeight: componentTokens.input.minHeight, flexDirection: 'row', alignItems: 'center', gap: spacing.xs, borderRadius: componentTokens.input.radius, borderWidth: surfaceBorderWidth, borderColor: tokens.border.default, backgroundColor: tokens.background.surface, paddingHorizontal: spacing.md },
+  searchField: { minHeight: componentTokens.input.minHeight, position: 'relative', flexDirection: 'row', alignItems: 'center', gap: spacing.xs, borderRadius: componentTokens.input.radius, borderWidth, borderColor: tokens.border.strong, backgroundColor: tokens.background.surface, paddingHorizontal: spacing.md },
   searchInput: { flex: 1, minWidth: spacing.none, color: tokens.text.primary, paddingVertical: spacing.xs, ...textStyles.body },
+  searchFocusRing: { position: 'absolute', inset: 0, borderRadius: componentTokens.input.radius, borderWidth: primitives.size.border.strong, borderColor: tokens.focus.ring },
   card: { backgroundColor: tokens.background.surface, borderWidth: surfaceBorderWidth, borderColor: tokens.border.default, borderRadius: componentTokens.card.radius, padding: componentTokens.card.padding, ...tokens.elevation.card },
   cardRaised: { backgroundColor: tokens.background.surfaceMuted, borderColor: tokens.border.default },
   metricCard: { minWidth: componentTokens.card.metricMinWidth, flexGrow: 1, flexBasis: componentTokens.card.metricMinWidth, gap: spacing.xs },
   metricLabel: { ...textStyles.caption, color: tokens.text.secondary, fontFamily: primitives.typography.family.uiBold, letterSpacing: primitives.typography.letterSpacing.label },
-  metricValue: { ...textStyles.moneyL, color: tokens.text.primary },
+  metricValue: { ...textStyles.moneyL, flexShrink: 1, color: tokens.text.primary },
   metricHelper: { ...textStyles.caption, color: tokens.text.secondary },
   pageHeader: { gap: spacing.xxs },
-  pageTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
-  eyebrow: { ...textStyles.caption, color: tokens.brand.accent, fontFamily: primitives.typography.family.uiExtraBold, letterSpacing: primitives.typography.letterSpacing.eyebrow },
-  pageTitle: { ...textStyles.title, flexShrink: 1, color: tokens.text.primary },
+  pageTitleRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.sm },
+  eyebrow: { ...textStyles.caption, color: tokens.action.text, fontFamily: primitives.typography.family.uiExtraBold, letterSpacing: primitives.typography.letterSpacing.eyebrow },
+  pageTitle: { ...textStyles.title, flexGrow: 1, flexShrink: 1, flexBasis: 240, color: tokens.text.primary },
   pageDescription: { ...textStyles.bodySmall, color: tokens.text.secondary, maxWidth: componentTokens.screen.readableMaxWidth },
-  sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
-  sectionTitle: { ...textStyles.section, flexShrink: 1, color: tokens.text.primary },
+  sectionHeader: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.sm },
+  sectionTitle: { ...textStyles.section, flexGrow: 1, flexShrink: 1, flexBasis: 200, color: tokens.text.primary },
   pill: { alignSelf: 'flex-start', borderRadius: componentTokens.chip.radius, borderWidth: surfaceBorderWidth, paddingHorizontal: componentTokens.chip.horizontalPadding, paddingVertical: spacing.xxs },
   pill_neutral: { borderColor: tokens.border.strong, backgroundColor: tokens.background.surfaceMuted },
   pill_positive: { borderColor: tokens.status.positive, backgroundColor: tokens.background.surfaceMuted },
   pill_warning: { borderColor: tokens.status.warning, backgroundColor: tokens.background.surfaceMuted },
   pill_negative: { borderColor: tokens.status.risk, backgroundColor: tokens.background.surfaceMuted },
-  pill_gold: { borderColor: tokens.brand.accent, backgroundColor: tokens.background.surfaceMuted },
+  pill_gold: { borderColor: tokens.action.primary, backgroundColor: tokens.background.surfaceMuted },
   pill_info: { borderColor: tokens.status.info, backgroundColor: tokens.background.surfaceMuted },
   pillText: { ...textStyles.caption, fontFamily: primitives.typography.family.uiBold },
-  pillText_neutral: { color: tokens.text.secondary }, pillText_positive: { color: tokens.status.positiveText }, pillText_warning: { color: tokens.status.warning }, pillText_negative: { color: tokens.status.riskText }, pillText_gold: { color: tokens.brand.accent }, pillText_info: { color: tokens.status.info },
-  filterChip: { minHeight: componentTokens.chip.minHeight, justifyContent: 'center', borderRadius: componentTokens.chip.radius, borderWidth: surfaceBorderWidth, borderColor: tokens.border.default, backgroundColor: tokens.background.surface, paddingHorizontal: componentTokens.chip.horizontalPadding },
-  filterChipSelected: { borderColor: tokens.brand.accent, backgroundColor: tokens.background.surfaceMuted },
+  pillText_neutral: { color: tokens.text.secondary }, pillText_positive: { color: tokens.status.positiveText }, pillText_warning: { color: tokens.status.warning }, pillText_negative: { color: tokens.status.riskText }, pillText_gold: { color: tokens.action.text }, pillText_info: { color: tokens.status.info },
+  filterChip: { minHeight: componentTokens.chip.minHeight, justifyContent: 'center', borderRadius: componentTokens.chip.radius, borderWidth, borderColor: tokens.border.strong, backgroundColor: tokens.background.surface, paddingHorizontal: componentTokens.chip.horizontalPadding },
+  filterChipSelected: { borderColor: tokens.action.primary, backgroundColor: tokens.background.surfaceMuted },
   filterChipText: { ...textStyles.bodySmall, color: tokens.text.secondary, fontFamily: primitives.typography.family.uiSemiBold },
   filterChipTextSelected: { color: tokens.text.primary },
   notice: { flexDirection: 'row', alignItems: 'flex-start', borderRadius: componentTokens.notice.radius, borderWidth, padding: componentTokens.notice.padding, gap: spacing.sm },
@@ -530,7 +553,7 @@ function createStyles(tokens: import('./tokens').ThemeTokens) {
   stateTitle: { ...textStyles.section, color: tokens.text.primary, textAlign: 'center' }, stateMessage: { ...textStyles.body, color: tokens.text.secondary, textAlign: 'center', maxWidth: componentTokens.dialog.maxWidth },
   stateAction: { width: '100%', maxWidth: componentTokens.dialog.maxWidth, gap: spacing.sm },
   progressGroup: { gap: spacing.xs },
-  progressTrack: { height: componentTokens.progress.height, borderRadius: componentTokens.progress.radius, backgroundColor: tokens.background.surfaceMuted, overflow: 'hidden' }, progressFill: { height: '100%', borderRadius: componentTokens.progress.radius, backgroundColor: tokens.brand.accent }, progressLabel: { ...textStyles.caption, color: tokens.text.secondary, textAlign: 'right' }, overlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: tokens.overlay },
+  progressTrack: { height: componentTokens.progress.height, borderRadius: componentTokens.progress.radius, backgroundColor: tokens.background.surfaceMuted, overflow: 'hidden' }, progressFill: { height: '100%', borderRadius: componentTokens.progress.radius, backgroundColor: tokens.action.primary }, progressLabel: { ...textStyles.caption, color: tokens.text.secondary, textAlign: 'right' }, overlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: tokens.overlay },
   dialogAlignment: { justifyContent: 'center', padding: spacing.md },
   sheet: { width: '100%', maxWidth: componentTokens.sheet.maxWidth, alignSelf: 'center', borderTopLeftRadius: componentTokens.sheet.radius, borderTopRightRadius: componentTokens.sheet.radius, borderWidth, borderColor: tokens.border.strong, backgroundColor: tokens.background.surfaceMuted, padding: componentTokens.sheet.padding, gap: spacing.md, ...tokens.elevation.overlay },
   dialog: { width: '100%', maxWidth: componentTokens.dialog.maxWidth, alignSelf: 'center', borderRadius: componentTokens.dialog.radius, borderWidth, borderColor: tokens.border.strong, backgroundColor: tokens.background.surfaceMuted, padding: componentTokens.dialog.padding, gap: spacing.md, ...tokens.elevation.overlay },

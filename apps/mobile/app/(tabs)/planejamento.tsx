@@ -25,7 +25,7 @@ export default function PlanningScreen() {
   const remaining = Number(plan?.revenue ?? 0) - allocation;
 
   return (
-    <Screen refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { void refresh(); }} tintColor={tokens.brand.accent} />}>
+    <Screen refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { void refresh(); }} tintColor={tokens.action.primary} />}>
       <PageHeader eyebrow={data.period.label} title="Planejamento" description="Sua distribuição mensal em um só lugar." />
       {!plan ? (
         <Card tone="raised" style={styles.emptyCard}>

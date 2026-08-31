@@ -39,7 +39,7 @@ export default function TransactionsScreen() {
   if (!data) return null;
 
   return (
-    <Screen refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { void refresh(); }} tintColor={tokens.brand.accent} />}>
+    <Screen refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { void refresh(); }} tintColor={tokens.action.primary} />}>
       <PageHeader eyebrow={data.period.label} title="Lançamentos" description="Seus movimentos, organizados por período." />
       <SearchField label="Buscar lançamentos" value={query} onChangeText={setQuery} placeholder="Descrição ou categoria" autoCorrect={false} clearButtonMode="while-editing" />
       <View accessibilityRole="toolbar" accessibilityLabel="Filtros de lançamentos" style={styles.filters}>{filters.map((item) => <FilterChip key={item.key} label={item.label} selected={item.key === filter} onPress={() => setFilter(item.key)} />)}</View>

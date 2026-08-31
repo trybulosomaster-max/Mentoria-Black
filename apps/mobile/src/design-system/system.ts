@@ -1,8 +1,12 @@
 import { AccessibilityInfo } from 'react-native';
-import { useEffect, useState } from 'react';
+import { createContext, createElement, type PropsWithChildren, useContext, useEffect, useState } from 'react';
 
-export function useReducedMotion(): boolean {
-  const [reduced, setReduced] = useState(false);
+const ReducedMotionContext = createContext(true);
+
+export function ReducedMotionProvider({ children }: PropsWithChildren) {
+  // Fail closed during the asynchronous native preference lookup so the first
+  // transition never animates before Reduce Motion is known.
+  const [reduced, setReduced] = useState(true);
 
   useEffect(() => {
     let mounted = true;
@@ -16,5 +20,9 @@ export function useReducedMotion(): boolean {
     };
   }, []);
 
-  return reduced;
+  return createElement(ReducedMotionContext.Provider, { value: reduced }, children);
+}
+
+export function useReducedMotion(): boolean {
+  return useContext(ReducedMotionContext);
 }

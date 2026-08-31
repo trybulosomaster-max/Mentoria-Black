@@ -66,9 +66,9 @@ function InfoRow({ label, value, styles }: { label: string; value: string; style
 
 function createStyles(tokens: ThemeTokens) {
   return StyleSheet.create({
-    accountCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.xs, paddingVertical: spacing.xxs },
+    accountCard: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.xs, paddingVertical: spacing.xxs },
     avatar: { width: primitives.size.touch.default, height: primitives.size.touch.default, borderRadius: primitives.radius.pill, backgroundColor: tokens.background.surfaceMuted, borderWidth: primitives.size.border.thin, borderColor: tokens.brand.accent, alignItems: 'center', justifyContent: 'center' },
-    avatarText: { ...textStyles.section, color: tokens.brand.accent },
+    avatarText: { ...textStyles.section, color: tokens.action.text },
     accountCopy: { flex: 1, minWidth: spacing.none, gap: spacing.xs },
     accountName: { ...textStyles.section, color: tokens.text.primary },
     accountEmail: { ...textStyles.bodySmall, color: tokens.text.secondary },
@@ -76,12 +76,12 @@ function createStyles(tokens: ThemeTokens) {
     appearanceGroup: { gap: spacing.xs },
     resolved: { ...textStyles.caption, color: tokens.text.secondary },
     moduleGroup: { padding: spacing.none },
-    moduleRow: { minHeight: primitives.size.touch.comfortable, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.xs },
+    moduleRow: { minHeight: primitives.size.touch.comfortable, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.xs },
     moduleDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: tokens.border.default },
     moduleTitle: { ...textStyles.body, color: tokens.text.primary, fontFamily: primitives.typography.family.uiBold },
     infoCard: { gap: spacing.md },
-    between: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
+    between: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
     infoLabel: { ...textStyles.bodySmall, color: tokens.text.secondary },
-    infoValue: { ...textStyles.bodySmall, color: tokens.text.primary, fontFamily: primitives.typography.family.uiBold, textAlign: 'right' },
+    infoValue: { ...textStyles.bodySmall, flexShrink: 1, color: tokens.text.primary, fontFamily: primitives.typography.family.uiBold, textAlign: 'right' },
   });
 }

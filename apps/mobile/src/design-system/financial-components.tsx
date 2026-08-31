@@ -1,5 +1,5 @@
-import { type PropsWithChildren, useMemo } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { type PropsWithChildren, useMemo, useState } from 'react';
+import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
 import { Card, ProgressBar, StatusPill, type StatusTone } from './components';
 import { AppIcon, type AppIconName } from './icons';
@@ -22,7 +22,8 @@ export function FinancialMetric({ label, value, helper, tone = 'neutral', emphas
 
 export function MetricGroup({ children }: PropsWithChildren) {
   const styles = useFinancialStyles();
-  return <View style={styles.metricGroup}>{children}</View>;
+  const { fontScale } = useWindowDimensions();
+  return <View style={[styles.metricGroup, fontScale >= 1.4 && styles.metricGroupReflow]}>{children}</View>;
 }
 
 export function TransactionRow({ title, meta, amount, status, tone, category }: { title: string; meta: string; amount: string; status: string; tone: StatusTone; category?: string }) {
@@ -32,7 +33,7 @@ export function TransactionRow({ title, meta, amount, status, tone, category }: 
     <Card accessibilityLabel={`${title}. ${meta}. ${amount}. ${status}`} style={styles.rowCard}>
       <View style={styles.rowTop}>
         <View style={styles.rowCopy}>
-          <Text numberOfLines={2} style={styles.rowTitle}>{title}</Text>
+          <Text style={styles.rowTitle}>{title}</Text>
           <Text style={styles.rowMeta}>{meta}</Text>
         </View>
         <Text maxFontSizeMultiplier={dynamicType.moneyMaxFontSizeMultiplier} style={[styles.rowAmount, amountTone]}>{amount}</Text>
@@ -63,7 +64,7 @@ export function AssetRow({ icon = 'wallet', title, subtitle, value, status, stat
     <Card accessibilityLabel={`${title}. ${subtitle}. ${value}${status ? `. ${status}` : ''}`} style={styles.assetCard}>
       <View style={styles.rowTop}>
         <View style={styles.assetIdentity}>
-          <View style={styles.assetIcon}><AppIcon name={icon} size={primitives.size.icon.sm} color={tokens.brand.accent} /></View>
+          <View style={styles.assetIcon}><AppIcon name={icon} size={primitives.size.icon.sm} color={tokens.action.text} /></View>
           <View style={styles.rowCopy}><Text style={styles.rowTitle}>{title}</Text><Text style={styles.rowMeta}>{subtitle}</Text></View>
         </View>
         <Text style={styles.assetValue}>{value}</Text>
@@ -94,7 +95,7 @@ export function ChartCard({ title, question, period, summary, state, accessibili
   const showsPlot = state === 'success' || state === 'partial' || state === 'stale';
   return (
     <Card accessibilityLabel={`${title}. Pergunta: ${question}. ${period}. ${summary}. ${chartStateLabels[state]}. ${accessibilityEquivalent}`} style={styles.chartCard}>
-      <View style={styles.rowTop}><View style={styles.rowCopy}><Text style={styles.rowTitle}>{title}</Text><Text style={styles.rowMeta}>{period}</Text></View><AppIcon name="report" color={tokens.brand.accent} /></View>
+      <View style={styles.rowTop}><View style={styles.rowCopy}><Text style={styles.rowTitle}>{title}</Text><Text style={styles.rowMeta}>{period}</Text></View><AppIcon name="report" color={tokens.action.text} /></View>
       <Text style={styles.chartQuestion}>{question}</Text>
       {state === 'partial' || state === 'stale' ? <StatusPill label={chartStateLabels[state]} tone="warning" /> : null}
       {showsPlot ? children : (
@@ -116,10 +117,11 @@ export function PermissionBadge({ label }: { label: string }) {
 export function ThemeRadioRow({ label, helper, selected, onPress }: { label: string; helper: string; selected: boolean; onPress(): void }) {
   const styles = useFinancialStyles();
   const { tokens } = useAvioraTheme();
+  const [focused, setFocused] = useState(false);
   return (
-    <Pressable accessibilityRole="radio" accessibilityLabel={`Aparência: ${label}`} accessibilityHint={helper} accessibilityState={{ checked: selected, selected }} onPress={onPress} style={({ pressed }) => [styles.themeRow, selected && styles.themeRowSelected, pressed && styles.themeRowPressed]}>
+    <Pressable accessibilityRole="radio" accessibilityLabel={`Aparência: ${label}`} accessibilityHint={helper} accessibilityState={{ checked: selected, selected }} onBlur={() => setFocused(false)} onFocus={() => setFocused(true)} onPress={onPress} style={({ pressed }) => [styles.themeRow, selected && styles.themeRowSelected, focused && styles.themeRowFocused, pressed && styles.themeRowPressed]}>
       <View style={styles.rowCopy}><Text style={styles.rowTitle}>{label}</Text><Text style={styles.rowMeta}>{helper}</Text></View>
-      <View style={[styles.radio, selected && styles.radioSelected]}>{selected ? <AppIcon name="success" size={primitives.size.icon.xs} color={primitives.color.neutral[950]} /> : null}</View>
+      <View style={[styles.radio, selected && styles.radioSelected]}>{selected ? <AppIcon name="success" size={primitives.size.icon.xs} color={tokens.action.onPrimary} /> : null}</View>
     </Pressable>
   );
 }
@@ -136,12 +138,12 @@ function createStyles(tokens: ThemeTokens) {
     metricEmphasized: { flexBasis: '100%', minHeight: 120, justifyContent: 'center', padding: spacing.lg, backgroundColor: tokens.background.surface, borderColor: tokens.border.default, ...tokens.elevation.card },
     metricLabel: { ...textStyles.caption, color: tokens.text.secondary, textTransform: 'uppercase', letterSpacing: primitives.typography.letterSpacing.label },
     metricValue: { ...textStyles.moneyM, color: tokens.text.primary }, metricValueXL: { ...textStyles.moneyXL, color: tokens.text.primary }, metricHelper: { ...textStyles.caption, color: tokens.text.secondary },
-    metricTone_neutral: { color: tokens.text.primary }, metricTone_positive: { color: tokens.status.positiveText }, metricTone_risk: { color: tokens.status.riskText }, metricTone_brand: { color: tokens.brand.accent },
-    metricGroup: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-    rowCard: { gap: spacing.sm }, rowTop: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.sm }, rowCopy: { flex: 1, minWidth: 0, gap: spacing.xxs }, rowTitle: { ...textStyles.body, color: tokens.text.primary, fontFamily: primitives.typography.family.uiBold }, rowMeta: { ...textStyles.caption, color: tokens.text.secondary }, rowAmount: { ...textStyles.moneyM, textAlign: 'right' }, amountPositive: { color: tokens.status.positiveText }, amountRisk: { color: tokens.status.riskText }, badges: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
+    metricTone_neutral: { color: tokens.text.primary }, metricTone_positive: { color: tokens.status.positiveText }, metricTone_risk: { color: tokens.status.riskText }, metricTone_brand: { color: tokens.action.text },
+    metricGroup: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }, metricGroupReflow: { flexDirection: 'column', flexWrap: 'nowrap', alignItems: 'stretch' },
+    rowCard: { gap: spacing.sm }, rowTop: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.sm }, rowCopy: { flexGrow: 1, flexShrink: 1, flexBasis: 180, minWidth: 0, gap: spacing.xxs }, rowTitle: { ...textStyles.body, color: tokens.text.primary, fontFamily: primitives.typography.family.uiBold }, rowMeta: { ...textStyles.caption, color: tokens.text.secondary }, rowAmount: { ...textStyles.moneyM, flexShrink: 1, maxWidth: '100%', textAlign: 'right' }, amountPositive: { color: tokens.status.positiveText }, amountRisk: { color: tokens.status.riskText }, badges: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
     planningRow: { gap: spacing.xs, paddingVertical: spacing.md, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: tokens.border.default }, planningValue: { ...textStyles.moneyM, color: tokens.text.primary },
-    assetCard: { gap: spacing.sm }, assetIdentity: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: spacing.sm }, assetIcon: { width: primitives.size.touch.minimum, height: primitives.size.touch.minimum, borderRadius: primitives.radius.md, backgroundColor: tokens.background.surfaceMuted, alignItems: 'center', justifyContent: 'center' }, assetValue: { ...textStyles.moneyM, color: tokens.text.primary, textAlign: 'right' },
+    assetCard: { gap: spacing.sm }, assetIdentity: { flexGrow: 1, flexShrink: 1, flexBasis: 180, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: spacing.sm }, assetIcon: { width: primitives.size.touch.minimum, height: primitives.size.touch.minimum, borderRadius: primitives.radius.md, backgroundColor: tokens.background.surfaceMuted, alignItems: 'center', justifyContent: 'center' }, assetValue: { ...textStyles.moneyM, flexShrink: 1, maxWidth: '100%', color: tokens.text.primary, textAlign: 'right' },
     chartCard: { gap: spacing.md }, chartQuestion: { ...textStyles.bodySmall, color: tokens.text.primary, fontFamily: primitives.typography.family.uiBold }, chartEmpty: { minHeight: 148, alignItems: 'center', justifyContent: 'center', gap: spacing.sm, padding: spacing.md, borderRadius: primitives.radius.md, backgroundColor: tokens.background.surfaceMuted }, chartLegend: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md }, chartLegendItem: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs }, chartActual: { width: spacing.xl, height: primitives.size.border.strong, backgroundColor: tokens.chart.actual }, chartProjected: { width: spacing.xl, height: primitives.size.border.strong, borderTopWidth: primitives.size.border.strong, borderStyle: 'dashed', borderColor: tokens.chart.projected }, chartEmptyTitle: { ...textStyles.bodySmall, color: tokens.text.primary, fontFamily: primitives.typography.family.uiBold }, chartEquivalent: { ...textStyles.caption, color: tokens.text.secondary },
-    themeRow: { minHeight: primitives.size.touch.default, flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderWidth: surfaceBorderWidth, borderColor: tokens.border.default, borderRadius: primitives.radius.md, backgroundColor: tokens.background.surface }, themeRowSelected: { borderColor: tokens.brand.accent, backgroundColor: tokens.background.surfaceMuted }, themeRowPressed: { opacity: primitives.opacity.pressed }, radio: { width: primitives.size.icon.md, height: primitives.size.icon.md, borderRadius: primitives.radius.pill, borderWidth: primitives.size.border.strong, borderColor: tokens.border.strong, alignItems: 'center', justifyContent: 'center' }, radioSelected: { backgroundColor: tokens.brand.accent, borderColor: tokens.brand.accent },
+    themeRow: { minHeight: primitives.size.touch.default, flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderWidth: primitives.size.border.thin, borderColor: tokens.border.strong, borderRadius: primitives.radius.md, backgroundColor: tokens.background.surface }, themeRowSelected: { borderColor: tokens.action.primary, backgroundColor: tokens.background.surfaceMuted }, themeRowFocused: { borderColor: tokens.focus.ring, borderWidth: primitives.size.border.strong }, themeRowPressed: { opacity: primitives.opacity.pressed }, radio: { width: primitives.size.icon.md, height: primitives.size.icon.md, borderRadius: primitives.radius.pill, borderWidth: primitives.size.border.strong, borderColor: tokens.border.strong, alignItems: 'center', justifyContent: 'center' }, radioSelected: { backgroundColor: tokens.action.primary, borderColor: tokens.action.primary },
   });
 }

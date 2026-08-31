@@ -26,7 +26,7 @@ export default function DashboardScreen() {
   const isFinanciallyEmpty = data.transactions.length === 0 && data.accounts.length === 0 && data.goals.length === 0;
 
   return (
-    <Screen refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { void refresh(); }} tintColor={tokens.brand.accent} />}>
+    <Screen refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { void refresh(); }} tintColor={tokens.action.primary} />}>
       <PageHeader eyebrow={data.period.label} title={`Olá, ${firstName}`} description="Seu mês em um olhar." />
 
       {isFinanciallyEmpty ? (
@@ -71,7 +71,7 @@ export default function DashboardScreen() {
 function createStyles(tokens: ThemeTokens) {
   return StyleSheet.create({
     heroEmpty: { gap: spacing.xs, paddingVertical: spacing.lg },
-    eyebrow: { ...textStyles.caption, color: tokens.brand.accent, letterSpacing: primitives.typography.letterSpacing.eyebrow },
+    eyebrow: { ...textStyles.caption, color: tokens.action.text, letterSpacing: primitives.typography.letterSpacing.eyebrow },
     emptyTitle: { ...textStyles.section, color: tokens.text.primary },
     emptyText: { ...textStyles.bodySmall, color: tokens.text.secondary },
     emptyList: { ...textStyles.bodySmall, color: tokens.text.secondary, textAlign: 'center', paddingVertical: spacing.sm },
