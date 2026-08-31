@@ -40,8 +40,8 @@ export type ThemeTokens = Readonly<{
   elevation: Readonly<{ card: Readonly<ViewStyle>; overlay: Readonly<ViewStyle> }>;
 }>;
 
-const lightElevation = Object.freeze({ card: Object.freeze({ shadowColor: '#17212B', shadowOffset: Object.freeze({ width: 0, height: 4 }), shadowOpacity: 0.08, shadowRadius: 14, elevation: 2 }) satisfies Readonly<ViewStyle>, overlay: Object.freeze({ shadowColor: '#17212B', shadowOffset: Object.freeze({ width: 0, height: 12 }), shadowOpacity: 0.18, shadowRadius: 28, elevation: 9 }) satisfies Readonly<ViewStyle> });
-const darkElevation = Object.freeze({ card: Object.freeze({ shadowColor: '#0E1822', shadowOffset: Object.freeze({ width: 0, height: 8 }), shadowOpacity: 0.24, shadowRadius: 20, elevation: 5 }) satisfies Readonly<ViewStyle>, overlay: Object.freeze({ shadowColor: '#0E1822', shadowOffset: Object.freeze({ width: 0, height: 16 }), shadowOpacity: 0.38, shadowRadius: 32, elevation: 12 }) satisfies Readonly<ViewStyle> });
+const lightElevation = Object.freeze({ card: Object.freeze({ shadowColor: '#17212B', shadowOffset: Object.freeze({ width: 0, height: 3 }), shadowOpacity: 0.06, shadowRadius: 10, elevation: 1 }) satisfies Readonly<ViewStyle>, overlay: Object.freeze({ shadowColor: '#17212B', shadowOffset: Object.freeze({ width: 0, height: 12 }), shadowOpacity: 0.18, shadowRadius: 28, elevation: 9 }) satisfies Readonly<ViewStyle> });
+const darkElevation = Object.freeze({ card: Object.freeze({ shadowColor: '#0E1822', shadowOffset: Object.freeze({ width: 0, height: 4 }), shadowOpacity: 0.16, shadowRadius: 12, elevation: 2 }) satisfies Readonly<ViewStyle>, overlay: Object.freeze({ shadowColor: '#0E1822', shadowOffset: Object.freeze({ width: 0, height: 16 }), shadowOpacity: 0.38, shadowRadius: 32, elevation: 12 }) satisfies Readonly<ViewStyle> });
 
 export const themeTokens = Object.freeze({
   light: Object.freeze({ id: 'aviora-light-a', background: Object.freeze({ canvas: '#F7F3EC', surface: '#FFFCF7', surfaceMuted: '#EFE8DD' }), text: Object.freeze({ primary: '#17212B', secondary: '#65717C', secondaryOnMuted: '#5D6974', inverse: '#F7F3EC' }), border: Object.freeze({ default: '#DED5C9', strong: '#CBBEAC' }), brand: Object.freeze({ accent: '#C4A56B' }), status: Object.freeze({ positive: '#1E7157', positiveText: '#1E7157', risk: '#A74449', riskText: '#A74449', warning: '#876F2E', info: '#376EA6' }), chart: Object.freeze({ actual: '#C4A56B', projected: '#376EA6', grid: '#DED5C9', projectionDash: Object.freeze([5, 5]) as readonly [number, number] }), navigation: Object.freeze({ background: '#FFFCF7', selectedBackground: '#EFE8DD', selected: '#17212B', unselected: '#65717C' }), focus: Object.freeze({ ring: '#376EA6', offset: 2 }), overlay: 'rgba(14, 24, 34, 0.72)', elevation: lightElevation }) satisfies ThemeTokens,
@@ -64,8 +64,8 @@ export const componentTokens = Object.freeze({
   button: Object.freeze({ minHeight: primitives.size.touch.default, radius: primitives.radius.md, horizontalPadding: primitives.space.md }),
   iconButton: Object.freeze({ size: primitives.size.touch.default, radius: primitives.radius.pill, iconSize: primitives.size.icon.md }),
   input: Object.freeze({ minHeight: primitives.size.touch.default, multilineMinHeight: 112, radius: primitives.radius.md }),
-  card: Object.freeze({ radius: primitives.radius.lg, padding: primitives.space.md, metricMinWidth: 158 }),
-  tab: Object.freeze({ height: 72, iconSize: primitives.size.icon.md, topPadding: primitives.space.xs, bottomPadding: primitives.space.sm }),
+  card: Object.freeze({ radius: primitives.radius.lg, padding: primitives.space.md, metricMinWidth: 104 }),
+  tab: Object.freeze({ height: 68, iconSize: primitives.size.icon.md, topPadding: primitives.space.xs, bottomPadding: primitives.space.xs }),
   chip: Object.freeze({ minHeight: primitives.size.touch.minimum, radius: primitives.radius.pill, horizontalPadding: primitives.space.sm }),
   notice: Object.freeze({ radius: primitives.radius.md, padding: primitives.space.md, iconSize: primitives.size.icon.sm }),
   progress: Object.freeze({ height: primitives.space.xs, radius: primitives.radius.pill }),
@@ -87,11 +87,11 @@ export const textStyles = Object.freeze({
   moneyL: textStyle({ fontFamily: type.family.uiBold, fontSize: type.size.title, lineHeight: type.lineHeight.title, fontVariant: ['tabular-nums'] }),
   moneyM: textStyle({ fontFamily: type.family.uiBold, fontSize: type.size.body, lineHeight: type.lineHeight.body, fontVariant: ['tabular-nums'] }),
   buttonLabel: textStyle({ fontFamily: type.family.uiBold, fontSize: type.size.button, lineHeight: type.lineHeight.button }),
-  tabLabel: textStyle({ fontFamily: type.family.uiSemiBold, fontSize: 11, lineHeight: 14 }),
+  tabLabel: textStyle({ fontFamily: type.family.uiSemiBold, fontSize: 10, lineHeight: 12, letterSpacing: -0.2 }),
   brand: textStyle({ fontFamily: type.family.brandRegular, fontSize: componentTokens.brand.wordmark, lineHeight: 34, letterSpacing: type.letterSpacing.brand }),
 } as const);
 
-export const dynamicType = Object.freeze({ enabled: true, maxFontSizeMultiplier: 2, moneyMaxFontSizeMultiplier: 1.6 });
+export const dynamicType = Object.freeze({ enabled: true, maxFontSizeMultiplier: 2, headingMaxFontSizeMultiplier: 1.4, moneyMaxFontSizeMultiplier: 1.6 });
 export const breakpoints = Object.freeze({ compactMin: 320, mediumMin: 600, expandedMin: 840 });
 export const colors = Object.freeze({ background: semantic.bg.base, backgroundElevated: semantic.bg.elevated, surface: semantic.surface.default, surfaceRaised: semantic.surface.raised, surfacePressed: semantic.surface.pressed, border: semantic.border.default, borderStrong: semantic.border.strong, text: semantic.text.primary, textMuted: semantic.text.secondary, textSubtle: semantic.text.subtle, gold: semantic.action.primary, goldBright: semantic.text.accent, goldDark: semantic.action.primaryPressed, positive: semantic.status.positive, negative: semantic.status.negative, warning: semantic.status.warning, info: semantic.status.info, overlay: semantic.overlay.default, transparent: primitives.color.transparent } as const);
 export const spacing = primitives.space;

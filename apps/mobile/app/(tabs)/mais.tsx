@@ -3,18 +3,12 @@ import { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { useAuth } from '../../src/core/auth/AuthProvider';
-import { appEnvironment } from '../../src/core/config/env';
 import { AppButton, Card, PageHeader, Screen, SectionTitle, StatusPill } from '../../src/design-system/components';
-import { PermissionBadge, ThemeRadioRow } from '../../src/design-system/financial-components';
+import { ThemeRadioRow } from '../../src/design-system/financial-components';
 import { useAvioraTheme } from '../../src/design-system/theme-provider';
-import { componentTokens, primitives, spacing, textStyles, type ThemeTokens } from '../../src/design-system/tokens';
+import { primitives, spacing, textStyles, type ThemeTokens } from '../../src/design-system/tokens';
 
-const modules = [
-  ['Metas', 'Acompanhamento detalhado em uma onda própria'],
-  ['Saúde financeira', 'Indicadores preservados até o gate de paridade'],
-  ['Relatórios', 'Leitura nativa em uma onda posterior'],
-  ['Conhecimento', 'Biblioteca e reader permanecem fora desta onda'],
-] as const;
+const modules = ['Metas', 'Saúde financeira', 'Relatórios', 'Conhecimento'] as const;
 
 const appearanceOptions = [
   { value: 'system', label: 'Sistema', helper: 'Usa a preferência do dispositivo.' },
@@ -30,36 +24,33 @@ export default function MoreScreen() {
 
   return (
     <Screen>
-      <PageHeader title="Mais" description="Conta, aparência, módulos e informações do AVIORA Mobile." />
+      <PageHeader title="Mais" description="Sua conta e preferências." />
 
       <SectionTitle title="Sua conta" />
-      <Card style={styles.accountCard}>
+      <View style={styles.accountCard}>
         <View style={styles.avatar}><Text style={styles.avatarText}>{String(user?.email ?? 'A').charAt(0).toUpperCase()}</Text></View>
         <View style={styles.accountCopy}>
           <Text style={styles.accountName}>{String(user?.user_metadata?.full_name ?? 'Cliente AVIORA')}</Text>
           <Text style={styles.accountEmail}>{user?.email ?? 'E-mail não informado'}</Text>
           <View style={styles.badges}>
-            <PermissionBadge label={entitlements?.app.accessType === 'trial' ? 'Acesso APP trial' : 'Acesso APP'} />
-            <StatusPill label={appEnvironment.readOnly ? 'Financeiro em leitura' : 'Financeiro habilitado'} tone="warning" />
+            <StatusPill label={entitlements?.app.accessType === 'trial' ? 'Acesso temporário' : 'Acesso ativo'} tone="positive" />
           </View>
         </View>
-      </Card>
+      </View>
 
       <SectionTitle title="Aparência" />
       <View accessibilityRole="radiogroup" accessibilityLabel="Aparência" style={styles.appearanceGroup}>
         {appearanceOptions.map((option) => <ThemeRadioRow key={option.value} label={option.label} helper={option.helper} selected={preference === option.value} onPress={() => setPreference(option.value)} />)}
       </View>
-      <Text style={styles.resolved}>Tema ativo: {resolvedTheme === 'light' ? 'Patrimônio Sereno' : 'Noite Executiva'}.</Text>
+      <Text style={styles.resolved}>Aparência atual: {resolvedTheme === 'light' ? 'Patrimônio Sereno' : 'Noite Executiva'}.</Text>
 
-      <SectionTitle title="Módulos oficiais" />
-      {modules.map(([title, description]) => <Card key={title} style={styles.moduleCard}><View style={styles.between}><View style={styles.accountCopy}><Text style={styles.moduleTitle}>{title}</Text><Text style={styles.moduleDescription}>{description}</Text></View><StatusPill label="Próxima onda" /></View></Card>)}
+      <SectionTitle title="Outras áreas" />
+      <Card style={styles.moduleGroup}>{modules.map((title, index) => <View key={title} style={[styles.moduleRow, index < modules.length - 1 && styles.moduleDivider]}><Text style={styles.moduleTitle}>{title}</Text><StatusPill label="Em breve" /></View>)}</Card>
 
-      <SectionTitle title="Aplicativo" />
+      <SectionTitle title="Sobre" />
       <Card style={styles.infoCard}>
         <InfoRow label="Versão" value={version} styles={styles} />
-        <InfoRow label="Ambiente" value={appEnvironment.name} styles={styles} />
-        <InfoRow label="Plataformas" value="iOS e Android" styles={styles} />
-        <InfoRow label="Modo financeiro" value={appEnvironment.readOnly ? 'Somente leitura' : 'Habilitado'} styles={styles} />
+        <InfoRow label="Experiência" value="Beta" styles={styles} />
       </Card>
       <AppButton label="Sair desta conta" variant="danger" onPress={signOut} />
     </Screen>
@@ -72,8 +63,8 @@ function InfoRow({ label, value, styles }: { label: string; value: string; style
 
 function createStyles(tokens: ThemeTokens) {
   return StyleSheet.create({
-    accountCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-    avatar: { width: componentTokens.avatar.size, height: componentTokens.avatar.size, borderRadius: primitives.radius.pill, backgroundColor: tokens.background.surfaceMuted, borderWidth: primitives.size.border.thin, borderColor: tokens.brand.accent, alignItems: 'center', justifyContent: 'center' },
+    accountCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.xs, paddingVertical: spacing.xxs },
+    avatar: { width: primitives.size.touch.default, height: primitives.size.touch.default, borderRadius: primitives.radius.pill, backgroundColor: tokens.background.surfaceMuted, borderWidth: primitives.size.border.thin, borderColor: tokens.brand.accent, alignItems: 'center', justifyContent: 'center' },
     avatarText: { ...textStyles.section, color: tokens.brand.accent },
     accountCopy: { flex: 1, minWidth: spacing.none, gap: spacing.xs },
     accountName: { ...textStyles.section, color: tokens.text.primary },
@@ -81,9 +72,10 @@ function createStyles(tokens: ThemeTokens) {
     badges: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
     appearanceGroup: { gap: spacing.xs },
     resolved: { ...textStyles.caption, color: tokens.text.secondary },
-    moduleCard: { minHeight: componentTokens.avatar.size + spacing.xl, justifyContent: 'center' },
+    moduleGroup: { padding: spacing.none },
+    moduleRow: { minHeight: primitives.size.touch.comfortable, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.xs },
+    moduleDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: tokens.border.default },
     moduleTitle: { ...textStyles.body, color: tokens.text.primary, fontFamily: primitives.typography.family.uiBold },
-    moduleDescription: { ...textStyles.caption, color: tokens.text.secondary },
     infoCard: { gap: spacing.md },
     between: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
     infoLabel: { ...textStyles.bodySmall, color: tokens.text.secondary },

@@ -30,6 +30,8 @@ export default function TabsLayout() {
             backgroundColor: tokens.navigation.background,
           }],
           tabBarLabelStyle: styles.tabLabel,
+          tabBarItemStyle: styles.tabItem,
+          tabBarIconStyle: styles.tabIcon,
           sceneStyle: { backgroundColor: tokens.background.canvas },
         }}
       >
@@ -48,4 +50,11 @@ const styles = StyleSheet.create({
     paddingTop: componentTokens.tab.topPadding,
   },
   tabLabel: textStyles.tabLabel,
+  tabItem: {
+    minWidth: 0,
+    paddingHorizontal: 0,
+  },
+  tabIcon: {
+    marginBottom: -2,
+  },
 });

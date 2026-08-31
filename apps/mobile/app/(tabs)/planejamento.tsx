@@ -5,7 +5,7 @@ import { useAuth } from '../../src/core/auth/AuthProvider';
 import { Card, InlineNotice, PageHeader, Screen, SectionTitle, StateView, StatusPill } from '../../src/design-system/components';
 import { FinancialMetric, MetricGroup, PlanningRow } from '../../src/design-system/financial-components';
 import { useAvioraTheme } from '../../src/design-system/theme-provider';
-import { primitives, spacing, textStyles, type ThemeTokens } from '../../src/design-system/tokens';
+import { spacing, textStyles, type ThemeTokens } from '../../src/design-system/tokens';
 import { useMobileSnapshot } from '../../src/features/read-models/use-mobile-snapshot';
 import { formatMoney } from '../../src/lib/format';
 
@@ -16,7 +16,7 @@ export default function PlanningScreen() {
   const { data, loading, refreshing, error, refresh } = useMobileSnapshot(accessContext);
   const { tokens } = useAvioraTheme();
   const styles = useMemo(() => createStyles(tokens), [tokens]);
-  if (loading && !data) return <Screen scroll={false}><StateView loading title="Carregando planejamento" message="Consultando o plano mensal sob as regras de acesso da conta." /></Screen>;
+  if (loading && !data) return <Screen scroll={false}><StateView loading title="Carregando planejamento" message="Atualizando seu plano mensal." /></Screen>;
   if (error && !data) return <Screen scroll={false}><StateView tone="error" title="Falha ao carregar" message={error} /></Screen>;
   if (!data) return null;
 
@@ -26,12 +26,12 @@ export default function PlanningScreen() {
 
   return (
     <Screen refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { void refresh(); }} tintColor={tokens.brand.accent} />}>
-      <PageHeader eyebrow={data.period.label} title="Planejamento" description="Distribuição aprovada para o mês, apresentada sem converter intenção em fato realizado." />
+      <PageHeader eyebrow={data.period.label} title="Planejamento" description="Sua distribuição mensal em um só lugar." />
       {!plan ? (
         <Card tone="raised" style={styles.emptyCard}>
-          <StatusPill label="Sem plano mensal" tone="warning" />
-          <Text style={styles.emptyTitle}>Nenhum planejamento foi retornado.</Text>
-          <Text style={styles.emptyText}>O estado é informativo. A criação e a edição permanecem indisponíveis nesta onda read-only.</Text>
+          <StatusPill label="Sem planejamento" tone="warning" />
+          <Text style={styles.emptyTitle}>Você ainda não possui planejamento para este mês.</Text>
+          <Text style={styles.emptyText}>Quando houver um plano, ele aparecerá aqui.</Text>
         </Card>
       ) : (
         <>
@@ -40,17 +40,13 @@ export default function PlanningScreen() {
             <FinancialMetric label="Total distribuído" value={formatMoney(allocation)} helper="Soma das categorias planejadas" />
             <FinancialMetric label="A distribuir" value={formatMoney(remaining)} helper={remaining < 0 ? 'Plano acima da receita' : 'Margem ainda não distribuída'} tone={remaining < 0 ? 'risk' : 'neutral'} />
           </MetricGroup>
-          <InlineNotice title="Sem mistura de estados" message="O contrato Mobile atual fornece o plano mensal, mas ainda não entrega consumo por categoria, projetado ou previsão. Esses valores não foram calculados na interface." tone="info" />
+          <InlineNotice title="Valores do mês" message="Planejado representa o que você definiu para o período." tone="info" />
           <SectionTitle title="Distribuição planejada" />
           <Card style={styles.allocationCard}>{categories.map(([label, key]) => {
             const value = Number(plan[key]);
             const percentage = plan.revenue > 0 ? Math.max(0, Math.min(100, (value / plan.revenue) * 100)) : 0;
             return <PlanningRow key={key} label={label} value={formatMoney(value)} percentage={percentage} />;
           })}</Card>
-          <Card tone="raised" style={styles.legendCard}>
-            <Text style={styles.legendTitle}>Semântica preservada</Text>
-            <Text style={styles.legendText}>Planejado descreve intenção. Realizado, Programado, Projetado e Previsão continuarão separados quando seus read models canônicos estiverem disponíveis.</Text>
-          </Card>
         </>
       )}
     </Screen>
@@ -59,12 +55,9 @@ export default function PlanningScreen() {
 
 function createStyles(tokens: ThemeTokens) {
   return StyleSheet.create({
-    emptyCard: { alignItems: 'flex-start', gap: spacing.sm, paddingVertical: spacing.xl },
+    emptyCard: { alignItems: 'flex-start', gap: spacing.xs, paddingVertical: spacing.lg },
     emptyTitle: { ...textStyles.section, color: tokens.text.primary },
     emptyText: { ...textStyles.bodySmall, color: tokens.text.secondary },
     allocationCard: { gap: spacing.none },
-    legendCard: { gap: spacing.xs },
-    legendTitle: { ...textStyles.body, color: tokens.text.primary, fontFamily: primitives.typography.family.uiBold },
-    legendText: { ...textStyles.bodySmall, color: tokens.text.secondary },
   });
 }

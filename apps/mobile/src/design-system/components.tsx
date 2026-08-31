@@ -71,6 +71,7 @@ export function Screen({
       paddingBottom: bottomPadding,
       maxWidth: layout.contentMaxWidth,
     },
+    variant === 'tab' && styles.tabContent,
     variant === 'auth' && styles.authContent,
     contentStyle,
   ];
@@ -297,12 +298,12 @@ export function PageHeader({ eyebrow, title, description, action }: { eyebrow?: 
   const styles = useStyles();
   return (
     <View style={styles.pageHeader}>
-      {eyebrow ? <Text style={styles.eyebrow}>{eyebrow}</Text> : null}
+      {eyebrow ? <Text maxFontSizeMultiplier={dynamicType.maxFontSizeMultiplier} style={styles.eyebrow}>{eyebrow}</Text> : null}
       <View style={styles.pageTitleRow}>
-        <Text accessibilityRole="header" style={styles.pageTitle}>{title}</Text>
+        <Text accessibilityRole="header" adjustsFontSizeToFit maxFontSizeMultiplier={dynamicType.headingMaxFontSizeMultiplier} minimumFontScale={0.75} numberOfLines={1} style={styles.pageTitle}>{title}</Text>
         {action}
       </View>
-      {description ? <Text style={styles.pageDescription}>{description}</Text> : null}
+      {description ? <Text maxFontSizeMultiplier={dynamicType.maxFontSizeMultiplier} style={styles.pageDescription}>{description}</Text> : null}
     </View>
   );
 }
@@ -311,7 +312,7 @@ export function SectionTitle({ title, action }: { title: string; action?: ReactN
   const styles = useStyles();
   return (
     <View style={styles.sectionHeader}>
-      <Text accessibilityRole="header" style={styles.sectionTitle}>{title}</Text>
+      <Text accessibilityRole="header" adjustsFontSizeToFit maxFontSizeMultiplier={dynamicType.headingMaxFontSizeMultiplier} minimumFontScale={0.8} numberOfLines={1} style={styles.sectionTitle}>{title}</Text>
       {action}
     </View>
   );
@@ -371,8 +372,8 @@ export function StateView({ title, message, action, loading = false, tone = 'emp
   return (
     <View accessibilityLiveRegion="polite" style={styles.stateView}>
       {loading ? <ActivityIndicator size="large" color={tokens.brand.accent} /> : <AppIcon name={stateIcon} size={primitives.size.icon.xl} color={tokens.brand.accent} />}
-      <Text accessibilityRole="header" style={styles.stateTitle}>{title}</Text>
-      <Text style={styles.stateMessage}>{message}</Text>
+      <Text accessibilityRole="header" adjustsFontSizeToFit maxFontSizeMultiplier={dynamicType.headingMaxFontSizeMultiplier} minimumFontScale={0.75} numberOfLines={2} style={styles.stateTitle}>{title}</Text>
+      <Text maxFontSizeMultiplier={dynamicType.maxFontSizeMultiplier} style={styles.stateMessage}>{message}</Text>
       {action ? <View style={styles.stateAction}>{action}</View> : null}
     </View>
   );
@@ -456,10 +457,12 @@ function useStyles() {
 }
 
 function createStyles(tokens: import('./tokens').ThemeTokens) {
+  const surfaceBorderWidth = tokens.id === 'aviora-dark-c' ? StyleSheet.hairlineWidth : borderWidth;
   return StyleSheet.create({
   flex: { flex: 1 },
   safe: { flex: 1, backgroundColor: tokens.background.canvas },
   screenContent: { width: '100%', alignSelf: 'center', paddingTop: spacing.md, gap: spacing.md },
+  tabContent: { paddingTop: spacing.sm, gap: spacing.sm },
   authContent: { justifyContent: 'center' },
   brand: { alignItems: 'center', gap: spacing.sm },
   brandCompact: { gap: spacing.none },
@@ -490,22 +493,22 @@ function createStyles(tokens: import('./tokens').ThemeTokens) {
   inputError: { borderColor: tokens.status.risk },
   fieldHelp: { ...textStyles.caption, color: tokens.text.secondary },
   fieldHelpError: { color: tokens.status.riskText },
-  searchField: { minHeight: componentTokens.input.minHeight, flexDirection: 'row', alignItems: 'center', gap: spacing.xs, borderRadius: componentTokens.input.radius, borderWidth, borderColor: tokens.border.strong, backgroundColor: tokens.background.surface, paddingHorizontal: spacing.md },
+  searchField: { minHeight: componentTokens.input.minHeight, flexDirection: 'row', alignItems: 'center', gap: spacing.xs, borderRadius: componentTokens.input.radius, borderWidth: surfaceBorderWidth, borderColor: tokens.border.default, backgroundColor: tokens.background.surface, paddingHorizontal: spacing.md },
   searchInput: { flex: 1, minWidth: spacing.none, color: tokens.text.primary, paddingVertical: spacing.xs, ...textStyles.body },
-  card: { backgroundColor: tokens.background.surface, borderWidth, borderColor: tokens.border.default, borderRadius: componentTokens.card.radius, padding: componentTokens.card.padding, ...tokens.elevation.card },
-  cardRaised: { backgroundColor: tokens.background.surfaceMuted, borderColor: tokens.border.strong },
+  card: { backgroundColor: tokens.background.surface, borderWidth: surfaceBorderWidth, borderColor: tokens.border.default, borderRadius: componentTokens.card.radius, padding: componentTokens.card.padding, ...tokens.elevation.card },
+  cardRaised: { backgroundColor: tokens.background.surfaceMuted, borderColor: tokens.border.default },
   metricCard: { minWidth: componentTokens.card.metricMinWidth, flexGrow: 1, flexBasis: componentTokens.card.metricMinWidth, gap: spacing.xs },
   metricLabel: { ...textStyles.caption, color: tokens.text.secondary, fontFamily: primitives.typography.family.uiBold, letterSpacing: primitives.typography.letterSpacing.label },
   metricValue: { ...textStyles.moneyL, color: tokens.text.primary },
   metricHelper: { ...textStyles.caption, color: tokens.text.secondary },
-  pageHeader: { gap: spacing.xs, marginBottom: spacing.xs },
+  pageHeader: { gap: spacing.xxs },
   pageTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
   eyebrow: { ...textStyles.caption, color: tokens.brand.accent, fontFamily: primitives.typography.family.uiExtraBold, letterSpacing: primitives.typography.letterSpacing.eyebrow },
   pageTitle: { ...textStyles.title, flexShrink: 1, color: tokens.text.primary },
-  pageDescription: { ...textStyles.body, color: tokens.text.secondary },
+  pageDescription: { ...textStyles.bodySmall, color: tokens.text.secondary, maxWidth: componentTokens.screen.readableMaxWidth },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
   sectionTitle: { ...textStyles.section, flexShrink: 1, color: tokens.text.primary },
-  pill: { alignSelf: 'flex-start', borderRadius: componentTokens.chip.radius, borderWidth, paddingHorizontal: componentTokens.chip.horizontalPadding, paddingVertical: spacing.xxs },
+  pill: { alignSelf: 'flex-start', borderRadius: componentTokens.chip.radius, borderWidth: surfaceBorderWidth, paddingHorizontal: componentTokens.chip.horizontalPadding, paddingVertical: spacing.xxs },
   pill_neutral: { borderColor: tokens.border.strong, backgroundColor: tokens.background.surfaceMuted },
   pill_positive: { borderColor: tokens.status.positive, backgroundColor: tokens.background.surfaceMuted },
   pill_warning: { borderColor: tokens.status.warning, backgroundColor: tokens.background.surfaceMuted },
@@ -514,8 +517,8 @@ function createStyles(tokens: import('./tokens').ThemeTokens) {
   pill_info: { borderColor: tokens.status.info, backgroundColor: tokens.background.surfaceMuted },
   pillText: { ...textStyles.caption, fontFamily: primitives.typography.family.uiBold },
   pillText_neutral: { color: tokens.text.secondary }, pillText_positive: { color: tokens.status.positiveText }, pillText_warning: { color: tokens.status.warning }, pillText_negative: { color: tokens.status.riskText }, pillText_gold: { color: tokens.brand.accent }, pillText_info: { color: tokens.status.info },
-  filterChip: { minHeight: componentTokens.chip.minHeight, justifyContent: 'center', borderRadius: componentTokens.chip.radius, borderWidth, borderColor: tokens.border.default, backgroundColor: tokens.background.surface, paddingHorizontal: componentTokens.chip.horizontalPadding },
-  filterChipSelected: { borderColor: tokens.focus.ring, backgroundColor: tokens.background.surfaceMuted },
+  filterChip: { minHeight: componentTokens.chip.minHeight, justifyContent: 'center', borderRadius: componentTokens.chip.radius, borderWidth: surfaceBorderWidth, borderColor: tokens.border.default, backgroundColor: tokens.background.surface, paddingHorizontal: componentTokens.chip.horizontalPadding },
+  filterChipSelected: { borderColor: tokens.brand.accent, backgroundColor: tokens.background.surfaceMuted },
   filterChipText: { ...textStyles.bodySmall, color: tokens.text.secondary, fontFamily: primitives.typography.family.uiSemiBold },
   filterChipTextSelected: { color: tokens.text.primary },
   notice: { flexDirection: 'row', alignItems: 'flex-start', borderRadius: componentTokens.notice.radius, borderWidth, padding: componentTokens.notice.padding, gap: spacing.sm },

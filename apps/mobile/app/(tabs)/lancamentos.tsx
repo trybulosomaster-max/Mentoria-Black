@@ -34,20 +34,20 @@ export default function TransactionsScreen() {
     return (data?.transactions ?? []).filter((transaction) => matchesFilter(transaction, filter) && (!normalized || [transaction.description, transaction.category, transaction.subcategory].some((value) => String(value ?? '').toLocaleLowerCase('pt-BR').includes(normalized))));
   }, [data?.transactions, filter, query]);
 
-  if (loading && !data) return <Screen scroll={false}><StateView loading title="Carregando lançamentos" message="Buscando o período sob as regras de acesso da conta." /></Screen>;
+  if (loading && !data) return <Screen scroll={false}><StateView loading title="Carregando lançamentos" message="Atualizando o período." /></Screen>;
   if (error && !data) return <Screen scroll={false}><StateView tone="error" title="Falha ao carregar" message={error} /></Screen>;
   if (!data) return null;
 
   return (
     <Screen refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { void refresh(); }} tintColor={tokens.brand.accent} />}>
-      <PageHeader eyebrow={data.period.label} title="Lançamentos" description="Consulte movimentos reais sem confundir status, competência ou natureza financeira." />
+      <PageHeader eyebrow={data.period.label} title="Lançamentos" description="Seus movimentos, organizados por período." />
       <SearchField label="Buscar lançamentos" value={query} onChangeText={setQuery} placeholder="Descrição ou categoria" autoCorrect={false} clearButtonMode="while-editing" />
       <View accessibilityRole="toolbar" accessibilityLabel="Filtros de lançamentos" style={styles.filters}>{filters.map((item) => <FilterChip key={item.key} label={item.label} selected={item.key === filter} onPress={() => setFilter(item.key)} />)}</View>
-      <Text style={styles.count}>{visible.length} de {data.transactions.length} lançamentos no período</Text>
+      <Text style={styles.count}>{query || filter !== 'todos' ? `${visible.length} de ${data.transactions.length} lançamentos` : `${data.transactions.length} ${data.transactions.length === 1 ? 'lançamento' : 'lançamentos'} neste período`}</Text>
       {visible.length ? visible.map((transaction) => {
         const status = transactionStatus(transaction);
         return <TransactionRow key={transaction.id} title={transaction.description} meta={`${transactionTypeLabel(transaction.transaction_type)} • ${formatDate(transaction.transaction_date)}${transaction.installment_total ? ` • Parcela ${transaction.installment_number ?? 0}/${transaction.installment_total}` : ''}`} amount={formatMoney(signedAmount(transaction))} status={status.label} tone={status.tone} category={transaction.category || 'Sem categoria'} />;
-      }) : <View accessibilityLiveRegion="polite" style={styles.emptyCard}><Text style={styles.emptyTitle}>Nenhum lançamento encontrado</Text><Text style={styles.empty}>Não há dados reais que correspondam à busca e aos filtros atuais.</Text></View>}
+      }) : <View accessibilityLiveRegion="polite" style={styles.emptyCard}><Text style={styles.emptyTitle}>{query || filter !== 'todos' ? 'Nenhum lançamento encontrado' : 'Nenhum lançamento neste período.'}</Text>{query || filter !== 'todos' ? <Text style={styles.empty}>Tente ajustar a busca ou os filtros.</Text> : null}</View>}
     </Screen>
   );
 }
@@ -56,7 +56,7 @@ function createStyles(tokens: ThemeTokens) {
   return StyleSheet.create({
     filters: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
     count: { ...textStyles.caption, color: tokens.text.secondary },
-    emptyCard: { alignItems: 'center', gap: spacing.xs, padding: spacing.xl, borderRadius: primitives.radius.lg, borderWidth: primitives.size.border.thin, borderColor: tokens.border.default, backgroundColor: tokens.background.surface },
+    emptyCard: { alignItems: 'center', gap: spacing.xs, paddingHorizontal: spacing.md, paddingVertical: spacing.lg, borderRadius: primitives.radius.lg, borderWidth: tokens.id === 'aviora-dark-c' ? StyleSheet.hairlineWidth : primitives.size.border.thin, borderColor: tokens.border.default, backgroundColor: tokens.background.surface },
     emptyTitle: { ...textStyles.section, color: tokens.text.primary, textAlign: 'center' },
     empty: { ...textStyles.bodySmall, color: tokens.text.secondary, textAlign: 'center' },
   });
