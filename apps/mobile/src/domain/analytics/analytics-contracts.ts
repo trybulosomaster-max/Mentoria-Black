@@ -128,4 +128,3 @@ export const FINANCIAL_SERIES_PRESENTATION = Object.freeze({
   projected: Object.freeze({ label: 'Projetado', lineStyle: 'dashed', marker: 'diamond' }),
   forecast: Object.freeze({ label: 'Previsão', lineStyle: 'dashed', marker: 'triangle' }),
 } as const satisfies Record<FinancialSeriesKind, Readonly<{ label: string; lineStyle: 'solid' | 'dotted' | 'dashed'; marker: 'circle' | 'square' | 'diamond' | 'triangle' }>>);
-
