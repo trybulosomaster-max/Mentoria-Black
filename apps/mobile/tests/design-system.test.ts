@@ -58,4 +58,5 @@ test('expõe Screen variants e todos os componentes fundamentais', async () => {
     assert.match(source, new RegExp(`export (?:function|const) ${component}\\b`));
   }
   assert.doesNotMatch(source, /<Text\b[^>]*\bonPress=/);
+  assert.doesNotMatch(source, /<AppIcon\b[^>]*accessibilityLabel=\{tone\}/);
 });

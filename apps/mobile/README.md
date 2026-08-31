@@ -19,21 +19,26 @@ Fundação React Native + Expo para iOS e Android.
 
 ```bash
 cp .env.example .env.local
-npm install
+npm ci
 npm run check
 npx expo-doctor@latest
 ```
 
 Preencha `.env.local` somente com URL e chave **publicável** do Supabase Beta. Nunca use `service_role`, secret key ou projeto de produção durante desenvolvimento.
 
-## Execução
+## Execução e ciclo visual local
 
 ```bash
-npm run ios
+npm start -- --lan
+npx expo run:ios --device "iPhone 17" --no-bundler
 npm run android
 ```
 
-A primeira execução nativa pode gerar os diretórios `ios/` e `android/`; eles permanecem ignorados até a equipe decidir se adotará workflow prebuild versionado.
+Com o Dev Client instalado, alterações normais em JavaScript/TypeScript usam Metro e Fast Refresh; não exigem rebuild nativo.
+
+A primeira execução nativa pode gerar os diretórios `ios/` e `android/`; eles permanecem ignorados. O projeto segue Continuous Native Generation e não promove arquivos derivados a fonte de verdade sem decisão arquitetural explícita.
+
+Production continua fail-closed enquanto o adapter nativo de secure storage não estiver aprovado.
 
 ## Gates
 
@@ -42,7 +47,6 @@ Consulte os documentos `docs/AVIORA_MOBILE_*` na raiz do repositório depois que
 O contrato arquitetural corrente é
 `docs/AVIORA_MOBILE_FOUNDATION_BLUEPRINT_V1.md`. Os blueprints/specs anteriores
 permanecem como registros históricos.
-
 
 ## Gates antes de distribuição externa
 

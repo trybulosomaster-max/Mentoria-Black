@@ -64,6 +64,10 @@ const required = [
   'src/infrastructure/cache/memory-private-cache.ts',
   'src/infrastructure/observability/redacted-observability.ts',
   'tests/foundation-core.test.ts',
+  'src/domain/bootstrap/app-bootstrap.ts',
+  'src/presentation/bootstrap/BootstrapExperience.tsx',
+  'src/presentation/navigation/AppRouteGate.tsx',
+  'tests/app-shell-auth.test.ts',
 ];
 
 for (const file of required) {
@@ -163,6 +167,22 @@ const tabLabels = ['Início', 'Lançamentos', 'Planejamento', 'Patrimônio', 'Ma
 const missingTabs = tabLabels.filter((label) => !tabLayout.includes(label));
 if (!missingTabs.length) ok('navigation:five-frozen-tabs');
 else fail('navigation:five-frozen-tabs', missingTabs.join(', '));
+
+const bootstrapContract = await readFile(path.join(root, 'src/domain/bootstrap/app-bootstrap.ts'), 'utf8');
+const routeGuard = await readFile(path.join(root, 'src/presentation/navigation/AppRouteGate.tsx'), 'utf8');
+const bootstrapStates = [
+  'BOOTING',
+  'UNAUTHENTICATED',
+  'AUTHENTICATED_CHECKING_ACCESS',
+  'AUTHORIZED',
+  'UNAUTHORIZED',
+  'RECOVERABLE_ERROR',
+];
+const missingBootstrapStates = bootstrapStates.filter((state) => !bootstrapContract.includes(`'${state}'`));
+if (!missingBootstrapStates.length) ok('bootstrap:six-state-contract');
+else fail('bootstrap:six-state-contract', missingBootstrapStates.join(', '));
+if (routeGuard.includes('resolveRouteDecision') && routeGuard.includes('retryBootstrap')) ok('bootstrap:central-route-guard');
+else fail('bootstrap:central-route-guard', 'guard central ou retry ausente');
 
 for (const item of checks) console.log(`✓ ${item.name}${item.detail ? ` — ${item.detail}` : ''}`);
 for (const item of failures) console.error(`✗ ${item.name} — ${item.detail}`);

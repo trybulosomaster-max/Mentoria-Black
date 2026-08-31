@@ -350,7 +350,7 @@ export function StateView({ title, message, action, loading = false, tone = 'emp
   const stateIcon: AppIconName = tone === 'error' ? 'error' : tone === 'offline' ? 'warning' : 'info';
   return (
     <View accessibilityLiveRegion="polite" style={styles.stateView}>
-      {loading ? <ActivityIndicator size="large" color={semantic.action.primary} /> : <AppIcon name={stateIcon} size={primitives.size.icon.xl} color={semantic.text.accent} accessibilityLabel={tone} />}
+      {loading ? <ActivityIndicator size="large" color={semantic.action.primary} /> : <AppIcon name={stateIcon} size={primitives.size.icon.xl} color={semantic.text.accent} />}
       <Text accessibilityRole="header" style={styles.stateTitle}>{title}</Text>
       <Text style={styles.stateMessage}>{message}</Text>
       {action ? <View style={styles.stateAction}>{action}</View> : null}

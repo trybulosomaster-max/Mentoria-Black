@@ -14,7 +14,7 @@ import { componentTokens, primitives, semantic, spacing, textStyles } from '../.
 const benefits = [
   ['Visão clara', 'Realizado, programado e patrimônio sem misturar conceitos.'],
   ['Uma única conta', 'Os mesmos dados e acessos da AVIORA Web.'],
-  ['Proteção por padrão', 'Leitura financeira nesta fundação, sem writes silenciosos.'],
+  ['Proteção por padrão', 'Leitura financeira nesta fundação, sem alterações silenciosas.'],
 ] as const;
 
 export default function WelcomeScreen() {

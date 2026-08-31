@@ -24,20 +24,19 @@ import { expoAuthDeepLinks } from '../../infrastructure/native/expo-auth-deep-li
 import { reactNativeLifecycle } from '../../infrastructure/native/react-native-lifecycle';
 import { createSelfAccessContext } from '../../application/foundation/access-context-factory';
 import type { AccessContext } from '../../domain/foundation/access-context';
+import {
+  resolveBootstrapState,
+  type BootstrapSignal,
+  type BootstrapState,
+} from '../../domain/bootstrap/app-bootstrap';
 
-type AuthPhase =
-  | 'booting'
-  | 'configuration-required'
-  | 'anonymous'
-  | 'loading-access'
-  | 'granted'
-  | 'denied'
-  | 'error';
+type AuthPhase = BootstrapSignal;
 
 type ActionResult = Readonly<{ ok: true; message?: string }> | Readonly<{ ok: false; message: string }>;
 
 type AuthContextValue = Readonly<{
   phase: AuthPhase;
+  bootstrapState: BootstrapState;
   session: Session | null;
   user: User | null;
   entitlements: NormalizedEntitlements | null;
@@ -57,6 +56,7 @@ type AuthContextValue = Readonly<{
   updatePassword(password: string): Promise<ActionResult>;
   exchangeCode(code: string): Promise<ActionResult>;
   refreshEntitlements(): Promise<ActionResult>;
+  retryBootstrap(): Promise<ActionResult>;
   startTrial(): Promise<ActionResult>;
   signOut(): Promise<void>;
 }>;
@@ -121,24 +121,35 @@ export function AuthProvider({ children }: PropsWithChildren) {
     }
   }, [client]);
 
+  const restoreSession = useCallback(async (): Promise<ActionResult> => {
+    if (!client) {
+      setPhase('configuration-required');
+      setErrorMessage(configurationMessage());
+      return { ok: false, message: configurationMessage() };
+    }
+
+    setPhase('booting');
+    setErrorMessage('');
+    const { data, error } = await client.auth.getSession();
+    if (!mounted.current) return { ok: false, message: 'A inicialização foi interrompida.' };
+    if (error) {
+      activeUserId.current = null;
+      setSession(null);
+      setErrorMessage('Não foi possível restaurar sua sessão. Verifique sua conexão e tente novamente.');
+      setPhase('error');
+      return { ok: false, message: 'Não foi possível restaurar sua sessão.' };
+    }
+
+    activeUserId.current = data.session?.user.id ?? null;
+    setSession(data.session);
+    return loadEntitlements(data.session);
+  }, [client, loadEntitlements]);
+
   useEffect(() => {
     mounted.current = true;
     if (!client) return () => { mounted.current = false; };
 
-    const bootstrap = async () => {
-      const { data, error } = await client.auth.getSession();
-      if (!mounted.current) return;
-      if (error) {
-        setErrorMessage('Não foi possível restaurar sua sessão.');
-        setPhase('error');
-        return;
-      }
-      activeUserId.current = data.session?.user.id ?? null;
-      setSession(data.session);
-      await loadEntitlements(data.session);
-    };
-
-    void bootstrap();
+    void restoreSession();
 
     const { data: listener } = client.auth.onAuthStateChange((_event, nextSession) => {
       if (!mounted.current) return;
@@ -161,7 +172,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
       removeLifecycleListener();
       client.auth.stopAutoRefresh();
     };
-  }, [client, loadEntitlements]);
+  }, [client, loadEntitlements, restoreSession]);
 
   const signIn = useCallback(async (email: string, password: string): Promise<ActionResult> => {
     if (!client) return { ok: false, message: configurationMessage() };
@@ -190,7 +201,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
         emailRedirectTo,
       },
     });
-    if (error) return { ok: false, message: error.message || 'Não foi possível criar sua conta.' };
+    if (error) return { ok: false, message: 'Não foi possível criar sua conta. Revise os dados e tente novamente.' };
     if (!data.session) return { ok: true, message: 'Conta criada. Confirme o e-mail para entrar.' };
     return { ok: true, message: 'Conta criada com sucesso.' };
   }, [client]);
@@ -222,6 +233,9 @@ export function AuthProvider({ children }: PropsWithChildren) {
   }, [client]);
 
   const refreshEntitlements = useCallback(async () => loadEntitlements(session), [loadEntitlements, session]);
+  const retryBootstrap = useCallback(async () => (
+    session ? loadEntitlements(session) : restoreSession()
+  ), [loadEntitlements, restoreSession, session]);
 
   const startTrial = useCallback(async (): Promise<ActionResult> => {
     if (!client) return { ok: false, message: configurationMessage() };
@@ -261,6 +275,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   const value = useMemo<AuthContextValue>(() => ({
     phase,
+    bootstrapState: resolveBootstrapState(phase),
     session,
     user: session?.user ?? null,
     entitlements,
@@ -274,6 +289,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     updatePassword,
     exchangeCode,
     refreshEntitlements,
+    retryBootstrap,
     startTrial,
     signOut,
   }), [
@@ -284,6 +300,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     exchangeCode,
     phase,
     refreshEntitlements,
+    retryBootstrap,
     requestPasswordReset,
     session,
     signIn,

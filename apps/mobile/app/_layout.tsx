@@ -17,12 +17,13 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AuthProvider, useAuth } from '../src/core/auth/AuthProvider';
 import { semantic } from '../src/design-system/tokens';
+import { bootstrapIsPending } from '../src/domain/bootstrap/app-bootstrap';
 
 void SplashScreen.preventAutoHideAsync();
 
 function BootstrapGate({ fontsReady }: { fontsReady: boolean }) {
-  const { phase } = useAuth();
-  const bootstrapReady = phase !== 'booting' && phase !== 'loading-access';
+  const { bootstrapState } = useAuth();
+  const bootstrapReady = !bootstrapIsPending(bootstrapState);
 
   useEffect(() => {
     if (fontsReady && bootstrapReady) void SplashScreen.hideAsync();

@@ -1,4 +1,3 @@
-import { Redirect } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { useAuth } from '../../src/core/auth/AuthProvider';
@@ -16,22 +15,23 @@ import { componentTokens, primitives, semantic, spacing, textStyles } from '../.
 
 export default function AccessScreen() {
   const {
-    session,
+    bootstrapState,
     entitlements,
-    financialAccess,
     errorMessage,
-    refreshEntitlements,
+    retryBootstrap,
     startTrial,
     signOut,
   } = useAuth();
 
-  if (!session) return <Redirect href="/(public)/sign-in" />;
-  if (financialAccess) return <Redirect href="/(tabs)" />;
-
   const experience = entitlements ? resolveExperience(entitlements) : 'no_access';
   const notice = entitlements ? trialNotice(entitlements) : '';
-  const title = experience === 'knowledge' ? 'Seu acesso é ao Conhecimento' : 'Acesso financeiro indisponível';
-  const description = experience === 'trial_expired'
+  const checkFailed = bootstrapState === 'RECOVERABLE_ERROR';
+  const title = checkFailed
+    ? 'Não foi possível verificar seu acesso'
+    : experience === 'knowledge' ? 'Seu acesso é ao Conhecimento' : 'Acesso financeiro indisponível';
+  const description = checkFailed
+    ? 'Sua sessão permanece protegida. Verifique a conexão e tente novamente.'
+    : experience === 'trial_expired'
     ? 'Seu período de teste terminou. Seus dados permanecem protegidos.'
     : experience === 'knowledge'
       ? 'A área financeira APP não está incluída no acesso atual.'
@@ -53,7 +53,7 @@ export default function AccessScreen() {
       </Card>
 
       <View style={styles.actions}>
-        <AppButton label="Verificar novamente" onPress={async () => { await refreshEntitlements(); }} />
+        <AppButton label="Verificar novamente" onPress={async () => { await retryBootstrap(); }} />
         {appEnvironment.enableTrialStart ? (
           <AppButton label="Ativar teste gratuito" variant="secondary" onPress={async () => { await startTrial(); }} />
         ) : null}
