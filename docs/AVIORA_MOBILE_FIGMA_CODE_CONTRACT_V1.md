@@ -1,5 +1,9 @@
 # AVIORA Mobile — Contrato Figma ↔ React V1
 
+> **Autoridade arquitetural:** este contrato visual é subordinado a
+> `AVIORA_MOBILE_FOUNDATION_BLUEPRINT_V1.md` e não reduz a matriz funcional ou
+> antecipa Feature Wave.
+
 **Gate:** 0B
 
 **Status:** contrato para handoff; nenhum arquivo Figma foi criado ou alterado

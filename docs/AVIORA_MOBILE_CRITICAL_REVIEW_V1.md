@@ -1,5 +1,10 @@
 # AVIORA Mobile V1 — Revisão crítica independente
 
+> **Follow-up — 2026-08-30.** O parecer abaixo permanece como revisão histórica
+> da primeira fundação read-only. O Mobile V1 final exige paridade integral,
+> incluindo writes e Administração quando autorizados, conforme
+> `AVIORA_MOBILE_FOUNDATION_BLUEPRINT_V1.md`.
+
 ## 1. Parecer executivo
 
 A proposta é tecnicamente viável e coerente com a maturidade atual da AVIORA, desde que a primeira entrega seja tratada como **fundação móvel e leitura segura**, não como tentativa de portar toda a Web de uma vez.

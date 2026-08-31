@@ -5,8 +5,12 @@ Fundação React Native + Expo para iOS e Android.
 ## Estado
 
 - autenticação e entitlement preparados para ambiente Beta;
-- dados financeiros em modo leitura;
-- trial automático desabilitado;
+- dados financeiros temporariamente em modo leitura durante a fundação;
+- Mobile V1 final exige paridade de leitura e escrita com o produto oficial;
+- trial temporariamente bloqueado por flag de desenvolvimento, sem criar
+  semântica diferente da Web;
+- secure storage, purge A→B/logout e cache privado pertencem ao Foundation V1
+  e precisam ser fechados antes de distribuição externa;
 - sem secrets;
 - sem migration/RLS;
 - sem publicação.
@@ -34,6 +38,10 @@ A primeira execução nativa pode gerar os diretórios `ios/` e `android/`; eles
 ## Gates
 
 Consulte os documentos `docs/AVIORA_MOBILE_*` na raiz do repositório depois que o overlay for aplicado.
+
+O contrato arquitetural corrente é
+`docs/AVIORA_MOBILE_FOUNDATION_BLUEPRINT_V1.md`. Os blueprints/specs anteriores
+permanecem como registros históricos.
 
 
 ## Gates antes de distribuição externa

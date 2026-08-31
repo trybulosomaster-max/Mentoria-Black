@@ -1,5 +1,10 @@
 # AVIORA Mobile — Gate 0B — Design System V1
 
+> **Follow-up — 2026-08-30.** A fundação visual abaixo permanece válida como
+> Design System candidato preservado. Ela não define escopo funcional, paridade,
+> trial, Administração ou roadmap; esses contratos são governados por
+> `AVIORA_MOBILE_FOUNDATION_BLUEPRINT_V1.md`.
+
 **Status:** candidato a congelamento
 
 **Base técnica:** `feat/aviora-mobile-foundation-v1@723a39ac715aa503e73a217a2b3821dd109c2fcf`

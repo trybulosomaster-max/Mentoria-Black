@@ -3,6 +3,13 @@
 ## Resultado
 **PARTIAL_GREEN — SOURCE_FIXES_COMPLETE / ENVIRONMENT_GATES_PENDING**
 
+> **Follow-up — 2026-08-30:** este foi o resultado verdadeiro daquela execução.
+> Em execução posterior no repositório real, os cinco gates ambientais foram
+> concluídos: instalação/lockfile, paridade Web↔Mobile sem SKIP, check integral,
+> `expo install --check` e Expo Doctor. O fechamento posterior está associado à
+> fundação em `723a39ac715aa503e73a217a2b3821dd109c2fcf`; o estado histórico
+> `PARTIAL_GREEN` acima é preservado deliberadamente.
+
 ## Mudanças
 - `apps/mobile/scripts/validate-deliverable.mjs`
 - `apps/mobile/src/core/auth/AuthProvider.tsx`

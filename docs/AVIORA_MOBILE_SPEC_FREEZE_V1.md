@@ -1,5 +1,10 @@
 # AVIORA Mobile V1 — Especificação congelada
 
+> **Freeze superado — 2026-08-30.** Este documento registra a primeira decisão
+> de scaffold e permanece histórico. Administração Web-only, trial divergente,
+> paridade limitada e extração imediata não são mais decisões vigentes. O freeze
+> arquitetural atual é `AVIORA_MOBILE_FOUNDATION_BLUEPRINT_V1.md`.
+
 **Freeze ID:** `AVIORA-MOBILE-FOUNDATION-V1`
 **Baseline:** `9b8659643d5d66713d0f12e2af9422c573a27a8d`
 **Estado:** `FROZEN_FOR_IMPLEMENTATION`

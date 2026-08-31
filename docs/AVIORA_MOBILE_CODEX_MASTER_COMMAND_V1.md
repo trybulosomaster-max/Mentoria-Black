@@ -1,5 +1,10 @@
 # AVIORA Mobile V1 — Comando mestre para Codex
 
+> **Comando histórico executado.** A baseline, os bloqueios de trial/Admin e a
+> estratégia de implementação deste comando não devem ser reutilizados como
+> contrato corrente. A autoridade atual é
+> `AVIORA_MOBILE_FOUNDATION_BLUEPRINT_V1.md`.
+
 Copie o bloco abaixo para a execução responsável pela integração. O comando pressupõe acesso ao repositório, Node 22+, ambiente iOS/Android e permissão para criar uma branch, mas **não** autoriza merge, push em `main`, deploy ou alteração de Supabase.
 
 ---

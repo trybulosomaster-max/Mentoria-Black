@@ -1,5 +1,10 @@
 # AVIORA Mobile V1 — Blueprint funcional e técnico
 
+> **Registro histórico.** Este blueprint refletia a baseline `9b865964…` e foi
+> superado em 2026-08-30 por `AVIORA_MOBILE_FOUNDATION_BLUEPRINT_V1.md`. O texto
+> original é preservado para rastreabilidade e não governa mais paridade,
+> Administração, trial, Reserva ou a sequência do kernel financeiro.
+
 **Status:** pronto para fundação móvel
 **Baseline:** `main@9b8659643d5d66713d0f12e2af9422c573a27a8d`
 **Plataformas:** iOS e Android

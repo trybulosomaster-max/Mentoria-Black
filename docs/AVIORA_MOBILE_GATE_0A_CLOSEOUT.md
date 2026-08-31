@@ -1,5 +1,11 @@
 # AVIORA Mobile — Gate 0A Closeout
 
+> **Follow-up ambiental — 2026-08-30.** As limitações ambientais registradas
+> neste documento foram resolvidas posteriormente no repositório integrado. O
+> lockfile, a paridade sem SKIP, o check integral, a compatibilidade Expo e o
+> Expo Doctor foram executados com sucesso no fechamento do Gate 0A. O status
+> histórico abaixo não foi reescrito.
+
 ## Escopo
 Fechamento técnico restrito: corridas de sessão/snapshot, decisão de storage, paridade Web↔Mobile, lockfile, TypeScript e Expo Doctor. Nenhuma tela nova.
 
