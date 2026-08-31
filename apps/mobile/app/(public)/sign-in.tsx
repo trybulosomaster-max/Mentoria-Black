@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { useAuth } from '../../src/core/auth/AuthProvider';
@@ -12,10 +12,13 @@ import {
   Screen,
   TextField,
 } from '../../src/design-system/components';
-import { componentTokens, semantic, spacing, textStyles } from '../../src/design-system/tokens';
+import { useAvioraTheme } from '../../src/design-system/theme-provider';
+import { componentTokens, spacing, textStyles, type ThemeTokens } from '../../src/design-system/tokens';
 
 export default function SignInScreen() {
   const { signIn, configurationRequired } = useAuth();
+  const { tokens } = useAvioraTheme();
+  const styles = useMemo(() => createStyles(tokens), [tokens]);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -97,10 +100,10 @@ export default function SignInScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(tokens: ThemeTokens) { return StyleSheet.create({
   content: { justifyContent: 'center', minHeight: '100%', maxWidth: componentTokens.dialog.maxWidth, width: '100%', alignSelf: 'center' },
   brand: { alignItems: 'center', marginBottom: spacing.sm },
   form: { gap: spacing.md },
   bottom: { gap: spacing.sm },
-  bottomText: { ...textStyles.bodySmall, color: semantic.text.secondary, textAlign: 'center' },
-});
+  bottomText: { ...textStyles.bodySmall, color: tokens.text.secondary, textAlign: 'center' },
+}); }

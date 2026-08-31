@@ -76,7 +76,7 @@ if (failed === 0) ok('scan:zero-hardcode-glyph-boundary');
 
 const configSource = await source('app.config.ts');
 const configColors = configSource.match(/#[0-9a-f]{6}\b/gi) ?? [];
-configColors.length === 3 && configColors.every((value) => value.toUpperCase() === '#050505')
+configColors.length === 3 && configColors.every((value) => value.toUpperCase() === '#0E1822')
   ? ok('hardcode:manifest-exception')
   : fail('hardcode:manifest-exception', 'manifest contém cor não documentada');
 

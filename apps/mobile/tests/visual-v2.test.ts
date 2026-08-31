@@ -5,6 +5,17 @@ import test from 'node:test';
 import { isThemePreference, resolveTheme, THEME_PREFERENCES } from '../src/design-system/theme-contract.ts';
 import { themeTokens } from '../src/design-system/tokens.ts';
 
+function relativeLuminance(hex: string) {
+  const channels = hex.slice(1).match(/.{2}/g)?.map((value) => Number.parseInt(value, 16) / 255) ?? [];
+  return channels.map((value) => value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4).reduce((sum, value, index) => sum + value * [0.2126, 0.7152, 0.0722][index]!, 0);
+}
+
+function contrast(foreground: string, background: string) {
+  const a = relativeLuminance(foreground);
+  const b = relativeLuminance(background);
+  return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+}
+
 test('resolve System para a aparência suportada pelo dispositivo', () => {
   assert.equal(resolveTheme('system', 'light'), 'light');
   assert.equal(resolveTheme('system', 'dark'), 'dark');
@@ -44,10 +55,19 @@ test('A e C mantêm a mesma estrutura sem árvore temática paralela', () => {
   }
 });
 
+test('texto principal e secundário preservam contraste AA nas superfícies canônicas', () => {
+  for (const tokens of [themeTokens.light, themeTokens.dark]) {
+    assert.ok(contrast(tokens.text.primary, tokens.background.canvas) >= 4.5);
+    assert.ok(contrast(tokens.text.primary, tokens.background.surface) >= 4.5);
+    assert.ok(contrast(tokens.text.secondary, tokens.background.canvas) >= 4.5);
+    assert.ok(contrast(tokens.text.secondary, tokens.background.surface) >= 4.5);
+  }
+});
+
 test('provider persiste preferência local e observa aparência do sistema', async () => {
   const source = await readFile(new URL('../src/design-system/theme-provider.tsx', import.meta.url), 'utf8');
   assert.match(source, /localStorage\?\.setItem\(THEME_PREFERENCE_STORAGE_KEY/);
-  assert.match(source, /Appearance\.addChangeListener/);
+  assert.match(source, /useColorScheme\(\)/);
   assert.match(source, /resolveTheme\(preference, systemScheme\)/);
   assert.doesNotMatch(source, /supabase|database|remote/i);
 });

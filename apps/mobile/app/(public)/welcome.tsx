@@ -1,4 +1,5 @@
 import { router } from 'expo-router';
+import { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { appEnvironment, configurationMessage } from '../../src/core/config/env';
@@ -9,7 +10,8 @@ import {
   InlineNotice,
   Screen,
 } from '../../src/design-system/components';
-import { componentTokens, primitives, semantic, spacing, textStyles } from '../../src/design-system/tokens';
+import { useAvioraTheme } from '../../src/design-system/theme-provider';
+import { componentTokens, primitives, spacing, textStyles, type ThemeTokens } from '../../src/design-system/tokens';
 
 const benefits = [
   ['Visão clara', 'Realizado, programado e patrimônio sem misturar conceitos.'],
@@ -18,6 +20,8 @@ const benefits = [
 ] as const;
 
 export default function WelcomeScreen() {
+  const { tokens } = useAvioraTheme();
+  const styles = useMemo(() => createStyles(tokens), [tokens]);
   return (
     <Screen variant="auth" contentStyle={styles.content}>
       <View style={styles.hero}>
@@ -66,17 +70,17 @@ export default function WelcomeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(tokens: ThemeTokens) { return StyleSheet.create({
   content: { justifyContent: 'center', minHeight: '100%' },
   hero: { alignItems: 'center', gap: spacing.md, paddingVertical: spacing.lg },
-  title: { ...textStyles.title, color: semantic.text.primary, textAlign: 'center', maxWidth: componentTokens.screen.stateMinHeight },
-  subtitle: { ...textStyles.body, color: semantic.text.secondary, textAlign: 'center', maxWidth: componentTokens.dialog.maxWidth },
+  title: { ...textStyles.title, color: tokens.text.primary, textAlign: 'center', maxWidth: componentTokens.screen.stateMinHeight },
+  subtitle: { ...textStyles.body, color: tokens.text.secondary, textAlign: 'center', maxWidth: componentTokens.dialog.maxWidth },
   benefitsCard: { gap: spacing.md },
   benefit: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
-  bullet: { width: spacing.xs, height: spacing.xs, borderRadius: primitives.radius.pill, backgroundColor: semantic.action.primary, marginTop: primitives.radius.xs },
+  bullet: { width: spacing.xs, height: spacing.xs, borderRadius: primitives.radius.pill, backgroundColor: tokens.brand.accent, marginTop: primitives.radius.xs },
   benefitCopy: { flex: 1, gap: spacing.xxs },
-  benefitTitle: { ...textStyles.body, color: semantic.text.primary, fontFamily: primitives.typography.family.uiExtraBold },
-  benefitDescription: { ...textStyles.bodySmall, color: semantic.text.secondary },
+  benefitTitle: { ...textStyles.body, color: tokens.text.primary, fontFamily: primitives.typography.family.uiExtraBold },
+  benefitDescription: { ...textStyles.bodySmall, color: tokens.text.secondary },
   actions: { gap: spacing.sm },
-  footnote: { ...textStyles.caption, color: semantic.text.subtle, textAlign: 'center' },
-});
+  footnote: { ...textStyles.caption, color: tokens.text.secondary, textAlign: 'center' },
+}); }

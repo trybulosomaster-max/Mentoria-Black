@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { useAuth } from '../../src/core/auth/AuthProvider';
@@ -11,7 +12,8 @@ import {
   PageHeader,
   Screen,
 } from '../../src/design-system/components';
-import { componentTokens, primitives, semantic, spacing, textStyles } from '../../src/design-system/tokens';
+import { useAvioraTheme } from '../../src/design-system/theme-provider';
+import { componentTokens, primitives, spacing, textStyles, type ThemeTokens } from '../../src/design-system/tokens';
 
 export default function AccessScreen() {
   const {
@@ -22,6 +24,8 @@ export default function AccessScreen() {
     startTrial,
     signOut,
   } = useAuth();
+  const { tokens } = useAvioraTheme();
+  const styles = useMemo(() => createStyles(tokens), [tokens]);
 
   const experience = entitlements ? resolveExperience(entitlements) : 'no_access';
   const notice = entitlements ? trialNotice(entitlements) : '';
@@ -63,11 +67,11 @@ export default function AccessScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(tokens: ThemeTokens) { return StyleSheet.create({
   content: { justifyContent: 'center', minHeight: '100%', maxWidth: componentTokens.screen.readableMaxWidth, width: '100%', alignSelf: 'center' },
   brand: { alignItems: 'center' },
   card: { gap: spacing.xs },
-  cardTitle: { ...textStyles.body, color: semantic.text.primary, fontFamily: primitives.typography.family.uiExtraBold },
-  cardText: { ...textStyles.bodySmall, color: semantic.text.secondary },
+  cardTitle: { ...textStyles.body, color: tokens.text.primary, fontFamily: primitives.typography.family.uiExtraBold },
+  cardText: { ...textStyles.bodySmall, color: tokens.text.secondary },
   actions: { gap: spacing.sm },
-});
+}); }

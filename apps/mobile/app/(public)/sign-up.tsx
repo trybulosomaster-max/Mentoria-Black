@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { useAuth } from '../../src/core/auth/AuthProvider';
@@ -13,10 +13,13 @@ import {
   TextField,
 } from '../../src/design-system/components';
 import { AppIcon } from '../../src/design-system/icons';
-import { componentTokens, primitives, semantic, spacing, textStyles, touch } from '../../src/design-system/tokens';
+import { useAvioraTheme } from '../../src/design-system/theme-provider';
+import { componentTokens, primitives, spacing, textStyles, touch, type ThemeTokens } from '../../src/design-system/tokens';
 
 export default function SignUpScreen() {
   const { signUp, configurationRequired } = useAuth();
+  const { tokens } = useAvioraTheme();
+  const styles = useMemo(() => createStyles(tokens), [tokens]);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -82,7 +85,7 @@ export default function SignUpScreen() {
           style={({ pressed }) => [styles.terms, pressed && styles.pressed]}
         >
           <View style={[styles.checkbox, termsAccepted && styles.checkboxChecked]}>
-            {termsAccepted ? <AppIcon name="success" size={primitives.size.icon.sm} color={semantic.text.inverse} /> : null}
+            {termsAccepted ? <AppIcon name="success" size={primitives.size.icon.sm} color={tokens.text.inverse} /> : null}
           </View>
           <Text style={styles.termsText}>
             Li e concordo com os Termos de Uso e a Política de Privacidade vigentes.
@@ -108,12 +111,12 @@ export default function SignUpScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(tokens: ThemeTokens) { return StyleSheet.create({
   content: { maxWidth: componentTokens.screen.readableMaxWidth, width: '100%', alignSelf: 'center' },
   form: { gap: spacing.md },
   terms: { minHeight: touch.comfortable, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.xs },
   pressed: { opacity: primitives.opacity.pressed },
-  checkbox: { width: primitives.size.icon.md, height: primitives.size.icon.md, borderRadius: primitives.radius.sm, borderWidth: primitives.size.border.thin, borderColor: semantic.border.strong, alignItems: 'center', justifyContent: 'center' },
-  checkboxChecked: { backgroundColor: semantic.action.primary, borderColor: semantic.action.primary },
-  termsText: { ...textStyles.bodySmall, flex: 1, color: semantic.text.secondary },
-});
+  checkbox: { width: primitives.size.icon.md, height: primitives.size.icon.md, borderRadius: primitives.radius.sm, borderWidth: primitives.size.border.thin, borderColor: tokens.border.strong, alignItems: 'center', justifyContent: 'center' },
+  checkboxChecked: { backgroundColor: tokens.brand.accent, borderColor: tokens.brand.accent },
+  termsText: { ...textStyles.bodySmall, flex: 1, color: tokens.text.secondary },
+}); }
