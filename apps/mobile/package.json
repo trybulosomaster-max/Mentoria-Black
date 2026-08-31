@@ -18,9 +18,10 @@
     "test:foundation-core": "node --experimental-strip-types --test tests/foundation-core.test.ts",
     "test:app-shell-auth": "node --experimental-strip-types --test tests/app-shell-auth.test.ts",
     "test:design-system": "node --experimental-strip-types --test tests/design-system.test.ts",
+    "test:visual-v2": "node --experimental-strip-types --test tests/visual-v2.test.ts",
     "validate:source": "node scripts/validate-deliverable.mjs",
     "validate:design-system": "node scripts/validate-design-system.mjs",
-    "check": "npm run validate:source && npm run validate:design-system && npm run typecheck:contracts && npm run test:contracts && npm run test:foundation-core && npm run test:app-shell-auth && npm run test:design-system && npm run test:parity && npm run typecheck",
+    "check": "npm run validate:source && npm run validate:design-system && npm run typecheck:contracts && npm run test:contracts && npm run test:foundation-core && npm run test:app-shell-auth && npm run test:design-system && npm run test:visual-v2 && npm run test:parity && npm run typecheck",
     "test:parity": "node --experimental-strip-types --test tests/web-financial-parity.test.ts tests/web-contract-parity.test.ts"
   },
   "dependencies": {

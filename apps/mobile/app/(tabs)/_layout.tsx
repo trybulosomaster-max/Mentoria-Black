@@ -3,7 +3,8 @@ import { type ColorValue, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppIcon, type AppIconName } from '../../src/design-system/icons';
-import { colors, componentTokens, textStyles } from '../../src/design-system/tokens';
+import { componentTokens, textStyles } from '../../src/design-system/tokens';
+import { useAvioraTheme } from '../../src/design-system/theme-provider';
 import { AppRouteGate } from '../../src/presentation/navigation/AppRouteGate';
 
 const icon = (name: AppIconName) => ({ color, size }: { color: ColorValue; size: number }) => (
@@ -12,6 +13,7 @@ const icon = (name: AppIconName) => ({ color, size }: { color: ColorValue; size:
 
 export default function TabsLayout() {
   const insets = useSafeAreaInsets();
+  const { tokens } = useAvioraTheme();
 
   return (
     <AppRouteGate scope="shell">
@@ -19,14 +21,16 @@ export default function TabsLayout() {
         screenOptions={{
           headerShown: false,
           tabBarHideOnKeyboard: true,
-          tabBarActiveTintColor: colors.goldBright,
-          tabBarInactiveTintColor: colors.textSubtle,
+          tabBarActiveTintColor: tokens.navigation.selected,
+          tabBarInactiveTintColor: tokens.navigation.unselected,
           tabBarStyle: [styles.tabBar, {
             height: componentTokens.tab.height + insets.bottom,
             paddingBottom: componentTokens.tab.bottomPadding + insets.bottom,
+            borderTopColor: tokens.border.default,
+            backgroundColor: tokens.navigation.background,
           }],
           tabBarLabelStyle: styles.tabLabel,
-          sceneStyle: { backgroundColor: colors.background },
+          sceneStyle: { backgroundColor: tokens.background.canvas },
         }}
       >
         <Tabs.Screen name="index" options={{ title: 'Início', tabBarIcon: icon('home') }} />
@@ -42,8 +46,6 @@ export default function TabsLayout() {
 const styles = StyleSheet.create({
   tabBar: {
     paddingTop: componentTokens.tab.topPadding,
-    borderTopColor: colors.border,
-    backgroundColor: colors.surface,
   },
   tabLabel: textStyles.tabLabel,
 });

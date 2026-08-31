@@ -17,7 +17,7 @@ import {
 
 test('expõe as três camadas obrigatórias de tokens', () => {
   assert.deepEqual(Object.keys(primitives.color).slice(0, 6), ['neutral', 'gold', 'green', 'red', 'yellow', 'blue']);
-  assert.equal(semantic.bg.base, primitives.color.neutral[1000]);
+  assert.equal(semantic.bg.base, '#0E1822');
   assert.equal(semantic.action.primary, primitives.color.gold[500]);
   assert.ok(componentTokens.button.minHeight >= 44);
   assert.ok(componentTokens.iconButton.size >= 44);

@@ -24,20 +24,20 @@ import {
   type ReactElement,
   type ReactNode,
   useId,
+  useMemo,
 } from 'react';
 
 import { AppIcon, type AppIconName } from './icons';
 import { useResponsiveLayout } from './responsive';
 import { useReducedMotion } from './system';
+import { useAvioraTheme } from './theme-provider';
 import {
-  colors,
   componentTokens,
   dynamicType,
   primitives,
-  semantic,
-  shadows,
   spacing,
   textStyles,
+  themeTokens,
 } from './tokens';
 
 export type ScreenVariant = 'tab' | 'stack' | 'modal' | 'auth';
@@ -60,6 +60,7 @@ export function Screen({
   contentStyle,
   testID,
 }: ScreenProps) {
+  const styles = useStyles();
   const insets = useSafeAreaInsets();
   const layout = useResponsiveLayout();
   const bottomPadding = componentTokens.screen.bottomPadding + insets.bottom;
@@ -105,11 +106,13 @@ export function Screen({
 }
 
 export function BrandMark({ compact = false }: { compact?: boolean }) {
+  const styles = useStyles();
+  const { tokens } = useAvioraTheme();
   const crestSize = compact ? componentTokens.brand.crestCompact : componentTokens.brand.crest;
   return (
     <View accessibilityLabel="AVIORA Gestão Financeira" style={[styles.brand, compact && styles.brandCompact]}>
       <LinearGradient
-        colors={[semantic.text.accent, semantic.action.primaryPressed]}
+        colors={[tokens.brand.accent, primitives.color.gold[700]]}
         style={[styles.brandCrest, { width: crestSize, height: crestSize, borderRadius: crestSize / 2 }]}
       >
         <View style={styles.brandInner}>
@@ -147,13 +150,15 @@ export function AppButton({
   icon,
   accessibilityHint,
 }: ButtonProps) {
+  const styles = useStyles();
+  const { tokens } = useAvioraTheme();
   const blocked = disabled || loading;
   const press = async () => {
     if (blocked) return;
     await Haptics.selectionAsync().catch(() => undefined);
     await onPress();
   };
-  const foreground = variant === 'primary' ? semantic.text.inverse : variant === 'danger' ? semantic.status.negative : variant === 'ghost' ? semantic.text.accent : semantic.text.primary;
+  const foreground = variant === 'primary' ? tokens.text.inverse : variant === 'danger' ? tokens.status.riskText : variant === 'ghost' ? tokens.brand.accent : tokens.text.primary;
 
   return (
     <Pressable
@@ -186,6 +191,8 @@ type IconButtonProps = Readonly<{
 }>;
 
 export function IconButton({ icon, label, onPress, variant = 'default', disabled = false }: IconButtonProps) {
+  const styles = useStyles();
+  const { tokens } = useAvioraTheme();
   return (
     <Pressable
       accessibilityRole="button"
@@ -196,7 +203,7 @@ export function IconButton({ icon, label, onPress, variant = 'default', disabled
       hitSlop={spacing.xxs}
       style={({ pressed }) => [styles.iconButton, styles[`iconButton_${variant}`], pressed && !disabled && styles.buttonPressed, disabled && styles.buttonDisabled]}
     >
-      <AppIcon name={icon} color={variant === 'danger' ? semantic.status.negative : semantic.text.secondary} />
+      <AppIcon name={icon} color={variant === 'danger' ? tokens.status.riskText : tokens.text.secondary} />
     </Pressable>
   );
 }
@@ -209,6 +216,8 @@ type FieldProps = TextInputProps & Readonly<{
 }>;
 
 export const TextField = forwardRef<TextInput, FieldProps>(function TextField({ label, helper, error, ...inputProps }, ref) {
+  const styles = useStyles();
+  const { tokens } = useAvioraTheme();
   const id = useId();
   const descriptionId = `${id}-description`;
   return (
@@ -223,8 +232,8 @@ export const TextField = forwardRef<TextInput, FieldProps>(function TextField({ 
         aria-invalid={Boolean(error)}
         allowFontScaling={dynamicType.enabled}
         maxFontSizeMultiplier={dynamicType.maxFontSizeMultiplier}
-        placeholderTextColor={semantic.text.subtle}
-        selectionColor={semantic.action.primary}
+        placeholderTextColor={tokens.text.secondary}
+        selectionColor={tokens.brand.accent}
         style={[styles.input, inputProps.multiline && styles.inputMultiline, Boolean(error) && styles.inputError, inputProps.style]}
       />
       {error || helper ? (
@@ -243,17 +252,19 @@ export const TextField = forwardRef<TextInput, FieldProps>(function TextField({ 
 type SearchFieldProps = Omit<FieldProps, 'label'> & Readonly<{ label?: string }>;
 
 export const SearchField = forwardRef<TextInput, SearchFieldProps>(function SearchField({ label = 'Buscar', ...inputProps }, ref) {
+  const styles = useStyles();
+  const { tokens } = useAvioraTheme();
   return (
     <View style={styles.searchField}>
-      <AppIcon name="search" size={primitives.size.icon.sm} color={semantic.text.subtle} />
+      <AppIcon name="search" size={primitives.size.icon.sm} color={tokens.text.secondary} />
       <TextInput
         {...inputProps}
         ref={ref}
         accessibilityLabel={label}
         allowFontScaling={dynamicType.enabled}
         maxFontSizeMultiplier={dynamicType.maxFontSizeMultiplier}
-        placeholderTextColor={semantic.text.subtle}
-        selectionColor={semantic.action.primary}
+        placeholderTextColor={tokens.text.secondary}
+        selectionColor={tokens.brand.accent}
         style={[styles.searchInput, inputProps.style]}
       />
     </View>
@@ -267,10 +278,12 @@ type CardProps = PropsWithChildren<{
 }>;
 
 export function Card({ children, style, tone = 'default', accessibilityLabel }: CardProps) {
+  const styles = useStyles();
   return <View accessibilityLabel={accessibilityLabel} style={[styles.card, tone === 'raised' && styles.cardRaised, style]}>{children}</View>;
 }
 
 export function MetricCard({ label, value, helper }: { label: string; value: string; helper?: string }) {
+  const styles = useStyles();
   return (
     <Card style={styles.metricCard}>
       <Text style={styles.metricLabel}>{label}</Text>
@@ -281,6 +294,7 @@ export function MetricCard({ label, value, helper }: { label: string; value: str
 }
 
 export function PageHeader({ eyebrow, title, description, action }: { eyebrow?: string; title: string; description?: string; action?: ReactNode }) {
+  const styles = useStyles();
   return (
     <View style={styles.pageHeader}>
       {eyebrow ? <Text style={styles.eyebrow}>{eyebrow}</Text> : null}
@@ -294,6 +308,7 @@ export function PageHeader({ eyebrow, title, description, action }: { eyebrow?: 
 }
 
 export function SectionTitle({ title, action }: { title: string; action?: ReactNode }) {
+  const styles = useStyles();
   return (
     <View style={styles.sectionHeader}>
       <Text accessibilityRole="header" style={styles.sectionTitle}>{title}</Text>
@@ -305,6 +320,7 @@ export function SectionTitle({ title, action }: { title: string; action?: ReactN
 export type StatusTone = 'neutral' | 'positive' | 'warning' | 'negative' | 'gold' | 'info';
 
 export function StatusPill({ label, tone = 'neutral' }: { label: string; tone?: StatusTone }) {
+  const styles = useStyles();
   return (
     <View accessibilityLabel={`${label}, estado`} style={[styles.pill, styles[`pill_${tone}`]]}>
       <Text style={[styles.pillText, styles[`pillText_${tone}`]]}>{label}</Text>
@@ -316,6 +332,7 @@ export function StatusPill({ label, tone = 'neutral' }: { label: string; tone?: 
 export const Pill = StatusPill;
 
 export function FilterChip({ label, selected, onPress, disabled = false }: { label: string; selected: boolean; onPress(): void; disabled?: boolean }) {
+  const styles = useStyles();
   return (
     <Pressable
       accessibilityRole="button"
@@ -333,6 +350,7 @@ type NoticeTone = 'info' | 'warning' | 'error' | 'success';
 const noticeIcon: Readonly<Record<NoticeTone, AppIconName>> = { info: 'info', warning: 'warning', error: 'error', success: 'success' };
 
 export function InlineNotice({ title, message, tone = 'info' }: { title: string; message: string; tone?: NoticeTone }) {
+  const styles = useStyles();
   return (
     <View accessibilityRole={tone === 'error' ? 'alert' : 'summary'} style={[styles.notice, styles[`notice_${tone}`]]}>
       <AppIcon name={noticeIcon[tone]} size={componentTokens.notice.iconSize} color={styles[`noticeIcon_${tone}`].color} />
@@ -347,10 +365,12 @@ export function InlineNotice({ title, message, tone = 'info' }: { title: string;
 type StateTone = 'empty' | 'error' | 'offline';
 
 export function StateView({ title, message, action, loading = false, tone = 'empty' }: { title: string; message: string; action?: ReactNode; loading?: boolean; tone?: StateTone }) {
+  const styles = useStyles();
+  const { tokens } = useAvioraTheme();
   const stateIcon: AppIconName = tone === 'error' ? 'error' : tone === 'offline' ? 'warning' : 'info';
   return (
     <View accessibilityLiveRegion="polite" style={styles.stateView}>
-      {loading ? <ActivityIndicator size="large" color={semantic.action.primary} /> : <AppIcon name={stateIcon} size={primitives.size.icon.xl} color={semantic.text.accent} />}
+      {loading ? <ActivityIndicator size="large" color={tokens.brand.accent} /> : <AppIcon name={stateIcon} size={primitives.size.icon.xl} color={tokens.brand.accent} />}
       <Text accessibilityRole="header" style={styles.stateTitle}>{title}</Text>
       <Text style={styles.stateMessage}>{message}</Text>
       {action ? <View style={styles.stateAction}>{action}</View> : null}
@@ -359,6 +379,7 @@ export function StateView({ title, message, action, loading = false, tone = 'emp
 }
 
 export function ProgressBar({ value, label, showValue = false }: { value: number; label: string; showValue?: boolean }) {
+  const styles = useStyles();
   const normalized = Math.max(0, Math.min(100, value));
   return (
     <View style={styles.progressGroup}>
@@ -373,6 +394,7 @@ export function ProgressBar({ value, label, showValue = false }: { value: number
 type OverlayProps = PropsWithChildren<{ visible: boolean; title: string; onClose(): void; actions?: ReactNode }>;
 
 export function BottomSheet({ visible, title, onClose, actions, children }: OverlayProps) {
+  const styles = useStyles();
   const insets = useSafeAreaInsets();
   const reducedMotion = useReducedMotion();
   return (
@@ -393,6 +415,7 @@ export function BottomSheet({ visible, title, onClose, actions, children }: Over
 }
 
 export function Dialog({ visible, title, onClose, actions, children }: OverlayProps) {
+  const styles = useStyles();
   const reducedMotion = useReducedMotion();
   return (
     <Modal visible={visible} transparent animationType={reducedMotion ? 'none' : 'fade'} onRequestClose={onClose} statusBarTranslucent>
@@ -412,6 +435,7 @@ export function Dialog({ visible, title, onClose, actions, children }: OverlayPr
 }
 
 export function Divider() {
+  const styles = useStyles();
   return <View accessibilityElementsHidden style={styles.divider} />;
 }
 
@@ -419,108 +443,98 @@ export const commonStyles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center' },
   between: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
   wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  muted: { color: semantic.text.secondary },
-  positive: { color: semantic.status.positive },
-  negative: { color: semantic.status.negative },
+  positive: { color: themeTokens.dark.status.positiveText },
+  negative: { color: themeTokens.dark.status.riskText },
   money: textStyles.moneyM,
 });
 
 const borderWidth = primitives.size.border.thin;
 
-const styles = StyleSheet.create({
+function useStyles() {
+  const { tokens } = useAvioraTheme();
+  return useMemo(() => createStyles(tokens), [tokens]);
+}
+
+function createStyles(tokens: import('./tokens').ThemeTokens) {
+  return StyleSheet.create({
   flex: { flex: 1 },
-  safe: { flex: 1, backgroundColor: semantic.bg.base },
+  safe: { flex: 1, backgroundColor: tokens.background.canvas },
   screenContent: { width: '100%', alignSelf: 'center', paddingTop: spacing.md, gap: spacing.md },
   authContent: { justifyContent: 'center' },
   brand: { alignItems: 'center', gap: spacing.sm },
   brandCompact: { gap: spacing.none },
-  brandCrest: { padding: componentTokens.brand.crestBorder, ...shadows.card },
-  brandInner: { flex: 1, borderRadius: primitives.radius.pill, backgroundColor: semantic.bg.base, alignItems: 'center', justifyContent: 'center', borderWidth, borderColor: semantic.action.primaryPressed },
-  brandLetter: { color: semantic.text.accent, fontFamily: primitives.typography.family.brandBold, fontSize: componentTokens.brand.letter },
+  brandCrest: { padding: componentTokens.brand.crestBorder, ...tokens.elevation.card },
+  brandInner: { flex: 1, borderRadius: primitives.radius.pill, backgroundColor: tokens.background.canvas, alignItems: 'center', justifyContent: 'center', borderWidth, borderColor: tokens.brand.accent },
+  brandLetter: { color: tokens.brand.accent, fontFamily: primitives.typography.family.brandBold, fontSize: componentTokens.brand.letter },
   brandLetterCompact: { fontSize: componentTokens.brand.letterCompact },
   brandCopy: { alignItems: 'center', gap: spacing.xxs },
-  brandName: { ...textStyles.brand, color: semantic.text.accent },
-  brandSubtitle: { color: semantic.text.primary, fontFamily: primitives.typography.family.uiSemiBold, fontSize: componentTokens.brand.subtitle, letterSpacing: primitives.typography.letterSpacing.brand },
+  brandName: { ...textStyles.brand, color: tokens.brand.accent },
+  brandSubtitle: { color: tokens.text.primary, fontFamily: primitives.typography.family.uiSemiBold, fontSize: componentTokens.brand.subtitle, letterSpacing: primitives.typography.letterSpacing.brand },
   button: { minHeight: componentTokens.button.minHeight, borderRadius: componentTokens.button.radius, paddingHorizontal: componentTokens.button.horizontalPadding, alignItems: 'center', justifyContent: 'center', borderWidth },
-  button_primary: { backgroundColor: semantic.action.primary, borderColor: semantic.action.primary },
-  button_secondary: { backgroundColor: semantic.action.secondary, borderColor: semantic.border.strong },
+  button_primary: { backgroundColor: tokens.brand.accent, borderColor: tokens.brand.accent },
+  button_secondary: { backgroundColor: tokens.background.surfaceMuted, borderColor: tokens.border.strong },
   button_ghost: { backgroundColor: primitives.color.transparent, borderColor: primitives.color.transparent },
-  button_danger: { backgroundColor: semantic.status.negativeSurface, borderColor: semantic.status.negativeBorder },
+  button_danger: { backgroundColor: tokens.background.surfaceMuted, borderColor: tokens.status.risk },
   buttonPressed: { opacity: primitives.opacity.pressed, transform: [{ scale: primitives.motion.pressedScale }] },
   buttonDisabled: { opacity: primitives.opacity.disabled },
   buttonContent: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs },
   buttonText: { ...textStyles.buttonLabel, textAlign: 'center' },
   iconButton: { width: componentTokens.iconButton.size, height: componentTokens.iconButton.size, borderRadius: componentTokens.iconButton.radius, alignItems: 'center', justifyContent: 'center', borderWidth },
-  iconButton_default: { backgroundColor: semantic.surface.raised, borderColor: semantic.border.default },
+  iconButton_default: { backgroundColor: tokens.background.surfaceMuted, borderColor: tokens.border.default },
   iconButton_ghost: { backgroundColor: primitives.color.transparent, borderColor: primitives.color.transparent },
-  iconButton_danger: { backgroundColor: semantic.status.negativeSurface, borderColor: semantic.status.negativeBorder },
+  iconButton_danger: { backgroundColor: tokens.background.surfaceMuted, borderColor: tokens.status.risk },
   field: { gap: spacing.xs },
-  fieldLabel: { ...textStyles.caption, color: semantic.text.secondary, fontFamily: primitives.typography.family.uiBold, letterSpacing: primitives.typography.letterSpacing.label },
-  input: { minHeight: componentTokens.input.minHeight, borderRadius: componentTokens.input.radius, borderWidth, borderColor: semantic.border.strong, backgroundColor: semantic.bg.elevated, color: semantic.text.primary, paddingHorizontal: spacing.md, ...textStyles.body },
+  fieldLabel: { ...textStyles.caption, color: tokens.text.secondary, fontFamily: primitives.typography.family.uiBold, letterSpacing: primitives.typography.letterSpacing.label },
+  input: { minHeight: componentTokens.input.minHeight, borderRadius: componentTokens.input.radius, borderWidth, borderColor: tokens.border.strong, backgroundColor: tokens.background.surface, color: tokens.text.primary, paddingHorizontal: spacing.md, ...textStyles.body },
   inputMultiline: { minHeight: componentTokens.input.multilineMinHeight, paddingTop: spacing.md, textAlignVertical: 'top' },
-  inputError: { borderColor: semantic.status.negative },
-  fieldHelp: { ...textStyles.caption, color: semantic.text.secondary },
-  fieldHelpError: { color: semantic.status.negative },
-  searchField: { minHeight: componentTokens.input.minHeight, flexDirection: 'row', alignItems: 'center', gap: spacing.xs, borderRadius: componentTokens.input.radius, borderWidth, borderColor: semantic.border.strong, backgroundColor: semantic.bg.elevated, paddingHorizontal: spacing.md },
-  searchInput: { flex: 1, minWidth: spacing.none, color: semantic.text.primary, paddingVertical: spacing.xs, ...textStyles.body },
-  card: { backgroundColor: semantic.surface.default, borderWidth, borderColor: semantic.border.default, borderRadius: componentTokens.card.radius, padding: componentTokens.card.padding, ...shadows.card },
-  cardRaised: { backgroundColor: semantic.surface.raised, borderColor: semantic.border.strong },
+  inputError: { borderColor: tokens.status.risk },
+  fieldHelp: { ...textStyles.caption, color: tokens.text.secondary },
+  fieldHelpError: { color: tokens.status.riskText },
+  searchField: { minHeight: componentTokens.input.minHeight, flexDirection: 'row', alignItems: 'center', gap: spacing.xs, borderRadius: componentTokens.input.radius, borderWidth, borderColor: tokens.border.strong, backgroundColor: tokens.background.surface, paddingHorizontal: spacing.md },
+  searchInput: { flex: 1, minWidth: spacing.none, color: tokens.text.primary, paddingVertical: spacing.xs, ...textStyles.body },
+  card: { backgroundColor: tokens.background.surface, borderWidth, borderColor: tokens.border.default, borderRadius: componentTokens.card.radius, padding: componentTokens.card.padding, ...tokens.elevation.card },
+  cardRaised: { backgroundColor: tokens.background.surfaceMuted, borderColor: tokens.border.strong },
   metricCard: { minWidth: componentTokens.card.metricMinWidth, flexGrow: 1, flexBasis: componentTokens.card.metricMinWidth, gap: spacing.xs },
-  metricLabel: { ...textStyles.caption, color: semantic.text.secondary, fontFamily: primitives.typography.family.uiBold, letterSpacing: primitives.typography.letterSpacing.label },
-  metricValue: { ...textStyles.moneyL, color: semantic.text.primary },
-  metricHelper: { ...textStyles.caption, color: semantic.text.subtle },
+  metricLabel: { ...textStyles.caption, color: tokens.text.secondary, fontFamily: primitives.typography.family.uiBold, letterSpacing: primitives.typography.letterSpacing.label },
+  metricValue: { ...textStyles.moneyL, color: tokens.text.primary },
+  metricHelper: { ...textStyles.caption, color: tokens.text.secondary },
   pageHeader: { gap: spacing.xs, marginBottom: spacing.xs },
   pageTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
-  eyebrow: { ...textStyles.caption, color: semantic.text.accent, fontFamily: primitives.typography.family.uiExtraBold, letterSpacing: primitives.typography.letterSpacing.eyebrow },
-  pageTitle: { ...textStyles.title, flexShrink: 1, color: semantic.text.primary },
-  pageDescription: { ...textStyles.body, color: semantic.text.secondary },
+  eyebrow: { ...textStyles.caption, color: tokens.brand.accent, fontFamily: primitives.typography.family.uiExtraBold, letterSpacing: primitives.typography.letterSpacing.eyebrow },
+  pageTitle: { ...textStyles.title, flexShrink: 1, color: tokens.text.primary },
+  pageDescription: { ...textStyles.body, color: tokens.text.secondary },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
-  sectionTitle: { ...textStyles.section, flexShrink: 1, color: semantic.text.primary },
+  sectionTitle: { ...textStyles.section, flexShrink: 1, color: tokens.text.primary },
   pill: { alignSelf: 'flex-start', borderRadius: componentTokens.chip.radius, borderWidth, paddingHorizontal: componentTokens.chip.horizontalPadding, paddingVertical: spacing.xxs },
-  pill_neutral: { borderColor: semantic.border.strong, backgroundColor: semantic.surface.raised },
-  pill_positive: { borderColor: semantic.status.positiveBorder, backgroundColor: semantic.status.positiveSurface },
-  pill_warning: { borderColor: semantic.status.warningBorder, backgroundColor: semantic.status.warningSurface },
-  pill_negative: { borderColor: semantic.status.negativeBorder, backgroundColor: semantic.status.negativeSurface },
-  pill_gold: { borderColor: semantic.action.primaryPressed, backgroundColor: primitives.color.gold[900] },
-  pill_info: { borderColor: semantic.status.infoBorder, backgroundColor: semantic.status.infoSurface },
+  pill_neutral: { borderColor: tokens.border.strong, backgroundColor: tokens.background.surfaceMuted },
+  pill_positive: { borderColor: tokens.status.positive, backgroundColor: tokens.background.surfaceMuted },
+  pill_warning: { borderColor: tokens.status.warning, backgroundColor: tokens.background.surfaceMuted },
+  pill_negative: { borderColor: tokens.status.risk, backgroundColor: tokens.background.surfaceMuted },
+  pill_gold: { borderColor: tokens.brand.accent, backgroundColor: tokens.background.surfaceMuted },
+  pill_info: { borderColor: tokens.status.info, backgroundColor: tokens.background.surfaceMuted },
   pillText: { ...textStyles.caption, fontFamily: primitives.typography.family.uiBold },
-  pillText_neutral: { color: semantic.text.secondary },
-  pillText_positive: { color: semantic.status.positive },
-  pillText_warning: { color: semantic.status.warning },
-  pillText_negative: { color: semantic.status.negative },
-  pillText_gold: { color: semantic.text.accent },
-  pillText_info: { color: semantic.status.info },
-  filterChip: { minHeight: componentTokens.chip.minHeight, justifyContent: 'center', borderRadius: componentTokens.chip.radius, borderWidth, borderColor: semantic.border.default, backgroundColor: semantic.surface.default, paddingHorizontal: componentTokens.chip.horizontalPadding },
-  filterChipSelected: { borderColor: semantic.border.focus, backgroundColor: primitives.color.gold[900] },
-  filterChipText: { ...textStyles.bodySmall, color: semantic.text.secondary, fontFamily: primitives.typography.family.uiSemiBold },
-  filterChipTextSelected: { color: semantic.text.accent },
+  pillText_neutral: { color: tokens.text.secondary }, pillText_positive: { color: tokens.status.positiveText }, pillText_warning: { color: tokens.status.warning }, pillText_negative: { color: tokens.status.riskText }, pillText_gold: { color: tokens.brand.accent }, pillText_info: { color: tokens.status.info },
+  filterChip: { minHeight: componentTokens.chip.minHeight, justifyContent: 'center', borderRadius: componentTokens.chip.radius, borderWidth, borderColor: tokens.border.default, backgroundColor: tokens.background.surface, paddingHorizontal: componentTokens.chip.horizontalPadding },
+  filterChipSelected: { borderColor: tokens.focus.ring, backgroundColor: tokens.background.surfaceMuted },
+  filterChipText: { ...textStyles.bodySmall, color: tokens.text.secondary, fontFamily: primitives.typography.family.uiSemiBold },
+  filterChipTextSelected: { color: tokens.text.primary },
   notice: { flexDirection: 'row', alignItems: 'flex-start', borderRadius: componentTokens.notice.radius, borderWidth, padding: componentTokens.notice.padding, gap: spacing.sm },
-  notice_info: { borderColor: semantic.status.infoBorder, backgroundColor: semantic.status.infoSurface },
-  notice_warning: { borderColor: semantic.status.warningBorder, backgroundColor: semantic.status.warningSurface },
-  notice_error: { borderColor: semantic.status.negativeBorder, backgroundColor: semantic.status.negativeSurface },
-  notice_success: { borderColor: semantic.status.positiveBorder, backgroundColor: semantic.status.positiveSurface },
-  noticeIcon_info: { color: semantic.status.info },
-  noticeIcon_warning: { color: semantic.status.warning },
-  noticeIcon_error: { color: semantic.status.negative },
-  noticeIcon_success: { color: semantic.status.positive },
+  notice_info: { borderColor: tokens.status.info, backgroundColor: tokens.background.surfaceMuted }, notice_warning: { borderColor: tokens.status.warning, backgroundColor: tokens.background.surfaceMuted }, notice_error: { borderColor: tokens.status.risk, backgroundColor: tokens.background.surfaceMuted }, notice_success: { borderColor: tokens.status.positive, backgroundColor: tokens.background.surfaceMuted },
+  noticeIcon_info: { color: tokens.status.info }, noticeIcon_warning: { color: tokens.status.warning }, noticeIcon_error: { color: tokens.status.riskText }, noticeIcon_success: { color: tokens.status.positiveText },
   noticeCopy: { flex: 1, gap: spacing.xs },
-  noticeTitle: { ...textStyles.bodySmall, color: semantic.text.primary, fontFamily: primitives.typography.family.uiExtraBold },
-  noticeMessage: { ...textStyles.bodySmall, color: semantic.text.secondary },
+  noticeTitle: { ...textStyles.bodySmall, color: tokens.text.primary, fontFamily: primitives.typography.family.uiExtraBold }, noticeMessage: { ...textStyles.bodySmall, color: tokens.text.secondary },
   stateView: { flex: 1, minHeight: componentTokens.screen.stateMinHeight, alignItems: 'center', justifyContent: 'center', gap: spacing.md, padding: spacing.xl },
-  stateTitle: { ...textStyles.section, color: semantic.text.primary, textAlign: 'center' },
-  stateMessage: { ...textStyles.body, color: semantic.text.secondary, textAlign: 'center', maxWidth: componentTokens.dialog.maxWidth },
+  stateTitle: { ...textStyles.section, color: tokens.text.primary, textAlign: 'center' }, stateMessage: { ...textStyles.body, color: tokens.text.secondary, textAlign: 'center', maxWidth: componentTokens.dialog.maxWidth },
   stateAction: { width: '100%', maxWidth: componentTokens.dialog.maxWidth, gap: spacing.sm },
   progressGroup: { gap: spacing.xs },
-  progressTrack: { height: componentTokens.progress.height, borderRadius: componentTokens.progress.radius, backgroundColor: semantic.surface.pressed, overflow: 'hidden' },
-  progressFill: { height: '100%', borderRadius: componentTokens.progress.radius, backgroundColor: semantic.action.primary },
-  progressLabel: { ...textStyles.caption, color: semantic.text.secondary, textAlign: 'right' },
-  overlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: semantic.overlay.default },
+  progressTrack: { height: componentTokens.progress.height, borderRadius: componentTokens.progress.radius, backgroundColor: tokens.background.surfaceMuted, overflow: 'hidden' }, progressFill: { height: '100%', borderRadius: componentTokens.progress.radius, backgroundColor: tokens.brand.accent }, progressLabel: { ...textStyles.caption, color: tokens.text.secondary, textAlign: 'right' }, overlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: tokens.overlay },
   dialogAlignment: { justifyContent: 'center', padding: spacing.md },
-  sheet: { width: '100%', maxWidth: componentTokens.sheet.maxWidth, alignSelf: 'center', borderTopLeftRadius: componentTokens.sheet.radius, borderTopRightRadius: componentTokens.sheet.radius, borderWidth, borderColor: semantic.border.strong, backgroundColor: semantic.surface.raised, padding: componentTokens.sheet.padding, gap: spacing.md, ...shadows.overlay },
-  dialog: { width: '100%', maxWidth: componentTokens.dialog.maxWidth, alignSelf: 'center', borderRadius: componentTokens.dialog.radius, borderWidth, borderColor: semantic.border.strong, backgroundColor: semantic.surface.raised, padding: componentTokens.dialog.padding, gap: spacing.md, ...shadows.overlay },
+  sheet: { width: '100%', maxWidth: componentTokens.sheet.maxWidth, alignSelf: 'center', borderTopLeftRadius: componentTokens.sheet.radius, borderTopRightRadius: componentTokens.sheet.radius, borderWidth, borderColor: tokens.border.strong, backgroundColor: tokens.background.surfaceMuted, padding: componentTokens.sheet.padding, gap: spacing.md, ...tokens.elevation.overlay },
+  dialog: { width: '100%', maxWidth: componentTokens.dialog.maxWidth, alignSelf: 'center', borderRadius: componentTokens.dialog.radius, borderWidth, borderColor: tokens.border.strong, backgroundColor: tokens.background.surfaceMuted, padding: componentTokens.dialog.padding, gap: spacing.md, ...tokens.elevation.overlay },
   overlayHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
-  overlayTitle: { ...textStyles.section, flex: 1, color: semantic.text.primary },
+  overlayTitle: { ...textStyles.section, flex: 1, color: tokens.text.primary },
   overlayBody: { gap: spacing.md },
   overlayActions: { gap: spacing.sm },
-  divider: { height: StyleSheet.hairlineWidth, backgroundColor: semantic.border.default, width: '100%' },
-});
+  divider: { height: StyleSheet.hairlineWidth, backgroundColor: tokens.border.default, width: '100%' },
+  });
+}

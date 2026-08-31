@@ -2,7 +2,8 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import type { ComponentProps } from 'react';
 import type { ColorValue } from 'react-native';
 
-import { componentTokens, semantic } from './tokens';
+import { componentTokens } from './tokens';
+import { useAvioraTheme } from './theme-provider';
 
 type IoniconName = ComponentProps<typeof Ionicons>['name'];
 
@@ -47,14 +48,15 @@ type AppIconProps = Readonly<{
 export function AppIcon({
   name,
   size = componentTokens.iconButton.iconSize,
-  color = semantic.text.secondary,
+  color,
   accessibilityLabel,
 }: AppIconProps) {
+  const { tokens } = useAvioraTheme();
   return (
     <Ionicons
       name={iconMap[name]}
       size={size}
-      color={color}
+      color={color ?? tokens.text.secondary}
       accessible={Boolean(accessibilityLabel)}
       accessibilityLabel={accessibilityLabel}
       accessibilityElementsHidden={!accessibilityLabel}

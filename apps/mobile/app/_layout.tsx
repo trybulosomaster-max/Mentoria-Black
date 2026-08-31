@@ -16,20 +16,36 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AuthProvider, useAuth } from '../src/core/auth/AuthProvider';
-import { semantic } from '../src/design-system/tokens';
+import { ThemeProvider, useAvioraTheme } from '../src/design-system/theme-provider';
 import { bootstrapIsPending } from '../src/domain/bootstrap/app-bootstrap';
 
 void SplashScreen.preventAutoHideAsync();
 
 function BootstrapGate({ fontsReady }: { fontsReady: boolean }) {
   const { bootstrapState } = useAuth();
+  const { ready: themeReady } = useAvioraTheme();
   const bootstrapReady = !bootstrapIsPending(bootstrapState);
 
   useEffect(() => {
-    if (fontsReady && bootstrapReady) void SplashScreen.hideAsync();
-  }, [bootstrapReady, fontsReady]);
+    if (fontsReady && bootstrapReady && themeReady) void SplashScreen.hideAsync();
+  }, [bootstrapReady, fontsReady, themeReady]);
 
   return null;
+}
+
+function ThemedApplication({ fontsReady }: { fontsReady: boolean }) {
+  const { resolvedTheme, tokens } = useAvioraTheme();
+  return (
+    <GestureHandlerRootView style={{ flex: 1, backgroundColor: tokens.background.canvas }}>
+      <SafeAreaProvider>
+        <AuthProvider>
+          <BootstrapGate fontsReady={fontsReady} />
+          <StatusBar style={resolvedTheme === 'dark' ? 'light' : 'dark'} />
+          <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: tokens.background.canvas }, animation: 'fade' }} />
+        </AuthProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
+  );
 }
 
 export default function RootLayout() {
@@ -43,21 +59,5 @@ export default function RootLayout() {
   });
   const fontsReady = fontsLoaded || Boolean(fontError);
 
-  return (
-    <GestureHandlerRootView style={{ flex: 1, backgroundColor: semantic.bg.base }}>
-      <SafeAreaProvider>
-        <AuthProvider>
-          <BootstrapGate fontsReady={fontsReady} />
-          <StatusBar style="light" />
-          <Stack
-            screenOptions={{
-              headerShown: false,
-              contentStyle: { backgroundColor: semantic.bg.base },
-              animation: 'fade',
-            }}
-          />
-        </AuthProvider>
-      </SafeAreaProvider>
-    </GestureHandlerRootView>
-  );
+  return <ThemeProvider><ThemedApplication fontsReady={fontsReady} /></ThemeProvider>;
 }
