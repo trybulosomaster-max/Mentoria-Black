@@ -75,6 +75,7 @@ const required = [
   'tests/security-guards.test.ts',
   'tests/use-mobile-snapshot.integration.test.ts',
   'tests/quick-actions.test.ts',
+  'tests/transactions-premium.test.ts',
 ];
 
 for (const file of required) {
@@ -214,6 +215,29 @@ if (quickActionSources.length >= 3 && !quickActionBoundaryViolations.length) {
   fail(
     'gate:quick-actions-read-only-boundary',
     quickActionBoundaryViolations
+      .map(({ file, violations }) => `${file}: ${violations.join(', ')}`)
+      .join(' | '),
+  );
+}
+
+const transactionSources = combined.filter(({ file }) => (
+  file === 'app/(tabs)/lancamentos.tsx'
+  || file.startsWith('src/features/transactions/')
+));
+const transactionBoundaryViolations = transactionSources.flatMap(({ file, source }) => {
+  const violations = databaseBoundaryViolations(file, source);
+  return violations.length ? [{ file, violations }] : [];
+});
+const hasTransactionScreen = transactionSources.some(({ file }) => file === 'app/(tabs)/lancamentos.tsx');
+const hasTransactionFeature = transactionSources.some(({ file }) => file.startsWith('src/features/transactions/'));
+if (hasTransactionScreen && hasTransactionFeature && !transactionBoundaryViolations.length) {
+  ok('gate:transactions-read-only-boundary', `${transactionSources.length} arquivos`);
+} else if (!hasTransactionScreen || !hasTransactionFeature) {
+  fail('gate:transactions-read-only-boundary', 'tela ou feature de Transações ausente');
+} else {
+  fail(
+    'gate:transactions-read-only-boundary',
+    transactionBoundaryViolations
       .map(({ file, violations }) => `${file}: ${violations.join(', ')}`)
       .join(' | '),
   );

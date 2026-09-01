@@ -14,6 +14,7 @@ import { AppIcon } from '../../design-system/icons';
 import { useResponsiveLayout } from '../../design-system/responsive';
 import { useAvioraTheme } from '../../design-system/theme-provider';
 import {
+  componentTokens,
   dynamicType,
   primitives,
   spacing,
@@ -30,6 +31,11 @@ import {
   shiftCalendarMonth,
   type CalendarMonth,
 } from '../../lib/format';
+import {
+  INITIAL_MONTH_SNAP_STATE,
+  transitionMonthSnap,
+  type MonthSnapEvent,
+} from './month-selector-snap';
 
 const MONTHS_BEFORE = 18;
 const MONTHS_AFTER = 18;
@@ -71,9 +77,7 @@ export function MonthSelector({
   }, [anchor, period.month, period.year]);
   const selectedIndex = months.findIndex((item) => sameCalendarMonth(item, period));
   const list = useRef<FlatList<CalendarMonth>>(null);
-  const userIsDragging = useRef(false);
-  const momentumActive = useRef(false);
-  const settleFrame = useRef<number | null>(null);
+  const snapState = useRef(INITIAL_MONTH_SNAP_STATE);
   const contentWidth = Math.min(width, layout.contentMaxWidth) - (layout.horizontalPadding * 2);
   const availableWidth = Math.max(280, contentWidth);
   const itemWidth = Math.max(128, Math.min(180, availableWidth * 0.38));
@@ -85,39 +89,24 @@ export function MonthSelector({
     list.current?.scrollToIndex({ index: selectedIndex, animated: !reducedMotion });
   }, [interval, reducedMotion, selectedIndex]);
 
-  useEffect(() => () => {
-    if (settleFrame.current !== null) cancelAnimationFrame(settleFrame.current);
-  }, []);
+  useEffect(() => {
+    if (!expanded) snapState.current = INITIAL_MONTH_SNAP_STATE;
+  }, [expanded]);
 
-  const selectFromOffset = (offset: number) => {
-    if (!userIsDragging.current) return;
-    userIsDragging.current = false;
-    const index = Math.max(0, Math.min(months.length - 1, Math.round(offset / interval)));
-    const next = months[index];
+  const applySnapEvent = (event: MonthSnapEvent) => {
+    const transition = transitionMonthSnap(snapState.current, event);
+    snapState.current = transition.state;
+    if (transition.commitIndex === null) return;
+    const next = months[transition.commitIndex];
     if (next && !sameCalendarMonth(next, period)) onChange(next);
-  };
-
-  const finishDrag = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const offset = event.nativeEvent.contentOffset.x;
-    if (settleFrame.current !== null) cancelAnimationFrame(settleFrame.current);
-    settleFrame.current = requestAnimationFrame(() => {
-      settleFrame.current = null;
-      if (!momentumActive.current) selectFromOffset(offset);
-    });
-  };
-
-  const finishMomentum = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    momentumActive.current = false;
-    if (settleFrame.current !== null) {
-      cancelAnimationFrame(settleFrame.current);
-      settleFrame.current = null;
-    }
-    selectFromOffset(event.nativeEvent.contentOffset.x);
   };
 
   const move = (offset: number) => {
     const next = shiftCalendarMonth(period, offset);
-    if (months.some((item) => sameCalendarMonth(item, next))) onChange(next);
+    if (months.some((item) => sameCalendarMonth(item, next))) {
+      snapState.current = INITIAL_MONTH_SNAP_STATE;
+      onChange(next);
+    }
   };
 
   return (
@@ -157,27 +146,34 @@ export function MonthSelector({
           decelerationRate="fast"
           disableIntervalMomentum
           onScrollBeginDrag={() => {
-            userIsDragging.current = true;
-            momentumActive.current = false;
-            if (settleFrame.current !== null) {
-              cancelAnimationFrame(settleFrame.current);
-              settleFrame.current = null;
-            }
+            applySnapEvent({ type: 'drag-begin' });
           }}
-          onScrollEndDrag={finishDrag}
+          onScrollEndDrag={(event: NativeSyntheticEvent<NativeScrollEvent>) => {
+            applySnapEvent({
+              type: 'drag-end',
+              offset: event.nativeEvent.contentOffset.x,
+              targetOffset: event.nativeEvent.targetContentOffset?.x,
+              velocityX: event.nativeEvent.velocity?.x,
+              interval,
+              itemCount: months.length,
+            });
+          }}
           onMomentumScrollBegin={() => {
-            momentumActive.current = true;
-            if (settleFrame.current !== null) {
-              cancelAnimationFrame(settleFrame.current);
-              settleFrame.current = null;
-            }
+            applySnapEvent({ type: 'momentum-begin' });
           }}
-          onMomentumScrollEnd={finishMomentum}
+          onMomentumScrollEnd={(event: NativeSyntheticEvent<NativeScrollEvent>) => {
+            applySnapEvent({
+              type: 'momentum-end',
+              offset: event.nativeEvent.contentOffset.x,
+              interval,
+              itemCount: months.length,
+            });
+          }}
           onScrollToIndexFailed={({ index }) => list.current?.scrollToOffset({ offset: interval * index, animated: false })}
           showsHorizontalScrollIndicator={false}
           snapToAlignment="start"
           snapToInterval={interval}
-          renderItem={({ item }) => {
+          renderItem={({ item, index }) => {
             const selected = sameCalendarMonth(item, period);
             return (
               <Pressable
@@ -185,7 +181,11 @@ export function MonthSelector({
                 accessibilityLabel={calendarMonthLabel(item)}
                 accessibilityHint="Seleciona este mês para o panorama. Use o botão do período para recolher a lista."
                 accessibilityState={{ selected }}
-                onPress={() => onChange(item)}
+                onPress={() => {
+                  snapState.current = INITIAL_MONTH_SNAP_STATE;
+                  list.current?.scrollToIndex({ index, animated: !reducedMotion });
+                  if (!sameCalendarMonth(item, period)) onChange(item);
+                }}
                 style={({ pressed }) => [
                   styles.month,
                   { width: itemWidth, marginRight: spacing.xs },
@@ -214,8 +214,8 @@ function createStyles(tokens: ThemeTokens) {
     triggerPressed: { opacity: primitives.opacity.pressed },
     title: { ...textStyles.section, color: tokens.text.primary, textAlign: 'center' },
     titleYear: { ...textStyles.bodySmall, color: tokens.text.secondary },
-    month: { minHeight: primitives.size.touch.comfortable, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderRadius: primitives.radius.pill, borderWidth: primitives.size.border.thin, borderColor: tokens.action.text, backgroundColor: tokens.action.primary },
-    monthSelected: { borderColor: tokens.action.onPrimary, backgroundColor: tokens.action.primary, ...tokens.elevation.card },
+    month: { minHeight: primitives.size.touch.comfortable, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderRadius: primitives.radius.pill, borderWidth: primitives.size.border.thin, borderColor: tokens.action.text, backgroundColor: tokens.action.primary, opacity: componentTokens.periodSelector.inactiveOpacity },
+    monthSelected: { zIndex: 1, borderWidth: primitives.size.border.strong, borderColor: tokens.action.onPrimary, backgroundColor: tokens.action.primary, opacity: primitives.opacity.opaque, ...tokens.elevation.card },
     monthPressed: { opacity: primitives.opacity.pressed },
     monthText: { ...textStyles.body, color: tokens.action.onPrimary, fontFamily: primitives.typography.family.uiSemiBold, textAlign: 'center' },
     monthTextSelected: { color: tokens.action.onPrimary, fontFamily: primitives.typography.family.uiSemiBold },

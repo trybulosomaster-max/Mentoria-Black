@@ -23,6 +23,8 @@ test('expõe as três camadas obrigatórias de tokens', () => {
   assert.ok(componentTokens.button.minHeight >= 44);
   assert.ok(componentTokens.iconButton.size >= 44);
   assert.ok(componentTokens.input.minHeight >= 44);
+  assert.ok(componentTokens.quickAction.contentClearance >= componentTokens.quickAction.triggerSize + primitives.space.md);
+  assert.ok(componentTokens.periodSelector.inactiveOpacity < primitives.opacity.opaque);
 });
 
 test('congela tipografia escalável e números tabulares', () => {
@@ -72,6 +74,7 @@ test('expõe Screen variants e todos os componentes fundamentais', async () => {
     assert.match(source, new RegExp(`export (?:function|const) ${component}\\b`));
   }
   assert.match(source, /edgeToEdgeTop \? \['left', 'right'\] : \['top', 'left', 'right'\]/);
+  assert.match(source, /variant === 'tab'[\s\S]*?componentTokens\.quickAction\.contentClearance/);
   assert.doesNotMatch(source, /<Text\b[^>]*\bonPress=/);
   assert.doesNotMatch(source, /<AppIcon\b[^>]*accessibilityLabel=\{tone\}/);
 });

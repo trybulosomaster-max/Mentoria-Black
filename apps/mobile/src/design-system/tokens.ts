@@ -80,7 +80,8 @@ export const componentTokens = Object.freeze({
   sheet: Object.freeze({ radius: primitives.radius.xl, padding: primitives.space.lg, maxWidth: 720 }),
   dialog: Object.freeze({ radius: primitives.radius.lg, padding: primitives.space.lg, maxWidth: 520 }),
   dashboard: Object.freeze({ flowIndicatorSize: 44, chartHeight: 144, chartPadding: 16, chartPointSize: 6, incomeLineWidth: 2, expenseLineWidth: 2 }),
-  quickAction: Object.freeze({ triggerSize: 56, actionSize: 48, slotWidth: 96, slotHeight: 100, topOffsetX: 52, topOffsetY: -132, sideOffsetY: -24, sideOffsetXMin: 88, sideOffsetXMax: 108, overlayElevation: 30 }),
+  periodSelector: Object.freeze({ inactiveOpacity: 0.88 }),
+  quickAction: Object.freeze({ triggerSize: 56, actionSize: 48, slotWidth: 104, slotHeight: 100, topOffsetX: 56, topOffsetY: -132, sideOffsetY: -24, sideOffsetXMin: 84, sideOffsetXMax: 108, contentClearance: 72, overlayElevation: 30 }),
   brand: Object.freeze({ crest: 92, crestCompact: 54, crestBorder: 2, letter: 42, letterCompact: 25, wordmark: 28, subtitle: 10 }), avatar: Object.freeze({ size: 56 }),
 } as const);
 

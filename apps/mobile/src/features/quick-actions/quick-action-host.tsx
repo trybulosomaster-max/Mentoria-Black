@@ -226,13 +226,15 @@ export function QuickActionHost({
                     <View style={[styles.actionIcon, { borderColor: color }]}>
                       <AppIcon name={action.icon} size={primitives.size.icon.md} color={color} />
                     </View>
-                    <Text
-                      maxFontSizeMultiplier={dynamicType.tabLabelMaxFontSizeMultiplier}
-                      numberOfLines={2}
-                      style={styles.actionLabel}
-                    >
-                      {visibleActionLabel(action)}
-                    </Text>
+                    <View style={styles.actionLabelBox}>
+                      <Text
+                        maxFontSizeMultiplier={dynamicType.tabLabelMaxFontSizeMultiplier}
+                        numberOfLines={2}
+                        style={styles.actionLabel}
+                      >
+                        {visibleActionLabel(action)}
+                      </Text>
+                    </View>
                   </Pressable>
                 </Animated.View>
               );
@@ -320,6 +322,11 @@ function createStyles(tokens: ThemeTokens) {
       justifyContent: 'center',
       borderWidth: primitives.size.border.thin,
       backgroundColor: tokens.background.surfaceMuted,
+    },
+    actionLabelBox: {
+      width: '100%',
+      minHeight: primitives.typography.lineHeight.button * 2,
+      alignItems: 'center',
     },
     actionLabel: {
       ...textStyles.buttonLabel,

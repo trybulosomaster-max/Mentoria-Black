@@ -10,10 +10,13 @@ import {
 } from '../../lib/format.ts';
 
 export type DashboardShortcutFlow = 'income' | 'expense';
+export type DashboardTransactionsFlow = DashboardShortcutFlow | 'all' | 'card';
+export type DashboardTransactionsOrigin = 'dashboard';
 
 export type DashboardTransactionsIntent = Readonly<{
   period: CalendarMonth;
-  flow: DashboardShortcutFlow;
+  flow: DashboardTransactionsFlow;
+  origin: DashboardTransactionsOrigin | null;
 }>;
 
 export const HIDDEN_FINANCIAL_VALUE = String.fromCharCode(0x2022).repeat(6);
@@ -35,28 +38,36 @@ export function financialValuePresentation(
   return Object.freeze({ text: value, accessibilityLabel: value });
 }
 
-export function dashboardTransactionsHref(period: CalendarMonth, flow: DashboardShortcutFlow) {
+export function dashboardTransactionsHref(
+  period: CalendarMonth,
+  flow: DashboardShortcutFlow | 'all',
+) {
   const [year, month] = calendarMonthKey(period).split('-');
   return Object.freeze({
     pathname: '/(tabs)/lancamentos' as const,
-    params: Object.freeze({ year, month, flow }),
+    params: Object.freeze({ year, month, flow, origin: 'dashboard' as const }),
   });
 }
 
-function firstParam(value: string | readonly string[] | undefined): string {
-  return Array.isArray(value) ? String(value[0] ?? '') : String(value ?? '');
+function singleParam(value: string | readonly string[] | undefined): string | null {
+  if (Array.isArray(value)) return value.length === 1 ? String(value[0] ?? '') : null;
+  return String(value ?? '');
 }
 
 export function parseDashboardTransactionsIntent(params: Readonly<{
   year?: string | readonly string[];
   month?: string | readonly string[];
   flow?: string | readonly string[];
+  origin?: string | readonly string[];
 }>): DashboardTransactionsIntent | null {
-  const yearValue = firstParam(params.year);
-  const monthValue = firstParam(params.month);
-  const flowValue = firstParam(params.flow);
+  const yearValue = singleParam(params.year);
+  const monthValue = singleParam(params.month);
+  const flowValue = singleParam(params.flow);
+  const originValue = singleParam(params.origin);
+  if (yearValue === null || monthValue === null || flowValue === null || originValue === null) return null;
   if (!/^\d{4}$/.test(yearValue) || !/^(?:0[1-9]|1[0-2])$/.test(monthValue)) return null;
-  if (flowValue !== 'income' && flowValue !== 'expense') return null;
+  if (!['all', 'income', 'expense', 'card'].includes(flowValue)) return null;
+  if (originValue && originValue !== 'dashboard') return null;
   const period = Object.freeze({ year: Number(yearValue), month: Number(monthValue) });
   try {
     calendarMonthWindow(period);
@@ -65,7 +76,11 @@ export function parseDashboardTransactionsIntent(params: Readonly<{
   } catch {
     return null;
   }
-  return Object.freeze({ period, flow: flowValue });
+  return Object.freeze({
+    period,
+    flow: flowValue as DashboardTransactionsFlow,
+    origin: originValue === 'dashboard' ? originValue : null,
+  });
 }
 
 export function transactionMatchesDashboardFlow(

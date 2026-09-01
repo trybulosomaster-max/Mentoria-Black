@@ -44,7 +44,7 @@ export default function DashboardScreen() {
   };
 
   const openAllTransactions = () => {
-    router.push('/(tabs)/lancamentos');
+    router.push(dashboardTransactionsHref(period, 'all'));
   };
 
   if (loading && !data) {

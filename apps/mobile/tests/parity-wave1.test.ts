@@ -26,7 +26,7 @@ test('Dashboard usa componentes canônicos sem sintetizar gráfico ou valores', 
 });
 
 test('Lançamentos, Planejamento e Patrimônio reutilizam primitives da Wave 1', async () => {
-  assert.match(await source('lancamentos.tsx'), /<TransactionRow\b/);
+  assert.match(await source('lancamentos.tsx'), /<TransactionListRow\b/);
   assert.match(await source('planejamento.tsx'), /<PlanningRow\b/);
   assert.match(await source('patrimonio.tsx'), /<AssetRow\b/);
 });

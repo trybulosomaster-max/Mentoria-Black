@@ -11,6 +11,10 @@ import {
   transactionMatchesDashboardFlow,
 } from '../src/features/dashboard/dashboard-contract.ts';
 import { buildDashboardPeriodReadModel } from '../src/features/dashboard/dashboard-read-model.ts';
+import {
+  INITIAL_MONTH_SNAP_STATE,
+  transitionMonthSnap,
+} from '../src/features/dashboard/month-selector-snap.ts';
 import { primitives } from '../src/design-system/tokens.ts';
 import {
   calendarMonthKey,
@@ -94,11 +98,12 @@ test('atalhos de Receita e Despesa carregam somente período e filtro allowliste
   const period = { year: 2026, month: 9 } as const;
   assert.deepEqual(dashboardTransactionsHref(period, 'income'), {
     pathname: '/(tabs)/lancamentos',
-    params: { year: '2026', month: '09', flow: 'income' },
+    params: { year: '2026', month: '09', flow: 'income', origin: 'dashboard' },
   });
   assert.deepEqual(parseDashboardTransactionsIntent({ year: '2026', month: '09', flow: 'expense' }), {
     period,
     flow: 'expense',
+    origin: null,
   });
   for (const invalid of [
     { year: '2026', month: '13', flow: 'income' },
@@ -213,18 +218,20 @@ test('seletor recolhe o carrossel e, ao expandir, oferece swipe, snap e alternat
   assert.match(selector, /snapToInterval/);
   assert.match(selector, /monthSequence\(period\)/);
   assert.match(selector, /onMomentumScrollEnd/);
-  assert.match(selector, /onScrollEndDrag=\{finishDrag\}/);
+  assert.match(selector, /onScrollEndDrag=/);
   assert.match(selector, /onMomentumScrollBegin/);
-  assert.match(selector, /requestAnimationFrame/);
-  assert.match(selector, /const offset = event\.nativeEvent\.contentOffset\.x;[\s\S]*?selectFromOffset\(offset\)/);
-  assert.doesNotMatch(selector, /requestAnimationFrame\(\(\) => \{[\s\S]*?selectFromOffset\(event\)/);
-  assert.match(selector, /onPress=\{\(\) => onChange\(item\)\}/);
+  assert.match(selector, /targetOffset: event\.nativeEvent\.targetContentOffset\?\.x/);
+  assert.match(selector, /transitionMonthSnap\(snapState\.current, event\)/);
+  assert.doesNotMatch(selector, /requestAnimationFrame|setTimeout|debounce/i);
+  assert.match(selector, /onPress=\{\(\) => \{[\s\S]*?scrollToIndex\(\{ index, animated: !reducedMotion \}\);[\s\S]*?onChange\(item\)/);
   assert.doesNotMatch(selector, /onPress=\{\(\) => \{[\s\S]*?onExpandedChange\(false\)/);
-  assert.match(selector, /userIsDragging/);
+  assert.match(selector, /snapState/);
   assert.match(selector, /onScrollBeginDrag/);
   assert.match(selector, /name: 'decrement', label: 'Mês anterior'/);
   assert.match(selector, /name: 'increment', label: 'Próximo mês'/);
   assert.match(selector, /accessibilityState=\{\{ selected \}\}/);
+  assert.match(selector, /opacity: componentTokens\.periodSelector\.inactiveOpacity/);
+  assert.match(selector, /monthSelected: \{[^\n]*borderWidth: primitives\.size\.border\.strong[^\n]*opacity: primitives\.opacity\.opaque/);
   assert.match(selector, /useReducedMotion/);
   assert.match(selector, /animated: !reducedMotion/);
   assert.match(selector, /useResponsiveLayout/);
@@ -232,12 +239,100 @@ test('seletor recolhe o carrossel e, ao expandir, oferece swipe, snap e alternat
   assert.match(selector, /\[interval, reducedMotion, selectedIndex\]/);
 });
 
+test('swipe em andamento não muda o período e o snap final seleciona uma única vez', () => {
+  const dragging = transitionMonthSnap(INITIAL_MONTH_SNAP_STATE, { type: 'drag-begin' });
+  assert.equal(dragging.commitIndex, null);
+  assert.equal(dragging.state.phase, 'dragging');
+
+  const released = transitionMonthSnap(dragging.state, {
+    type: 'drag-end',
+    offset: 144,
+    targetOffset: 432,
+    velocityX: 2.4,
+    interval: 144,
+    itemCount: 12,
+  });
+  assert.equal(released.commitIndex, null);
+  assert.equal(released.state.phase, 'settling');
+
+  const momentum = transitionMonthSnap(released.state, { type: 'momentum-begin' });
+  assert.equal(momentum.commitIndex, null);
+  const settled = transitionMonthSnap(momentum.state, {
+    type: 'momentum-end',
+    offset: 432,
+    interval: 144,
+    itemCount: 12,
+  });
+  assert.equal(settled.commitIndex, 3);
+  assert.equal(settled.state.phase, 'idle');
+});
+
+test('swipe rápido ignora meses intermediários e mantém dezembro → janeiro no índice final', () => {
+  const months = [
+    { year: 2026, month: 12 },
+    shiftCalendarMonth({ year: 2026, month: 12 }, 1),
+    shiftCalendarMonth({ year: 2026, month: 12 }, 2),
+  ] as const;
+  const dragging = transitionMonthSnap(INITIAL_MONTH_SNAP_STATE, { type: 'drag-begin' });
+  const released = transitionMonthSnap(dragging.state, {
+    type: 'drag-end',
+    offset: 24,
+    targetOffset: 160,
+    velocityX: 3,
+    interval: 160,
+    itemCount: months.length,
+  });
+  assert.equal(released.commitIndex, null);
+  const settled = transitionMonthSnap(released.state, {
+    type: 'momentum-end',
+    offset: 160,
+    interval: 160,
+    itemCount: months.length,
+  });
+  assert.equal(settled.commitIndex, 1);
+  assert.deepEqual(months[settled.commitIndex!], { year: 2027, month: 1 });
+});
+
+test('arraste já alinhado pode confirmar no fim nativo sem temporizador', () => {
+  const dragging = transitionMonthSnap(INITIAL_MONTH_SNAP_STATE, { type: 'drag-begin' });
+  const settled = transitionMonthSnap(dragging.state, {
+    type: 'drag-end',
+    offset: 320,
+    targetOffset: 320,
+    velocityX: 0,
+    interval: 160,
+    itemCount: 8,
+  });
+  assert.equal(settled.commitIndex, 2);
+  assert.equal(settled.state.phase, 'idle');
+});
+
+test('fim de arraste sem evidência nativa de repouso aguarda o snap', () => {
+  const dragging = transitionMonthSnap(INITIAL_MONTH_SNAP_STATE, { type: 'drag-begin' });
+  const released = transitionMonthSnap(dragging.state, {
+    type: 'drag-end',
+    offset: 320,
+    interval: 160,
+    itemCount: 8,
+  });
+  assert.equal(released.commitIndex, null);
+  assert.equal(released.state.phase, 'settling');
+  const settled = transitionMonthSnap(released.state, {
+    type: 'momentum-end',
+    offset: 320,
+    interval: 160,
+    itemCount: 8,
+  });
+  assert.equal(settled.commitIndex, 2);
+});
+
 test('período participa da leitura e da proteção contra snapshot atrasado', async () => {
-  const [repository, hook, layout, transactions] = await Promise.all([
+  const [repository, hook, layout, transactions, transactionsReadModel] = await Promise.all([
     source('src/features/read-models/mobile-read.repository.ts'),
     source('src/features/read-models/use-mobile-snapshot.ts'),
     source('app/(tabs)/_layout.tsx'),
     source('app/(tabs)/lancamentos.tsx'),
+    source('src/features/transactions/transactions-read-model.ts'),
   ]);
   assert.match(repository, /calendarMonthWindow\(period\)/);
   assert.match(repository, /\.gte\('transaction_date', start\)/);
@@ -250,9 +345,11 @@ test('período participa da leitura e da proteção contra snapshot atrasado', a
   assert.match(hook, /loadSnapshot\(context, period\)/);
   assert.match(layout, /<FinancialPeriodProvider>/);
   assert.match(transactions, /parseDashboardTransactionsIntent/);
-  assert.match(transactions, /transactionMatchesDashboardFlow/);
-  assert.match(transactions, /data\.financialAsOfDate/);
-  assert.doesNotMatch(transactions, /transactionMatchesDashboardFlow\([^)]*data\.generatedAt/);
+  assert.match(transactions, /<MonthSelector/);
+  assert.match(transactions, /dashboardFlow/);
+  assert.match(transactions, /data\?\.financialAsOfDate/);
+  assert.match(transactionsReadModel, /financialEffect\(transaction, \{ now \}\)/);
+  assert.doesNotMatch(transactionsReadModel, /generatedAt/);
 });
 
 test('Dashboard mantém árvore ABC única e módulos congelados fora da implementação', async () => {

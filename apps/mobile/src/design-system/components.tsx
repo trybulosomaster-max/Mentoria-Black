@@ -66,7 +66,10 @@ export function Screen({
   const styles = useStyles();
   const insets = useSafeAreaInsets();
   const layout = useResponsiveLayout();
-  const bottomPadding = componentTokens.screen.bottomPadding + insets.bottom;
+  const shellClearance = variant === 'tab'
+    ? componentTokens.quickAction.contentClearance
+    : primitives.space.none;
+  const bottomPadding = componentTokens.screen.bottomPadding + shellClearance + insets.bottom;
   const containerStyle = [
     styles.screenContent,
     {

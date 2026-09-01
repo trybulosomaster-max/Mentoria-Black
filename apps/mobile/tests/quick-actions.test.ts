@@ -50,8 +50,9 @@ test('Quick Add abre e fecha com haptic, safe area e Reduce Motion', async () =>
   assert.match(host, /tabBarHeight \+ spacing\.xs/);
   assert.equal(componentTokens.quickAction.triggerSize, 56);
   assert.equal(componentTokens.quickAction.actionSize, 48);
-  assert.equal(componentTokens.quickAction.slotWidth, 96);
+  assert.equal(componentTokens.quickAction.slotWidth, 104);
   assert.equal(componentTokens.quickAction.slotHeight, 100);
+  assert.ok(componentTokens.quickAction.contentClearance >= componentTokens.quickAction.triggerSize + 16);
   assert.match(host, /const TRIGGER_SIZE = componentTokens\.quickAction\.triggerSize/);
   assert.match(host, /const ACTION_SIZE = componentTokens\.quickAction\.actionSize/);
   assert.match(host, /accessibilityLabel="Abrir ações rápidas"/);
@@ -85,6 +86,8 @@ test('ações flutuam diretamente no overlay, sem card, e permanecem estritament
   assert.match(host, /y: verticalOffset/);
   assert.match(host, /action\.id === 'card_purchase' \? 'Despesa\\nCartão'/);
   assert.match(host, /maxFontSizeMultiplier=\{dynamicType\.tabLabelMaxFontSizeMultiplier\}/);
+  assert.match(host, /styles\.actionLabelBox/);
+  assert.match(host, /actionLabelBox: \{[\s\S]*?minHeight: primitives\.typography\.lineHeight\.button \* 2[\s\S]*?alignItems: 'center'/);
   assert.match(host, /actionLabel: \{[\s\S]*?width: '100%'[\s\S]*?alignSelf: 'center'[\s\S]*?textAlign: 'center'/);
   assert.match(host, /outputRange: \[0, target\.x\]/);
   assert.match(host, /outputRange: \[0, target\.y\]/);
@@ -93,6 +96,43 @@ test('ações flutuam diretamente no overlay, sem card, e permanecem estritament
   assert.doesNotMatch(actionOrbit, /backgroundColor|borderColor|borderWidth|borderRadius|elevation|shadow/);
   assert.doesNotMatch(host, /actionGrid|actionField|pendingLabel|Em breve|<Modal\b|\bModal,/);
   assert.doesNotMatch(combined, /expo-router|supabase|\.from\s*\(|\.rpc\s*\(|\.insert\s*\(|\.update\s*\(|\.upsert\s*\(|\.delete\s*\(/i);
+});
+
+test('shell reserva uma zona inferior única para o FAB sem offsets por tela', async () => {
+  const [components, home, transactions, more, planning, patrimony] = await Promise.all([
+    source('src/design-system/components.tsx'),
+    source('app/(tabs)/index.tsx'),
+    source('app/(tabs)/lancamentos.tsx'),
+    source('app/(tabs)/mais.tsx'),
+    source('app/(tabs)/planejamento.tsx'),
+    source('app/(tabs)/patrimonio.tsx'),
+  ]);
+  assert.match(components, /variant === 'tab'[\s\S]*?componentTokens\.quickAction\.contentClearance/);
+  assert.match(components, /componentTokens\.screen\.bottomPadding \+ shellClearance \+ insets\.bottom/);
+  for (const screen of [home, transactions, more, planning, patrimony]) {
+    assert.match(screen, /<Screen\b/);
+    assert.doesNotMatch(screen, /quickAction.*(?:padding|offset|inset)|fab.*(?:padding|offset|inset)/i);
+  }
+});
+
+test('Quick Add permanece fail-closed mesmo com as quatro ações visíveis', async () => {
+  const [layout, host, contract, accessContext, capabilityRegistry] = await Promise.all([
+    source('app/(tabs)/_layout.tsx'),
+    source('src/features/quick-actions/quick-action-host.tsx'),
+    source('src/features/quick-actions/quick-action-contract.ts'),
+    source('src/application/foundation/access-context-factory.ts'),
+    source('src/domain/foundation/capability-registry.ts'),
+  ]);
+  const boundary = `${layout}\n${host}\n${contract}`;
+  assert.match(layout, /<QuickActionHost tabBarHeight=\{tabBarHeight\} \/>/);
+  assert.doesNotMatch(layout, /QuickActionHost[^>]*(?:handlers|route|href|command)/);
+  assert.match(host, /handlers = EMPTY_HANDLERS/);
+  assert.match(host, /if \(!handler\) return/);
+  assert.match(host, /disabled=\{!enabled\}/);
+  assert.match(accessContext, /permissions = new Set<string>\(\)/);
+  assert.match(accessContext, /financialWrites: false/);
+  assert.match(capabilityRegistry, /'financial\.write'[\s\S]*?requiredPermission: 'financial:write'/);
+  assert.doesNotMatch(boundary, /@supabase\/supabase-js|\.from\s*\(|\.rpc\s*\(|\.insert\s*\(|\.update\s*\(|\.upsert\s*\(|\.delete\s*\(|fetch\s*\(|axios|XMLHttpRequest/i);
 });
 
 test('geometria compacta preserva respiro entre atalhos em telas menores', async () => {
