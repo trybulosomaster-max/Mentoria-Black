@@ -10,7 +10,12 @@ import type {
   Database,
 } from '../../core/supabase/database.types';
 import { summarizeRealized } from '../../domain/finance/foundation-financial-read-model';
-import { currentMonthWindow, saoPauloCalendar } from '../../lib/format';
+import {
+  calendarMonthWindow,
+  currentMonthWindow,
+  saoPauloCalendar,
+  type CalendarMonth,
+} from '../../lib/format';
 import type { AccessContext } from '../../domain/foundation/access-context';
 import type { FinancialReadRepositoryPort } from '../../ports/foundation-ports';
 
@@ -71,10 +76,13 @@ async function loadAllTransactions(
   throw new Error('O período excede o limite seguro de leitura. Refine o intervalo antes de continuar.');
 }
 
-export async function loadMobileSnapshot(userId: string): Promise<MobileSnapshot> {
+export async function loadMobileSnapshotForPeriod(
+  userId: string,
+  period: CalendarMonth,
+): Promise<MobileSnapshot> {
   if (!userId) throw new Error('Usuário obrigatório para carregar dados financeiros.');
   const client = requireSupabaseClient();
-  const window = currentMonthWindow();
+  const window = calendarMonthWindow(period);
   const calendar = saoPauloCalendar();
 
   const [transactions, accountsResult, cardsResult, goalsResult, planResult] = await Promise.all([
@@ -137,8 +145,13 @@ export async function loadMobileSnapshot(userId: string): Promise<MobileSnapshot
   });
 }
 
-export const mobileFinancialReadRepository: FinancialReadRepositoryPort<MobileSnapshot> = Object.freeze({
-  async loadSnapshot(context: AccessContext) {
+export async function loadMobileSnapshot(userId: string): Promise<MobileSnapshot> {
+  const current = currentMonthWindow();
+  return loadMobileSnapshotForPeriod(userId, current);
+}
+
+export const mobileFinancialReadRepository = Object.freeze({
+  async loadSnapshot(context: AccessContext, period?: CalendarMonth) {
     if (Date.parse(context.sessionExpiresAt) <= Date.now()) {
       throw new Error('Sessão expirada. Entre novamente.');
     }
@@ -148,6 +161,7 @@ export const mobileFinancialReadRepository: FinancialReadRepositoryPort<MobileSn
     ) {
       throw new Error('Acesso compartilhado ainda não está habilitado no Mobile.');
     }
-    return loadMobileSnapshot(context.resourceOwnerId);
+    if (!period) return loadMobileSnapshot(context.resourceOwnerId);
+    return loadMobileSnapshotForPeriod(context.resourceOwnerId, period);
   },
-});
+}) satisfies FinancialReadRepositoryPort<MobileSnapshot>;

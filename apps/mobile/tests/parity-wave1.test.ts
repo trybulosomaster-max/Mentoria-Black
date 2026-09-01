@@ -20,7 +20,7 @@ test('Wave 1 permanece estritamente read-only', async () => {
 
 test('Dashboard usa componentes canônicos sem sintetizar gráfico ou valores', async () => {
   const content = await source('index.tsx');
-  for (const component of ['FinancialMetric', 'MetricGroup', 'TransactionRow']) assert.match(content, new RegExp(`<${component}\\b`));
+  for (const component of ['MonthSelector', 'DashboardHero', 'TransactionRow']) assert.match(content, new RegExp(`<${component}\\b`));
   assert.doesNotMatch(content, /<ChartCard\b/);
   assert.doesNotMatch(content, /4\.280|12\.480|7\.860|4\.620/);
 });

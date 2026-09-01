@@ -2,6 +2,7 @@ import { Tabs } from 'expo-router';
 import { type ColorValue, StyleSheet, Text, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { FinancialPeriodProvider } from '../../src/application/period/financial-period-provider';
 import { AppIcon, type AppIconName } from '../../src/design-system/icons';
 import { componentTokens, dynamicType, textStyles } from '../../src/design-system/tokens';
 import { useAvioraTheme } from '../../src/design-system/theme-provider';
@@ -24,7 +25,8 @@ export default function TabsLayout() {
 
   return (
     <AppRouteGate scope="shell">
-      <Tabs
+      <FinancialPeriodProvider>
+        <Tabs
         screenOptions={{
           headerShown: false,
           tabBarHideOnKeyboard: true,
@@ -41,13 +43,14 @@ export default function TabsLayout() {
           tabBarIconStyle: styles.tabIcon,
           sceneStyle: { backgroundColor: tokens.background.canvas },
         }}
-      >
-        <Tabs.Screen name="index" options={{ title: 'Início', tabBarIcon: icon('home'), tabBarLabel: label('Início') }} />
-        <Tabs.Screen name="lancamentos" options={{ title: 'Lançamentos', tabBarIcon: icon('transactions'), tabBarLabel: label('Lançamentos') }} />
-        <Tabs.Screen name="planejamento" options={{ title: 'Planejamento', tabBarIcon: icon('planning'), tabBarLabel: label('Planejamento') }} />
-        <Tabs.Screen name="patrimonio" options={{ title: 'Patrimônio', tabBarIcon: icon('patrimony'), tabBarLabel: label('Patrimônio') }} />
-        <Tabs.Screen name="mais" options={{ title: 'Mais', tabBarIcon: icon('more'), tabBarLabel: label('Mais') }} />
-      </Tabs>
+        >
+          <Tabs.Screen name="index" options={{ title: 'Início', tabBarIcon: icon('home'), tabBarLabel: label('Início') }} />
+          <Tabs.Screen name="lancamentos" options={{ title: 'Lançamentos', tabBarIcon: icon('transactions'), tabBarLabel: label('Lançamentos') }} />
+          <Tabs.Screen name="planejamento" options={{ title: 'Planejamento', tabBarIcon: icon('planning'), tabBarLabel: label('Planejamento') }} />
+          <Tabs.Screen name="patrimonio" options={{ title: 'Patrimônio', tabBarIcon: icon('patrimony'), tabBarLabel: label('Patrimônio') }} />
+          <Tabs.Screen name="mais" options={{ title: 'Mais', tabBarIcon: icon('more'), tabBarLabel: label('Mais') }} />
+        </Tabs>
+      </FinancialPeriodProvider>
     </AppRouteGate>
   );
 }

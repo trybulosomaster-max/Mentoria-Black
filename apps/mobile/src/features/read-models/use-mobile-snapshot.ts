@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { AccessContext } from '../../domain/foundation/access-context';
+import {
+  calendarMonthKey,
+  currentMonthWindow,
+  type CalendarMonth,
+} from '../../lib/format.ts';
 import { mobileFinancialReadRepository, type MobileSnapshot } from './mobile-read.repository.ts';
 
 type SnapshotState = Readonly<{
@@ -15,9 +20,15 @@ function emptyState(identityKey: string | null, loading: boolean): SnapshotState
   return { identityKey, data: null, loading, refreshing: false, error: '' };
 }
 
-export function useMobileSnapshot(context: AccessContext | null | undefined) {
+export function useMobileSnapshot(
+  context: AccessContext | null | undefined,
+  requestedPeriod?: CalendarMonth,
+) {
+  const current = currentMonthWindow();
+  const period = requestedPeriod ?? current;
+  const periodKey = calendarMonthKey(period);
   const identityKey = context
-    ? `${context.environment}:${context.actingUserId}:${context.resourceOwnerId}:${context.generation}`
+    ? `${context.environment}:${context.actingUserId}:${context.resourceOwnerId}:${context.generation}:${periodKey}`
     : null;
   const [state, setState] = useState<SnapshotState>(() => emptyState(identityKey, Boolean(context)));
   const activeIdentity = useRef<string | null>(identityKey);
@@ -42,7 +53,7 @@ export function useMobileSnapshot(context: AccessContext | null | undefined) {
       ? { ...current, loading: manual ? current.loading : true, refreshing: manual, error: '' }
       : emptyState(expectedIdentity, true));
     try {
-      const snapshot = await mobileFinancialReadRepository.loadSnapshot(context);
+      const snapshot = await mobileFinancialReadRepository.loadSnapshot(context, period);
       if (requestIsCurrent()) {
         setState({ identityKey: expectedIdentity, data: snapshot, loading: false, refreshing: false, error: '' });
       }
@@ -57,7 +68,7 @@ export function useMobileSnapshot(context: AccessContext | null | undefined) {
         });
       }
     }
-  }, [context, identityKey]);
+  }, [context, identityKey, period.month, period.year]);
 
   useEffect(() => {
     activeIdentity.current = identityKey;

@@ -14,6 +14,7 @@ import {
   FOUNDATION_SCHEMA_VERSION,
 } from '../src/domain/foundation/api-compatibility.ts';
 import { MemoryPrivateCache } from '../src/infrastructure/cache/memory-private-cache.ts';
+import { calendarMonthKey, type CalendarMonth } from '../src/lib/format.ts';
 
 type Deferred<T> = Readonly<{
   promise: Promise<T>;
@@ -42,10 +43,10 @@ function deferred<T>(): Deferred<T> {
   return { promise, resolve, reject };
 }
 
-function snapshot(owner: string): SyntheticSnapshot {
+function snapshot(owner: string, period: CalendarMonth = { year: 2026, month: 8 }): SyntheticSnapshot {
   return Object.freeze({
     generatedAt: `owner:${owner}`,
-    period: Object.freeze({ year: 2026, month: 8, label: 'Agosto de 2026' }),
+    period: Object.freeze({ year: period.year, month: period.month, label: calendarMonthKey(period) }),
     metrics: Object.freeze({
       realizedIncome: 0,
       realizedExpense: 0,
@@ -70,7 +71,7 @@ function snapshot(owner: string): SyntheticSnapshot {
 const pendingLoads = new Map<string, Deferred<SyntheticSnapshot>[]>();
 const loadCalls: string[] = [];
 const controlledRepository = Object.freeze({
-  loadSnapshot(context: AccessContext): Promise<SyntheticSnapshot> {
+  loadSnapshot(context: AccessContext, _period?: CalendarMonth): Promise<SyntheticSnapshot> {
     const owner = context.resourceOwnerId;
     loadCalls.push(owner);
     const request = deferred<SyntheticSnapshot>();
@@ -105,6 +106,7 @@ function context(owner: string, generation: number): AccessContext {
 type RenderEvidence = Readonly<{
   activeOwner: string | null;
   snapshotOwner: string | null;
+  snapshotPeriod: string | null;
   entitlementOwner: string | null;
   loading: boolean;
 }>;
@@ -112,15 +114,17 @@ type RenderEvidence = Readonly<{
 type ProbeProps = Readonly<{
   context: AccessContext | null;
   entitlement: IdentityBoundValue<Readonly<{ owner: string }>> | null;
+  period?: CalendarMonth;
   evidence: RenderEvidence[];
 }>;
 
-function Probe({ context: activeContext, entitlement, evidence }: ProbeProps): ReactElement | null {
-  const result = useMobileSnapshot(activeContext);
+function Probe({ context: activeContext, entitlement, period, evidence }: ProbeProps): ReactElement | null {
+  const result = useMobileSnapshot(activeContext, period);
   const entitlementValue = valueForActiveIdentity(entitlement, activeContext?.actingUserId ?? null);
   evidence.push(Object.freeze({
     activeOwner: activeContext?.actingUserId ?? null,
     snapshotOwner: result.data?.generatedAt.replace('owner:', '') ?? null,
+    snapshotPeriod: result.data ? `${result.data.period.year}-${String(result.data.period.month).padStart(2, '0')}` : null,
     entitlementOwner: entitlementValue?.owner ?? null,
     loading: result.loading,
   }));
@@ -260,6 +264,7 @@ test('React montado nunca entrega snapshot ou entitlement de A ao contexto B', a
     assert.deepEqual(evidence.at(-1), {
       activeOwner: null,
       snapshotOwner: null,
+      snapshotPeriod: null,
       entitlementOwner: null,
       loading: false,
     });
@@ -288,6 +293,39 @@ test('React montado nunca entrega snapshot ou entitlement de A ao contexto B', a
       assert.ok(frame.snapshotOwner === null || frame.snapshotOwner === frame.activeOwner);
       assert.ok(frame.entitlementOwner === null || frame.entitlementOwner === frame.activeOwner);
     }
+  } finally {
+    await act(async () => root.unmount());
+    dom.restore();
+  }
+});
+
+test('troca de período oculta sincronamente o snapshot anterior do mesmo owner', async () => {
+  pendingLoads.clear();
+  loadCalls.length = 0;
+  const dom = installMinimalDom();
+  const root = createRoot(dom.container);
+  const evidence: RenderEvidence[] = [];
+  const ownerContext = context('A', 10);
+  const entitlement = bindValueToIdentity('A', Object.freeze({ owner: 'A' }));
+  const august = Object.freeze({ year: 2026, month: 8 });
+  const september = Object.freeze({ year: 2026, month: 9 });
+
+  try {
+    await render(root, { context: ownerContext, entitlement, period: august, evidence });
+    const augustLoad = await waitForLoad('A', 0);
+    await act(async () => { augustLoad.resolve(snapshot('A', august)); await augustLoad.promise; });
+    assert.equal(evidence.at(-1)?.snapshotPeriod, '2026-08');
+
+    const beforeSeptember = evidence.length;
+    await render(root, { context: ownerContext, entitlement, period: september, evidence });
+    const septemberLoad = await waitForLoad('A', 1);
+    const transition = evidence.slice(beforeSeptember);
+    assert.ok(transition.some((frame) => frame.activeOwner === 'A' && frame.loading));
+    assert.ok(transition.every((frame) => frame.snapshotPeriod !== '2026-08'));
+
+    await act(async () => { septemberLoad.resolve(snapshot('A', september)); await septemberLoad.promise; });
+    assert.equal(evidence.at(-1)?.snapshotOwner, 'A');
+    assert.equal(evidence.at(-1)?.snapshotPeriod, '2026-09');
   } finally {
     await act(async () => root.unmount());
     dom.restore();
