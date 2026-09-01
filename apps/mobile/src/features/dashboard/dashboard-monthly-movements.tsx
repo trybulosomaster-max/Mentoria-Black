@@ -7,7 +7,6 @@ import {
   type ViewStyle,
 } from 'react-native';
 
-import { Card } from '../../design-system/components';
 import { useAvioraTheme } from '../../design-system/theme-provider';
 import {
   componentTokens,
@@ -136,14 +135,14 @@ export function DashboardMonthlyMovements({
   };
 
   return (
-    <Card tone="raised" style={styles.card}>
+    <View style={styles.section}>
       <View style={styles.header}>
         <View style={styles.headerCopy}>
           <Text accessibilityRole="header" style={styles.title}>Movimentos do mês</Text>
           <Text style={styles.subtitle}>Receitas e despesas realizadas, dia a dia</Text>
         </View>
-        <View accessible accessibilityLabel={`Dados realizados em ${periodLabel}`} style={styles.scopePill}>
-          <Text style={styles.scopeText}>Realizado</Text>
+        <View accessible accessibilityLabel={`Dados realizados em ${periodLabel}`} style={styles.scope}>
+          <Text style={styles.scopeText}>REALIZADO</Text>
         </View>
       </View>
 
@@ -205,39 +204,39 @@ export function DashboardMonthlyMovements({
           <Text style={styles.legendText}>Despesas</Text>
         </View>
       </View>
-    </Card>
+    </View>
   );
 }
 
 function createStyles(tokens: ThemeTokens) {
   return StyleSheet.create({
-    card: { gap: spacing.md, overflow: 'hidden', padding: spacing.lg },
-    header: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.sm },
-    headerCopy: { minWidth: 0, flex: 1, gap: spacing.xxs },
+    section: { gap: spacing.xl, overflow: 'hidden', paddingVertical: spacing.xl, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: tokens.border.default },
+    header: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.md },
+    headerCopy: { minWidth: 0, flex: 1, gap: spacing.xs },
     title: { ...textStyles.section, color: tokens.text.primary },
     subtitle: { ...textStyles.bodySmall, color: tokens.text.secondary },
-    scopePill: { minHeight: primitives.size.touch.minimum, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.sm, borderRadius: primitives.radius.pill, borderWidth: StyleSheet.hairlineWidth, borderColor: tokens.border.default, backgroundColor: tokens.background.surfaceMuted },
-    scopeText: { ...textStyles.caption, color: tokens.text.secondary },
-    plotGroup: { gap: spacing.xxs },
-    plot: { position: 'relative', height: PLOT_HEIGHT, overflow: 'hidden', borderRadius: primitives.radius.md, backgroundColor: tokens.background.surfaceMuted },
+    scope: { alignItems: 'flex-end', justifyContent: 'center', paddingTop: spacing.xs },
+    scopeText: { ...textStyles.caption, color: tokens.action.text, fontFamily: primitives.typography.family.uiSemiBold, letterSpacing: primitives.typography.letterSpacing.label },
+    plotGroup: { gap: spacing.xs },
+    plot: { position: 'relative', height: PLOT_HEIGHT, overflow: 'hidden' },
     gridLine: { position: 'absolute', right: 0, left: 0, height: StyleSheet.hairlineWidth, backgroundColor: tokens.chart.grid },
     gridLineTop: { top: PLOT_PADDING },
     gridLineMiddle: { top: PLOT_HEIGHT / 2 },
     gridLineBottom: { bottom: PLOT_PADDING },
     plotPoint: { position: 'absolute', width: componentTokens.dashboard.chartPointSize, height: componentTokens.dashboard.chartPointSize, borderRadius: componentTokens.dashboard.chartPointSize / 2 },
     plotPointSquare: { borderRadius: primitives.radius.none },
-    emptyPlot: { minHeight: PLOT_HEIGHT, alignItems: 'center', justifyContent: 'center', gap: spacing.xs, padding: spacing.lg, borderRadius: primitives.radius.md, backgroundColor: tokens.background.surfaceMuted },
-    hiddenPlot: { minHeight: PLOT_HEIGHT, alignItems: 'center', justifyContent: 'center', gap: spacing.xs, borderRadius: primitives.radius.md, backgroundColor: tokens.background.surfaceMuted },
+    emptyPlot: { minHeight: PLOT_HEIGHT, alignItems: 'center', justifyContent: 'center', gap: spacing.xs, padding: spacing.xl },
+    hiddenPlot: { minHeight: PLOT_HEIGHT, alignItems: 'center', justifyContent: 'center', gap: spacing.xs },
     hiddenValue: { ...textStyles.moneyL, color: tokens.text.primary, letterSpacing: primitives.typography.letterSpacing.label },
     emptyTitle: { ...textStyles.body, color: tokens.text.primary, textAlign: 'center' },
     emptyText: { ...textStyles.bodySmall, color: tokens.text.secondary, textAlign: 'center' },
-    temporalAxis: { minHeight: spacing.lg, flexDirection: 'row', alignItems: 'center', paddingHorizontal: PLOT_PADDING },
+    temporalAxis: { minHeight: spacing.xl, flexDirection: 'row', alignItems: 'center', paddingHorizontal: PLOT_PADDING },
     temporalReference: { ...textStyles.caption, flex: 1, color: tokens.text.secondary },
     temporalReferenceStart: { textAlign: 'left' },
     temporalReferenceMiddle: { textAlign: 'center' },
     temporalReferenceEnd: { textAlign: 'right' },
-    legend: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.md },
-    legendItem: { minHeight: primitives.size.touch.minimum, flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+    legend: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.xl },
+    legendItem: { minHeight: spacing.xxl, flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
     legendSquare: { width: spacing.xs + StyleSheet.hairlineWidth, height: spacing.xs + StyleSheet.hairlineWidth, borderRadius: primitives.radius.none },
     legendCircle: { width: spacing.xs + StyleSheet.hairlineWidth, height: spacing.xs + StyleSheet.hairlineWidth, borderRadius: primitives.radius.pill },
     legendText: { ...textStyles.caption, color: tokens.text.secondary },

@@ -55,7 +55,7 @@ export default function TransactionsScreen() {
   if (!data) return null;
 
   return (
-    <Screen refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { void refresh(); }} tintColor={tokens.action.primary} />}>
+    <Screen refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { void refresh(); }} tintColor={tokens.action.text} />}>
       <PageHeader eyebrow={data.period.label} title="Lançamentos" description="Seus movimentos, organizados por período." />
       {intent ? (
         <View accessibilityRole="toolbar" accessibilityLabel="Filtro recebido da Principal" style={styles.shortcutFilter}>

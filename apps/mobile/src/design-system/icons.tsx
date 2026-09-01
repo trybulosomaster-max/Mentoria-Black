@@ -25,6 +25,7 @@ export const iconMap = Object.freeze({
   'trend-down': 'trending-down-outline',
   'arrow-up': 'arrow-up-outline',
   'arrow-down': 'arrow-down-outline',
+  transfer: 'swap-horizontal-outline',
   goal: 'flag-outline',
   report: 'bar-chart-outline',
   knowledge: 'book-outline',

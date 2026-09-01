@@ -77,7 +77,7 @@ export function MonthSelector({
   const contentWidth = Math.min(width, layout.contentMaxWidth) - (layout.horizontalPadding * 2);
   const availableWidth = Math.max(280, contentWidth);
   const itemWidth = Math.max(128, Math.min(180, availableWidth * 0.38));
-  const interval = itemWidth + spacing.sm;
+  const interval = itemWidth + spacing.xs;
   const sidePadding = Math.max(0, (availableWidth - itemWidth) / 2);
 
   useEffect(() => {
@@ -188,7 +188,7 @@ export function MonthSelector({
                 onPress={() => onChange(item)}
                 style={({ pressed }) => [
                   styles.month,
-                  { width: itemWidth, marginRight: spacing.sm },
+                  { width: itemWidth, marginRight: spacing.xs },
                   selected && styles.monthSelected,
                   pressed && styles.monthPressed,
                 ]}
@@ -208,18 +208,18 @@ export function MonthSelector({
 
 function createStyles(tokens: ThemeTokens) {
   return StyleSheet.create({
-    container: { gap: spacing.sm },
+    container: { gap: spacing.xs },
     trigger: { minHeight: primitives.size.touch.comfortable, alignSelf: 'center', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, paddingHorizontal: spacing.md, borderRadius: primitives.radius.pill, borderWidth: StyleSheet.hairlineWidth, borderColor: tokens.border.default, backgroundColor: tokens.background.surface },
-    triggerEmbedded: { borderColor: primitives.color.transparent, backgroundColor: primitives.color.transparent },
+    triggerEmbedded: { borderColor: tokens.border.strong, backgroundColor: primitives.color.transparent },
     triggerPressed: { opacity: primitives.opacity.pressed },
     title: { ...textStyles.section, color: tokens.text.primary, textAlign: 'center' },
     titleYear: { ...textStyles.bodySmall, color: tokens.text.secondary },
-    month: { minHeight: primitives.size.touch.comfortable, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: primitives.radius.pill, borderWidth: primitives.size.border.thin, borderColor: tokens.border.default, backgroundColor: tokens.background.surface },
-    monthSelected: { borderWidth: primitives.size.border.strong, borderColor: tokens.action.primary, backgroundColor: tokens.background.surfaceMuted },
+    month: { minHeight: primitives.size.touch.comfortable, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderRadius: primitives.radius.pill, borderWidth: primitives.size.border.thin, borderColor: tokens.action.text, backgroundColor: tokens.action.primary },
+    monthSelected: { borderColor: tokens.action.onPrimary, backgroundColor: tokens.action.primary, ...tokens.elevation.card },
     monthPressed: { opacity: primitives.opacity.pressed },
-    monthText: { ...textStyles.body, color: tokens.text.secondary, fontFamily: primitives.typography.family.uiSemiBold, textAlign: 'center' },
-    monthTextSelected: { color: tokens.text.primary, fontFamily: primitives.typography.family.uiBold },
-    yearText: { ...textStyles.caption, color: tokens.text.secondary },
-    yearTextSelected: { color: tokens.action.text },
+    monthText: { ...textStyles.body, color: tokens.action.onPrimary, fontFamily: primitives.typography.family.uiSemiBold, textAlign: 'center' },
+    monthTextSelected: { color: tokens.action.onPrimary, fontFamily: primitives.typography.family.uiSemiBold },
+    yearText: { ...textStyles.caption, color: tokens.action.onPrimary },
+    yearTextSelected: { color: tokens.action.onPrimary },
   });
 }

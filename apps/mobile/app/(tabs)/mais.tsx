@@ -36,7 +36,7 @@ export default function MoreScreen() {
           <Text style={styles.accountName}>{String(user?.user_metadata?.full_name ?? 'Cliente AVIORA')}</Text>
           <Text style={styles.accountEmail}>{user?.email ?? 'E-mail não informado'}</Text>
           <View style={styles.badges}>
-            <StatusPill label={entitlements?.app.accessType === 'trial' ? 'Acesso temporário' : 'Acesso ativo'} tone="positive" />
+            <StatusPill label={entitlements?.app.accessType === 'trial' ? 'Acesso temporário' : 'Acesso ativo'} tone="gold" />
           </View>
         </View>
       </View>
@@ -78,10 +78,10 @@ function createStyles(tokens: ThemeTokens) {
     moduleGroup: { padding: spacing.none },
     moduleRow: { minHeight: primitives.size.touch.comfortable, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.xs },
     moduleDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: tokens.border.default },
-    moduleTitle: { ...textStyles.body, color: tokens.text.primary, fontFamily: primitives.typography.family.uiBold },
+    moduleTitle: { ...textStyles.body, color: tokens.text.primary, fontFamily: primitives.typography.family.uiSemiBold },
     infoCard: { gap: spacing.md },
     between: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
     infoLabel: { ...textStyles.bodySmall, color: tokens.text.secondary },
-    infoValue: { ...textStyles.bodySmall, flexShrink: 1, color: tokens.text.primary, fontFamily: primitives.typography.family.uiBold, textAlign: 'right' },
+    infoValue: { ...textStyles.bodySmall, flexShrink: 1, color: tokens.text.primary, fontFamily: primitives.typography.family.uiSemiBold, textAlign: 'right' },
   });
 }

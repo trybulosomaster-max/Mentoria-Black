@@ -55,6 +55,8 @@ const required = [
   'src/core/supabase/client.ts',
   'src/domain/access/access-contract.ts',
   'src/domain/finance/foundation-financial-read-model.ts',
+  'src/features/quick-actions/quick-action-contract.ts',
+  'src/features/quick-actions/quick-action-host.tsx',
   'tests/contracts.test.ts',
   'tests/web-financial-parity.test.ts',
   'tests/web-contract-parity.test.ts',
@@ -72,6 +74,7 @@ const required = [
   'tests/app-shell-auth.test.ts',
   'tests/security-guards.test.ts',
   'tests/use-mobile-snapshot.integration.test.ts',
+  'tests/quick-actions.test.ts',
 ];
 
 for (const file of required) {
@@ -133,8 +136,7 @@ const forbiddenWrites = ['.insert(', '.update(', '.upsert(', '.delete(', '.rpc('
 if (!forbiddenWrites.length) ok('gate:read-repository-has-no-write');
 else fail('gate:read-repository-has-no-write', forbiddenWrites.join(', '));
 
-const dashboardSources = combined.filter(({ file }) => file.startsWith('src/features/dashboard/'));
-const dashboardBoundaryViolations = dashboardSources.flatMap(({ file, source }) => {
+function databaseBoundaryViolations(file, source) {
   const sourceFile = ts.createSourceFile(
     file,
     source,
@@ -175,6 +177,12 @@ const dashboardBoundaryViolations = dashboardSources.flatMap(({ file, source }) 
   }
   collectDatabaseOperations(sourceFile);
   if (operations.size) violations.push(...operations);
+  return violations;
+}
+
+const dashboardSources = combined.filter(({ file }) => file.startsWith('src/features/dashboard/'));
+const dashboardBoundaryViolations = dashboardSources.flatMap(({ file, source }) => {
+  const violations = databaseBoundaryViolations(file, source);
   return violations.length ? [{ file, violations }] : [];
 });
 if (dashboardSources.length && !dashboardBoundaryViolations.length) {
@@ -185,6 +193,27 @@ if (dashboardSources.length && !dashboardBoundaryViolations.length) {
   fail(
     'gate:dashboard-read-only-boundary',
     dashboardBoundaryViolations
+      .map(({ file, violations }) => `${file}: ${violations.join(', ')}`)
+      .join(' | '),
+  );
+}
+
+const quickActionSources = combined.filter(({ file }) => (
+  file === 'app/(tabs)/_layout.tsx'
+  || file.startsWith('src/features/quick-actions/')
+));
+const quickActionBoundaryViolations = quickActionSources.flatMap(({ file, source }) => {
+  const violations = databaseBoundaryViolations(file, source);
+  return violations.length ? [{ file, violations }] : [];
+});
+if (quickActionSources.length >= 3 && !quickActionBoundaryViolations.length) {
+  ok('gate:quick-actions-read-only-boundary', `${quickActionSources.length} arquivos`);
+} else if (quickActionSources.length < 3) {
+  fail('gate:quick-actions-read-only-boundary', `escopo inesperado: ${quickActionSources.length} arquivos`);
+} else {
+  fail(
+    'gate:quick-actions-read-only-boundary',
+    quickActionBoundaryViolations
       .map(({ file, violations }) => `${file}: ${violations.join(', ')}`)
       .join(' | '),
   );

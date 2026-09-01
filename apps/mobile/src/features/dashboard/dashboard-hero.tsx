@@ -63,21 +63,22 @@ function FlowShortcut({
       onPress={onPress}
       style={({ pressed }) => [
         styles.flowShortcut,
+        !income && styles.flowShortcutMirrored,
         pressed && (reducedMotion ? styles.pressedReduced : styles.pressed),
       ]}
     >
       <View accessibilityElementsHidden style={[styles.flowIndicator, { backgroundColor: accent }]}>
         <AppIcon
           name={income ? 'arrow-up' : 'arrow-down'}
-          size={primitives.size.icon.xl}
+          size={primitives.size.icon.sm}
           color={onAccent}
         />
       </View>
-      <View style={styles.flowCopy}>
-        <Text style={styles.flowLabel}>{label}</Text>
+      <View style={[styles.flowCopy, !income && styles.flowCopyMirrored]}>
+        <Text style={[styles.flowLabel, !income && styles.flowTextMirrored]}>{label}</Text>
         <Text
           maxFontSizeMultiplier={dynamicType.moneyMaxFontSizeMultiplier}
-          style={[styles.flowValue, { color: valueColor }]}
+          style={[styles.flowValue, !income && styles.flowTextMirrored, { color: valueColor }]}
         >
           {value.text}
         </Text>
@@ -157,17 +158,20 @@ export function DashboardHero({
 
 function createStyles(tokens: ThemeTokens) {
   return StyleSheet.create({
-    hero: { alignItems: 'center', gap: spacing.md },
+    hero: { alignItems: 'center', gap: spacing.xl },
     balance: { maxWidth: '100%', alignItems: 'center', gap: spacing.xs },
     balanceLabel: { ...textStyles.bodySmall, color: tokens.text.secondary, textAlign: 'center' },
-    balanceValue: { ...textStyles.moneyXL, maxWidth: '100%', color: tokens.text.primary, textAlign: 'center' },
-    flows: { width: '100%', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.xl, paddingTop: spacing.sm },
-    flowsReflow: { flexDirection: 'column', alignItems: 'stretch', gap: spacing.sm },
-    flowShortcut: { minWidth: 0, minHeight: primitives.size.touch.comfortable, flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, paddingVertical: spacing.xs, borderRadius: primitives.radius.md },
+    balanceValue: { ...textStyles.moneyXL, maxWidth: '100%', color: tokens.text.primary, fontFamily: primitives.typography.family.uiRegular, textAlign: 'center' },
+    flows: { width: '100%', flexDirection: 'row', alignItems: 'stretch', justifyContent: 'space-between', gap: spacing.xxl, paddingTop: spacing.md },
+    flowsReflow: { flexDirection: 'column', alignItems: 'stretch', gap: spacing.md },
+    flowShortcut: { minWidth: 0, minHeight: primitives.size.touch.comfortable, flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start', gap: spacing.md, paddingVertical: spacing.xs },
+    flowShortcutMirrored: { flexDirection: 'row-reverse' },
     flowIndicator: { width: componentTokens.dashboard.flowIndicatorSize, height: componentTokens.dashboard.flowIndicatorSize, flexShrink: 0, alignItems: 'center', justifyContent: 'center', borderRadius: componentTokens.dashboard.flowIndicatorSize / 2 },
-    flowCopy: { minWidth: 0, gap: spacing.xxs },
-    flowLabel: { ...textStyles.bodySmall, color: tokens.text.secondary },
-    flowValue: { ...textStyles.moneyM, flexShrink: 1 },
+    flowCopy: { minWidth: 0, flex: 1, justifyContent: 'center', gap: primitives.space.none },
+    flowCopyMirrored: { alignItems: 'flex-end' },
+    flowTextMirrored: { textAlign: 'right' },
+    flowLabel: { ...textStyles.bodySmall, color: tokens.text.secondary, fontFamily: primitives.typography.family.uiRegular },
+    flowValue: { ...textStyles.moneyM, flexShrink: 1, color: tokens.text.primary, fontSize: primitives.typography.size.section, letterSpacing: -0.2 },
     pressed: { opacity: primitives.opacity.pressed, transform: [{ scale: primitives.motion.pressedScale }] },
     pressedReduced: { opacity: primitives.opacity.pressed },
   });

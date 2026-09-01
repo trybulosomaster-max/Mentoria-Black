@@ -71,7 +71,7 @@ function createStyles(tokens: ThemeTokens) { return StyleSheet.create({
   content: { justifyContent: 'center', minHeight: '100%', maxWidth: componentTokens.screen.readableMaxWidth, width: '100%', alignSelf: 'center' },
   brand: { alignItems: 'center' },
   card: { gap: spacing.xs },
-  cardTitle: { ...textStyles.body, color: tokens.text.primary, fontFamily: primitives.typography.family.uiExtraBold },
+  cardTitle: { ...textStyles.body, color: tokens.text.primary, fontFamily: primitives.typography.family.uiSemiBold },
   cardText: { ...textStyles.bodySmall, color: tokens.text.secondary },
   actions: { gap: spacing.sm },
 }); }

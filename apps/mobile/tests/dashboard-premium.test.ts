@@ -11,6 +11,7 @@ import {
   transactionMatchesDashboardFlow,
 } from '../src/features/dashboard/dashboard-contract.ts';
 import { buildDashboardPeriodReadModel } from '../src/features/dashboard/dashboard-read-model.ts';
+import { primitives } from '../src/design-system/tokens.ts';
 import {
   calendarMonthKey,
   calendarMonthLabel,
@@ -124,7 +125,11 @@ test('filtro de atalho usa o mesmo efeito financeiro realizado do agregado', () 
 });
 
 test('ocultação remove o valor tanto do texto quanto do rótulo acessível', () => {
+  const visible = financialValuePresentation('R$ 1.234,56', true);
+  const zero = financialValuePresentation('R$ 0,00', true);
   const hidden = financialValuePresentation('R$ 9.876,54', false);
+  assert.deepEqual(visible, { text: 'R$ 1.234,56', accessibilityLabel: 'R$ 1.234,56' });
+  assert.deepEqual(zero, { text: 'R$ 0,00', accessibilityLabel: 'R$ 0,00' });
   assert.equal(hidden.text, '••••••');
   assert.equal(hidden.accessibilityLabel, 'Valor oculto');
   assert.doesNotMatch(`${hidden.text}:${hidden.accessibilityLabel}`, /9\.876|9876/);
@@ -277,12 +282,27 @@ test('topo integra mês, saldo e Receita/Despesa acionáveis numa superfície ú
   assert.match(hero, /tokens\.status\.onPositive/);
   assert.match(hero, /tokens\.status\.onRisk/);
   assert.match(hero, /styles\.flowIndicator/);
+  assert.match(hero, /size=\{primitives\.size\.icon\.sm\}/);
+  assert.match(hero, /flowIndicatorSize/);
+  assert.match(hero, /flowLabel: \{[^\n]*textStyles\.bodySmall[^\n]*uiRegular/);
+  assert.match(hero, /flowValue: \{[^\n]*textStyles\.moneyM[^\n]*fontSize: primitives\.typography\.size\.section/);
+  assert.doesNotMatch(hero, /flowShortcut: \{[^\n]*(?:backgroundColor|borderWidth|borderColor)/);
+  assert.match(hero, /!income && styles\.flowShortcutMirrored/);
+  assert.match(hero, /!income && styles\.flowCopyMirrored/);
+  assert.match(hero, /!income && styles\.flowTextMirrored/);
+  assert.match(hero, /flowShortcutMirrored: \{ flexDirection: 'row-reverse' \}/);
+  assert.match(hero, /flowCopyMirrored: \{ alignItems: 'flex-end' \}/);
+  assert.match(hero, /flowTextMirrored: \{ textAlign: 'right' \}/);
+  assert.match(hero, /flowIndicator: \{[^\n]*alignItems: 'center'[^\n]*justifyContent: 'center'/);
   assert.match(hero, /accessibilityElementsHidden/);
   assert.doesNotMatch(hero, /<Card\b|<Image\b|<LinearGradient\b/);
   assert.doesNotMatch(hero, /currencyGlyph|flowRing|flowArrowMask|allowFontScaling=\{false\}/);
   assert.doesNotMatch(hero, /Desempenho positivo|Controle de gastos|Ao vivo/);
   assert.equal((hero.match(/<FlowShortcut\b/g) ?? []).length, 2);
   assert.match(dashboard, /contentStyle=\{styles\.screenContent\}/);
+  assert.match(dashboard, /edgeToEdgeTop/);
+  assert.match(dashboard, /useSafeAreaInsets\(\)/);
+  assert.match(dashboard, /paddingTop: insets\.top \+ spacing\.xl/);
   assert.match(dashboard, /<View style=\{\[styles\.topPanel/);
   assert.match(dashboard, /<LinearGradient/);
   assert.match(dashboard, /embedded/);
@@ -307,11 +327,49 @@ test('composição analítica usa série canônica, equivalente acessível e lis
   assert.match(chart, /Sem série realizada neste período/);
   assert.match(chart, /Valores do gráfico ocultos/);
   assert.doesNotMatch(chart, /Math\.random|fixture|mock|8\.193|8\.154|38,55/);
-  assert.equal((activity.match(/<Card\b/g) ?? []).length, 2);
+  assert.equal((chart.match(/<Card\b/g) ?? []).length, 0);
+  assert.equal((activity.match(/<Card\b/g) ?? []).length, 0);
+  assert.match(chart, /borderTopWidth: StyleSheet\.hairlineWidth/);
+  assert.match(activity, /borderTopWidth: StyleSheet\.hairlineWidth/);
+  assert.doesNotMatch(activity, /headerIcon: \{[^\n]*borderWidth|rowGlyph: \{[^\n]*borderWidth/);
   assert.match(activity, /breakpoints\.mediumMin/);
   assert.match(activity, /Programados do período/);
   assert.match(activity, /Movimentos recentes/);
   assert.match(activity, /financialValuePresentation/);
   assert.match(readModel, /financialEffect\(transaction, \{ now: today \}\)/);
   assert.doesNotMatch(readModel, /Math\.random|fixture|mock/);
+});
+
+test('Principal aplica redução visual, espaçamento múltiplo de 8 e ícones lineares de 20 a 24 px', async () => {
+  const [dashboard, hero, selector, chart, activity] = await Promise.all([
+    source('app/(tabs)/index.tsx'),
+    source('src/features/dashboard/dashboard-hero.tsx'),
+    source('src/features/dashboard/month-selector.tsx'),
+    source('src/features/dashboard/dashboard-monthly-movements.tsx'),
+    source('src/features/dashboard/dashboard-activity.tsx'),
+  ]);
+  const combined = [dashboard, hero, selector, chart, activity].join('\n');
+  assert.doesNotMatch(combined, /spacing\.(?:xxs|sm|lg)/);
+  for (const match of combined.matchAll(/(?:gap|padding(?:Horizontal|Vertical|Top|Bottom|Left|Right)?|margin(?:Horizontal|Vertical|Top|Bottom|Left|Right)?):\s*(\d+)/g)) {
+    assert.equal(Number(match[1]) % 8, 0, `${match[0]} precisa respeitar a escala de 8`);
+  }
+  for (const token of ['none', 'xs', 'md', 'xl', 'xxl'] as const) {
+    assert.equal(primitives.space[token] % 8, 0);
+  }
+  assert.doesNotMatch(combined, /primitives\.size\.icon\.(?:xs|lg|xl)/);
+  for (const icon of combined.matchAll(/<AppIcon\b[\s\S]*?\/>/g)) {
+    assert.match(icon[0], /size=\{primitives\.size\.icon\.(?:sm|md)\}/);
+  }
+  assert.doesNotMatch(combined, /uiBold|uiExtraBold|fontWeight/);
+  assert.match(hero, /size=\{primitives\.size\.icon\.sm\}/);
+  assert.match(activity, /size=\{primitives\.size\.icon\.sm\}/);
+  assert.match(selector, /triggerEmbedded: \{ borderColor: tokens\.border\.strong/);
+  assert.match(selector, /month: \{[^\n]*borderColor: tokens\.action\.text[^\n]*backgroundColor: tokens\.action\.primary/);
+  assert.match(selector, /monthSelected: \{[^\n]*borderColor: tokens\.action\.onPrimary[^\n]*backgroundColor: tokens\.action\.primary[^\n]*\.\.\.tokens\.elevation\.card/);
+  assert.match(selector, /monthText: \{[^\n]*color: tokens\.action\.onPrimary/);
+  assert.match(selector, /yearText: \{[^\n]*color: tokens\.action\.onPrimary/);
+  assert.doesNotMatch(selector, /month(?:Selected)?: \{[^\n]*LinearGradient|month(?:Selected)?: \{[^\n]*gradient/);
+  assert.match(hero, /balanceValue: \{[^\n]*fontFamily: primitives\.typography\.family\.uiRegular/);
+  assert.doesNotMatch(chart, /scopePill|tone="raised"/);
+  assert.doesNotMatch(activity, /tone="raised"/);
 });

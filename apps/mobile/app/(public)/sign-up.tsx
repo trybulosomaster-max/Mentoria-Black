@@ -120,7 +120,7 @@ function createStyles(tokens: ThemeTokens) { return StyleSheet.create({
   terms: { minHeight: touch.comfortable, flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, paddingVertical: spacing.xs },
   pressed: { opacity: primitives.opacity.pressed },
   checkbox: { width: primitives.size.icon.md, height: primitives.size.icon.md, borderRadius: primitives.radius.sm, borderWidth: primitives.size.border.thin, borderColor: tokens.border.strong, alignItems: 'center', justifyContent: 'center' },
-  checkboxChecked: { backgroundColor: tokens.action.primary, borderColor: tokens.action.primary },
+  checkboxChecked: { backgroundColor: tokens.action.primary, borderColor: tokens.action.text },
   checkboxFocused: { borderColor: tokens.focus.ring, borderWidth: primitives.size.border.strong },
   termsText: { ...textStyles.bodySmall, flex: 1, color: tokens.text.secondary },
 }); }

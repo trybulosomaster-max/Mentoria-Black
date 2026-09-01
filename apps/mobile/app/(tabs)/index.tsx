@@ -2,6 +2,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useFinancialPeriod } from '../../src/application/period/financial-period-provider';
 import { useAuth } from '../../src/core/auth/AuthProvider';
@@ -22,6 +23,7 @@ export default function DashboardScreen() {
   const { period, setPeriod } = useFinancialPeriod();
   const { accessContext } = useAuth();
   const { data, loading, refreshing, error, refresh } = useMobileSnapshot(accessContext, period);
+  const insets = useSafeAreaInsets();
   const layout = useResponsiveLayout();
   const { tokens } = useAvioraTheme();
   const styles = useMemo(() => createStyles(tokens), [tokens]);
@@ -65,9 +67,10 @@ export default function DashboardScreen() {
   return (
     <Screen
       contentStyle={styles.screenContent}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { void refresh(); }} tintColor={tokens.action.primary} />}
+      edgeToEdgeTop
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { void refresh(); }} tintColor={tokens.action.text} />}
     >
-      <View style={[styles.topPanel, { paddingHorizontal: layout.horizontalPadding }]}>
+      <View style={[styles.topPanel, { paddingHorizontal: layout.horizontalPadding, paddingTop: insets.top + spacing.xl }]}>
         <LinearGradient
           colors={[tokens.background.surface, tokens.background.surfaceMuted]}
           end={{ x: 0.85, y: 1 }}
@@ -117,10 +120,10 @@ export default function DashboardScreen() {
 
 function createStyles(tokens: ThemeTokens) {
   return StyleSheet.create({
-    screenContent: { gap: primitives.space.none, paddingTop: primitives.space.none, paddingHorizontal: primitives.space.none },
-    topPanel: { position: 'relative', overflow: 'hidden', gap: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.xl, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: tokens.border.default, borderBottomLeftRadius: primitives.radius.xl, borderBottomRightRadius: primitives.radius.xl, backgroundColor: tokens.background.surface },
+    screenContent: { gap: primitives.space.none, paddingTop: primitives.space.none, paddingHorizontal: primitives.space.none, backgroundColor: tokens.background.canvas },
+    topPanel: { position: 'relative', overflow: 'hidden', gap: spacing.xl, paddingBottom: spacing.xxl, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: tokens.border.default, borderBottomLeftRadius: primitives.radius.xl, borderBottomRightRadius: primitives.radius.xl, backgroundColor: tokens.background.surface },
     topPanelBackdrop: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 },
-    body: { gap: spacing.md, paddingTop: spacing.md },
-    updated: { ...textStyles.caption, alignSelf: 'center', color: tokens.text.secondary, textAlign: 'center' },
+    body: { gap: primitives.space.none, paddingTop: spacing.md },
+    updated: { ...textStyles.caption, alignSelf: 'center', color: tokens.text.secondary, paddingVertical: spacing.xl, textAlign: 'center' },
   });
 }

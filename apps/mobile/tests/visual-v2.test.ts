@@ -51,24 +51,86 @@ test('preferência Light anterior migra para Sereno sem introduzir tema legado',
   assert.equal(migrateThemePreference('unknown'), null);
 });
 
-test('tokens A e C preservam o freeze e B materializa Branco Executivo', () => {
+test('tokens A, B e C materializam a direção private banking aprovada', () => {
   assert.equal(themeTokens.serene.id, 'aviora-light-a');
-  assert.equal(themeTokens.serene.background.canvas, '#F7F3EC');
-  assert.equal(themeTokens.serene.background.surface, '#FFFCF7');
-  assert.equal(themeTokens.serene.text.primary, '#17212B');
-  assert.equal(themeTokens.serene.brand.accent, '#C4A56B');
+  assert.equal(themeTokens.serene.background.canvas, '#F4EFE6');
+  assert.equal(themeTokens.serene.background.surface, '#FCFAF6');
+  assert.equal(themeTokens.serene.text.primary, '#252722');
+  assert.equal(themeTokens.serene.brand.accent, '#C9A127');
   assert.equal(themeTokens.white.id, 'aviora-white-b');
-  assert.equal(themeTokens.white.background.canvas, '#FEFDFC');
+  assert.equal(themeTokens.white.background.canvas, '#FAFAF8');
   assert.equal(themeTokens.white.background.surface, '#FFFFFF');
-  assert.equal(themeTokens.white.text.primary, '#263543');
-  assert.equal(themeTokens.white.status.positive, '#277F84');
-  assert.equal(themeTokens.white.status.risk, '#C66A5D');
-  assert.equal(themeTokens.white.chart.projected, '#6B5AA7');
+  assert.equal(themeTokens.white.text.primary, '#1E2420');
+  assert.equal(themeTokens.white.status.positive, '#17654D');
+  assert.equal(themeTokens.white.status.risk, '#A34349');
+  assert.equal(themeTokens.white.chart.projected, '#9A753F');
   assert.equal(themeTokens.dark.id, 'aviora-dark-c');
-  assert.equal(themeTokens.dark.background.canvas, '#0E1822');
-  assert.equal(themeTokens.dark.background.surface, '#152635');
-  assert.equal(themeTokens.dark.text.primary, '#E7E0D5');
-  assert.equal(themeTokens.dark.brand.accent, '#C4A56B');
+  assert.deepEqual(Object.values(themeTokens.dark.background), ['#0D0D0D', '#181818', '#242424']);
+  assert.equal(themeTokens.dark.text.primary, '#F0ECE3');
+  assert.equal(themeTokens.dark.brand.accent, '#C9A127');
+  assert.equal(themeTokens.dark.action.primary, '#C9A127');
+  assert.equal(themeTokens.dark.status.info, '#A0A09A');
+  assert.equal(themeTokens.dark.focus.ring, '#C9A127');
+});
+
+test('dourado AVIORA governa identidade e verde permanece semântico', async () => {
+  assert.deepEqual(themeTokens.serene.action, { primary: '#C9A127', onPrimary: '#0D0D0D', text: '#765B2D' });
+  assert.deepEqual(themeTokens.white.action, { primary: '#C9A127', onPrimary: '#0D0D0D', text: '#705426' });
+  assert.deepEqual(themeTokens.dark.action, { primary: '#C9A127', onPrimary: '#0D0D0D', text: '#C9A127' });
+  assert.deepEqual(
+    [themeTokens.serene.brand.accent, themeTokens.white.brand.accent, themeTokens.dark.brand.accent],
+    ['#C9A127', '#C9A127', '#C9A127'],
+  );
+
+  assert.deepEqual(
+    [themeTokens.serene.navigation.selected, themeTokens.white.navigation.selected, themeTokens.dark.navigation.selected],
+    ['#765B2D', '#705426', '#C9A127'],
+  );
+  assert.deepEqual(
+    [themeTokens.serene.focus.ring, themeTokens.white.focus.ring, themeTokens.dark.focus.ring],
+    ['#765B2D', '#705426', '#C9A127'],
+  );
+  assert.deepEqual(
+    [themeTokens.serene.chart.actual, themeTokens.white.chart.actual, themeTokens.dark.chart.actual],
+    ['#765B2D', '#705426', '#C9A127'],
+  );
+
+  for (const tokens of [themeTokens.serene, themeTokens.white, themeTokens.dark]) {
+    assert.notEqual(tokens.action.primary, tokens.status.positive, `${tokens.id}: ação não pode reutilizar o verde de Receita`);
+    assert.notEqual(tokens.action.text, tokens.status.positiveText, `${tokens.id}: destaque institucional não pode reutilizar o verde positivo`);
+    assert.notEqual(tokens.navigation.selected, tokens.status.positiveText, `${tokens.id}: navegação ativa não pode reutilizar o verde positivo`);
+    assert.notEqual(tokens.focus.ring, tokens.status.positiveText, `${tokens.id}: foco não pode reutilizar o verde positivo`);
+    assert.notEqual(tokens.chart.actual, tokens.status.positiveText, `${tokens.id}: Realizado não pode reutilizar o verde de Receita`);
+    assert.notEqual(tokens.action.primary, tokens.status.risk, `${tokens.id}: ação institucional não pode reutilizar vermelho`);
+  }
+
+  const [tabs, quickActions, activity, more, patrimony, nativeConfig] = await Promise.all([
+    readFile(new URL('../app/(tabs)/_layout.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('../src/features/quick-actions/quick-action-host.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('../src/features/dashboard/dashboard-activity.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('../app/(tabs)/mais.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('../app/(tabs)/patrimonio.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('../app.config.ts', import.meta.url), 'utf8'),
+  ]);
+  assert.match(tabs, /tabBarActiveTintColor: tokens\.navigation\.selected/);
+  assert.match(quickActions, /backgroundColor: tokens\.action\.primary/);
+  assert.match(quickActions, /return tokens\.action\.text/);
+  assert.doesNotMatch(quickActions, /return tokens\.status\.info/);
+  assert.match(activity, /name="transactions"[^>]*color=\{tokens\.action\.text\}/);
+  assert.match(more, /Acesso ativo[^\n]*tone="gold"/);
+  assert.match(patrimony, /statusTone=\{account\.statement_balance === null \? 'warning' : 'gold'\}/);
+  assert.equal((nativeConfig.match(/#0D0D0D/g) ?? []).length, 3);
+  assert.doesNotMatch(nativeConfig, /#0E1822/i);
+});
+
+test('Noite Executiva usa três níveis de grafite neutro sem base azul', () => {
+  const levels = Object.values(themeTokens.dark.background);
+  const channels = levels.map((hex) => hex.slice(1).match(/.{2}/g)!.map((value) => Number.parseInt(value, 16)));
+  for (const [red, green, blue] of channels) {
+    assert.equal(Math.max(red!, green!, blue!) - Math.min(red!, green!, blue!), 0, `${red},${green},${blue} não é grafite RGB neutro`);
+  }
+  assert.ok(relativeLuminance(levels[0]!) < relativeLuminance(levels[1]!));
+  assert.ok(relativeLuminance(levels[1]!) < relativeLuminance(levels[2]!));
 });
 
 test('A, B e C mantêm a mesma estrutura sem árvore temática paralela', () => {
@@ -104,8 +166,8 @@ test('ações, controles, foco, seleção e séries essenciais preservam 3:1', (
     for (const [surface, background] of surfaces) {
       assertContrastAtLeast(`${tokens.id}: limite forte/${surface}`, tokens.border.strong, background, 3);
       assertContrastAtLeast(`${tokens.id}: foco/${surface}`, tokens.focus.ring, background, 3);
-      assertContrastAtLeast(`${tokens.id}: ação preenchida/${surface}`, tokens.action.primary, background, 3);
-      assertContrastAtLeast(`${tokens.id}: seleção/${surface}`, tokens.action.primary, background, 3);
+      assertContrastAtLeast(`${tokens.id}: limite de ação preenchida/${surface}`, tokens.action.text, background, 3);
+      assertContrastAtLeast(`${tokens.id}: seleção/${surface}`, tokens.action.text, background, 3);
       assertContrastAtLeast(`${tokens.id}: borda positiva/${surface}`, tokens.status.positive, background, 3);
       assertContrastAtLeast(`${tokens.id}: borda negativa/${surface}`, tokens.status.risk, background, 3);
       assertContrastAtLeast(`${tokens.id}: borda de aviso/${surface}`, tokens.status.warning, background, 3);
@@ -127,9 +189,9 @@ test('dourado decorativo não é reutilizado como texto ou ação incompatível'
   assert.match(components, /button_primary: \{ backgroundColor: tokens\.action\.primary/);
   assert.match(components, /eyebrow: \{[^\n]*color: tokens\.action\.text/);
   assert.match(components, /pillText_gold: \{ color: tokens\.action\.text/);
-  assert.match(components, /filterChipSelected: \{ borderColor: tokens\.action\.primary/);
+  assert.match(components, /filterChipSelected: \{ borderColor: tokens\.action\.text/);
   assert.match(financial, /metricTone_brand: \{ color: tokens\.action\.text/);
-  assert.match(financial, /themeRowSelected: \{ borderColor: tokens\.action\.primary/);
+  assert.match(financial, /themeRowSelected: \{ borderColor: tokens\.action\.text/);
   assert.doesNotMatch(components, /button_primary: \{[^\n]*tokens\.brand\.accent/);
   assert.doesNotMatch(components, /eyebrow: \{[^\n]*tokens\.brand\.accent/);
 });

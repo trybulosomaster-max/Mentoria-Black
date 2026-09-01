@@ -20,7 +20,7 @@ export function BootstrapExperience({ state, message, onRetry }: Props) {
     <Screen variant="auth" scroll={false} contentStyle={styles.content} testID="bootstrap-experience">
       <BrandMark />
       <View accessibilityLiveRegion="polite" style={styles.status}>
-        {!failed ? <ActivityIndicator size="large" color={tokens.action.primary} /> : null}
+        {!failed ? <ActivityIndicator size="large" color={tokens.action.text} /> : null}
         <Text accessibilityRole="header" style={styles.title}>
           {failed ? 'Não foi possível iniciar' : 'Preparando sua AVIORA'}
         </Text>

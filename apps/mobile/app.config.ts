@@ -19,7 +19,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   splash: {
     image: './assets/splash-icon.png',
     resizeMode: 'contain',
-    backgroundColor: '#0E1822',
+    backgroundColor: '#0D0D0D',
   },
   ios: {
     supportsTablet: true,
@@ -32,7 +32,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     package: ANDROID_PACKAGE,
     adaptiveIcon: {
       foregroundImage: './assets/adaptive-icon.png',
-      backgroundColor: '#0E1822',
+      backgroundColor: '#0D0D0D',
     },
     edgeToEdgeEnabled: true,
     predictiveBackGestureEnabled: true,
@@ -43,7 +43,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     [
       'expo-splash-screen',
       {
-        backgroundColor: '#0E1822',
+        backgroundColor: '#0D0D0D',
         image: './assets/splash-icon.png',
         imageWidth: 180,
       },

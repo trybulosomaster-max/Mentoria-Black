@@ -9,6 +9,7 @@ import {
   primitives,
   semantic,
   textStyles,
+  themeTokens,
 } from '../src/design-system/tokens.ts';
 import {
   resolveResponsiveLayout,
@@ -17,15 +18,23 @@ import {
 
 test('expõe as três camadas obrigatórias de tokens', () => {
   assert.deepEqual(Object.keys(primitives.color).slice(0, 6), ['neutral', 'gold', 'green', 'red', 'yellow', 'blue']);
-  assert.equal(semantic.bg.base, '#0E1822');
-  assert.equal(semantic.action.primary, primitives.color.gold[500]);
+  assert.equal(semantic.bg.base, themeTokens.dark.background.canvas);
+  assert.equal(semantic.action.primary, themeTokens.dark.action.primary);
   assert.ok(componentTokens.button.minHeight >= 44);
   assert.ok(componentTokens.iconButton.size >= 44);
   assert.ok(componentTokens.input.minHeight >= 44);
 });
 
 test('congela tipografia escalável e números tabulares', () => {
-  assert.match(String(textStyles.body.fontFamily), /^Inter_/);
+  assert.deepEqual(
+    Object.keys(primitives.typography.family).filter((family) => family.startsWith('ui')),
+    ['uiRegular', 'uiSemiBold'],
+  );
+  assert.equal(textStyles.body.fontFamily, 'Inter_400Regular');
+  assert.equal(textStyles.caption.fontFamily, 'Inter_400Regular');
+  assert.equal(textStyles.title.fontFamily, 'Inter_600SemiBold');
+  assert.equal(textStyles.section.fontFamily, 'Inter_600SemiBold');
+  assert.equal(textStyles.moneyM.fontFamily, 'Inter_600SemiBold');
   assert.match(String(textStyles.brand.fontFamily), /^Syncopate_/);
   assert.deepEqual(textStyles.moneyM.fontVariant, ['tabular-nums']);
   assert.equal(dynamicType.enabled, true);
@@ -49,6 +58,11 @@ test('mantém o contrato canônico de ícones vetoriais', async () => {
     assert.match(source, new RegExp(`\\b${name}:|'${name}':`));
   }
   assert.match(source, /@expo\/vector-icons\/Ionicons/);
+  for (const icon of ['eye', 'eye-off', 'trend-up', 'trend-down', 'arrow-up', 'arrow-down', 'calendar']) {
+    assert.match(source, new RegExp(`(?:${icon}:|'${icon}':) '[^']+-outline'`));
+  }
+  assert.equal(primitives.size.icon.sm, 20);
+  assert.equal(primitives.size.icon.md, 24);
 });
 
 test('expõe Screen variants e todos os componentes fundamentais', async () => {
@@ -57,6 +71,7 @@ test('expõe Screen variants e todos os componentes fundamentais', async () => {
   for (const component of ['AppButton', 'IconButton', 'TextField', 'SearchField', 'Card', 'MetricCard', 'StatusPill', 'FilterChip', 'InlineNotice', 'StateView', 'Divider', 'PageHeader', 'SectionTitle', 'ProgressBar', 'BottomSheet', 'Dialog']) {
     assert.match(source, new RegExp(`export (?:function|const) ${component}\\b`));
   }
+  assert.match(source, /edgeToEdgeTop \? \['left', 'right'\] : \['top', 'left', 'right'\]/);
   assert.doesNotMatch(source, /<Text\b[^>]*\bonPress=/);
   assert.doesNotMatch(source, /<AppIcon\b[^>]*accessibilityLabel=\{tone\}/);
 });

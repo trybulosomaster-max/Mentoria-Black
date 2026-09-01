@@ -3,8 +3,6 @@ import 'react-native-gesture-handler';
 import {
   Inter_400Regular,
   Inter_600SemiBold,
-  Inter_700Bold,
-  Inter_800ExtraBold,
   useFonts,
 } from '@expo-google-fonts/inter';
 import { Syncopate_400Regular, Syncopate_700Bold } from '@expo-google-fonts/syncopate';
@@ -54,8 +52,6 @@ export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
     Inter_400Regular,
     Inter_600SemiBold,
-    Inter_700Bold,
-    Inter_800ExtraBold,
     Syncopate_400Regular,
     Syncopate_700Bold,
   });

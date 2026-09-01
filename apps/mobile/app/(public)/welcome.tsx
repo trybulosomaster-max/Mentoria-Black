@@ -79,7 +79,7 @@ function createStyles(tokens: ThemeTokens) { return StyleSheet.create({
   benefit: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
   bullet: { width: spacing.xs, height: spacing.xs, borderRadius: primitives.radius.pill, backgroundColor: tokens.brand.accent, marginTop: primitives.radius.xs },
   benefitCopy: { flex: 1, gap: spacing.xxs },
-  benefitTitle: { ...textStyles.body, color: tokens.text.primary, fontFamily: primitives.typography.family.uiExtraBold },
+  benefitTitle: { ...textStyles.body, color: tokens.text.primary, fontFamily: primitives.typography.family.uiSemiBold },
   benefitDescription: { ...textStyles.bodySmall, color: tokens.text.secondary },
   actions: { gap: spacing.sm },
   footnote: { ...textStyles.caption, color: tokens.text.secondary, textAlign: 'center' },

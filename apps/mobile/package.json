@@ -24,9 +24,10 @@
     "test:analytics-foundation": "node --experimental-strip-types --test tests/analytics-foundation.test.ts",
     "test:parity-wave1": "node --experimental-strip-types --test tests/parity-wave1.test.ts",
     "test:dashboard-premium": "node --experimental-strip-types --test tests/dashboard-premium.test.ts",
+    "test:quick-actions": "node --experimental-strip-types --test tests/quick-actions.test.ts",
     "validate:source": "node scripts/validate-deliverable.mjs",
     "validate:design-system": "node scripts/validate-design-system.mjs",
-    "check": "npm run validate:source && npm run validate:design-system && npm run typecheck:contracts && npm run test:contracts && npm run test:foundation-core && npm run test:app-shell-auth && npm run test:security-guards && npm run test:identity-isolation && npm run test:design-system && npm run test:visual-v2 && npm run test:analytics-foundation && npm run test:parity-wave1 && npm run test:dashboard-premium && npm run test:parity && npm run typecheck",
+    "check": "npm run validate:source && npm run validate:design-system && npm run typecheck:contracts && npm run test:contracts && npm run test:foundation-core && npm run test:app-shell-auth && npm run test:security-guards && npm run test:identity-isolation && npm run test:design-system && npm run test:visual-v2 && npm run test:analytics-foundation && npm run test:parity-wave1 && npm run test:dashboard-premium && npm run test:quick-actions && npm run test:parity && npm run typecheck",
     "test:parity": "node --experimental-strip-types --test tests/web-financial-parity.test.ts tests/web-contract-parity.test.ts"
   },
   "dependencies": {

@@ -19,7 +19,7 @@ export default function NetWorthScreen() {
   if (!data) return null;
 
   return (
-    <Screen refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { void refresh(); }} tintColor={tokens.action.primary} />}>
+    <Screen refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { void refresh(); }} tintColor={tokens.action.text} />}>
       <PageHeader eyebrow={data.period.label} title="Patrimônio" description="Contas, cartões e metas em uma visão clara." />
       <Text style={styles.contextNote}><Text style={styles.contextNoteStrong}>Visão atual. </Text>Apenas saldos confirmados entram no total; limites de cartão aparecem separadamente.</Text>
 
@@ -29,7 +29,7 @@ export default function NetWorthScreen() {
       </MetricGroup>
 
       <SectionTitle title={`Contas (${data.accounts.length})`} />
-      {data.accounts.length ? data.accounts.map((account) => <AssetRow key={account.id} icon="wallet" title={account.name} subtitle={account.institution || account.account_type || 'Conta'} value={account.statement_balance === null ? 'Não informado' : formatMoney(account.statement_balance)} status={account.balance_as_of ? `Atualizado em ${formatDate(account.balance_as_of)}` : 'Sem atualização recente'} statusTone={account.statement_balance === null ? 'warning' : 'positive'} />) : <EmptyBlock title="Nenhuma conta disponível." message="Suas contas aparecerão aqui quando estiverem disponíveis." styles={styles} />}
+      {data.accounts.length ? data.accounts.map((account) => <AssetRow key={account.id} icon="wallet" title={account.name} subtitle={account.institution || account.account_type || 'Conta'} value={account.statement_balance === null ? 'Não informado' : formatMoney(account.statement_balance)} status={account.balance_as_of ? `Atualizado em ${formatDate(account.balance_as_of)}` : 'Sem atualização recente'} statusTone={account.statement_balance === null ? 'warning' : 'gold'} />) : <EmptyBlock title="Nenhuma conta disponível." message="Suas contas aparecerão aqui quando estiverem disponíveis." styles={styles} />}
 
       <SectionTitle title={`Cartões cadastrados (${data.cards.length})`} />
       {data.cards.length ? data.cards.map((card) => <AssetRow key={card.id} icon="card" title={card.name} subtitle={[card.institution, card.brand].filter(Boolean).join(' • ') || 'Cartão'} value={formatMoney(card.limit)} status={`Limite configurado • fecha dia ${card.closing_day ?? '—'} • vence dia ${card.due_day ?? '—'}`} statusTone="neutral" />) : <EmptyBlock title="Nenhum cartão disponível." message="Seus cartões aparecerão aqui quando estiverem disponíveis." styles={styles} />}
@@ -49,8 +49,8 @@ function EmptyBlock({ title, message, styles }: { title: string; message: string
 
 function createStyles(tokens: ThemeTokens) {
   return StyleSheet.create({
-    contextNote: { ...textStyles.bodySmall, color: tokens.text.secondary, paddingHorizontal: spacing.xs }, contextNoteStrong: { color: tokens.text.primary, fontFamily: primitives.typography.family.uiBold },
-    goalCard: { gap: spacing.sm }, goalTitle: { ...textStyles.body, color: tokens.text.primary, fontFamily: primitives.typography.family.uiBold }, goalMeta: { ...textStyles.caption, color: tokens.text.secondary },
-    emptyTitle: { ...textStyles.body, color: tokens.text.primary, fontFamily: primitives.typography.family.uiBold, textAlign: 'center' }, emptyText: { ...textStyles.bodySmall, color: tokens.text.secondary, textAlign: 'center', marginTop: spacing.xs },
+    contextNote: { ...textStyles.bodySmall, color: tokens.text.secondary, paddingHorizontal: spacing.xs }, contextNoteStrong: { color: tokens.text.primary, fontFamily: primitives.typography.family.uiSemiBold },
+    goalCard: { gap: spacing.sm }, goalTitle: { ...textStyles.body, color: tokens.text.primary, fontFamily: primitives.typography.family.uiSemiBold }, goalMeta: { ...textStyles.caption, color: tokens.text.secondary },
+    emptyTitle: { ...textStyles.body, color: tokens.text.primary, fontFamily: primitives.typography.family.uiSemiBold, textAlign: 'center' }, emptyText: { ...textStyles.bodySmall, color: tokens.text.secondary, textAlign: 'center', marginTop: spacing.xs },
   });
 }

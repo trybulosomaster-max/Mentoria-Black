@@ -49,6 +49,7 @@ type ScreenProps = PropsWithChildren<{
   keyboardAware?: boolean;
   refreshControl?: ReactElement<RefreshControlProps>;
   contentStyle?: StyleProp<ViewStyle>;
+  edgeToEdgeTop?: boolean;
   testID?: string;
 }>;
 
@@ -59,6 +60,7 @@ export function Screen({
   keyboardAware = variant === 'auth' || variant === 'modal',
   refreshControl,
   contentStyle,
+  edgeToEdgeTop = false,
   testID,
 }: ScreenProps) {
   const styles = useStyles();
@@ -93,7 +95,7 @@ export function Screen({
   );
 
   return (
-    <SafeAreaView testID={testID} style={styles.safe} edges={['top', 'left', 'right']}>
+    <SafeAreaView testID={testID} style={styles.safe} edges={edgeToEdgeTop ? ['left', 'right'] : ['top', 'left', 'right']}>
       {keyboardAware ? (
         <KeyboardAvoidingView
           style={styles.flex}
@@ -246,7 +248,7 @@ export const TextField = forwardRef<TextInput, FieldProps>(function TextField({ 
         onBlur={(event) => { setFocused(false); onBlur?.(event); }}
         onFocus={(event) => { setFocused(true); onFocus?.(event); }}
         placeholderTextColor={tokens.text.secondary}
-        selectionColor={tokens.action.primary}
+        selectionColor={tokens.action.text}
         style={[styles.input, inputProps.multiline && styles.inputMultiline, Boolean(error) && styles.inputError, inputProps.style, focused && styles.controlFocused]}
       />
       {error || helper ? (
@@ -280,7 +282,7 @@ export const SearchField = forwardRef<TextInput, SearchFieldProps>(function Sear
         onBlur={(event) => { setFocused(false); onBlur?.(event); }}
         onFocus={(event) => { setFocused(true); onFocus?.(event); }}
         placeholderTextColor={tokens.text.secondary}
-        selectionColor={tokens.action.primary}
+        selectionColor={tokens.action.text}
         style={[styles.searchInput, inputProps.style]}
       />
       {focused ? <View accessibilityElementsHidden pointerEvents="none" style={styles.searchFocusRing} /> : null}
@@ -391,7 +393,7 @@ export function StateView({ title, message, action, loading = false, tone = 'emp
   const stateIcon: AppIconName = tone === 'error' ? 'error' : tone === 'offline' ? 'warning' : 'info';
   return (
     <View accessibilityLiveRegion="polite" style={styles.stateView}>
-      {loading ? <ActivityIndicator size="large" color={tokens.action.primary} /> : <AppIcon name={stateIcon} size={primitives.size.icon.xl} color={tokens.action.text} />}
+      {loading ? <ActivityIndicator size="large" color={tokens.action.text} /> : <AppIcon name={stateIcon} size={primitives.size.icon.xl} color={tokens.action.text} />}
       <Text accessibilityRole="header" maxFontSizeMultiplier={dynamicType.headingMaxFontSizeMultiplier} style={styles.stateTitle}>{title}</Text>
       <Text maxFontSizeMultiplier={dynamicType.maxFontSizeMultiplier} style={styles.stateMessage}>{message}</Text>
       {action ? <View style={styles.stateAction}>{action}</View> : null}
@@ -494,7 +496,7 @@ function createStyles(tokens: import('./tokens').ThemeTokens) {
   brandName: { ...textStyles.brand, color: tokens.action.text },
   brandSubtitle: { color: tokens.text.primary, fontFamily: primitives.typography.family.uiSemiBold, fontSize: componentTokens.brand.subtitle, letterSpacing: primitives.typography.letterSpacing.brand },
   button: { minHeight: componentTokens.button.minHeight, borderRadius: componentTokens.button.radius, paddingHorizontal: componentTokens.button.horizontalPadding, alignItems: 'center', justifyContent: 'center', borderWidth },
-  button_primary: { backgroundColor: tokens.action.primary, borderColor: tokens.action.primary },
+  button_primary: { backgroundColor: tokens.action.primary, borderColor: tokens.action.text },
   button_secondary: { backgroundColor: tokens.background.surfaceMuted, borderColor: tokens.border.strong },
   button_ghost: { backgroundColor: primitives.color.transparent, borderColor: primitives.color.transparent },
   button_danger: { backgroundColor: tokens.background.surfaceMuted, borderColor: tokens.status.risk },
@@ -509,7 +511,7 @@ function createStyles(tokens: import('./tokens').ThemeTokens) {
   iconButton_ghost: { backgroundColor: primitives.color.transparent, borderColor: primitives.color.transparent },
   iconButton_danger: { backgroundColor: tokens.background.surfaceMuted, borderColor: tokens.status.risk },
   field: { gap: spacing.xs },
-  fieldLabel: { ...textStyles.caption, color: tokens.text.secondary, fontFamily: primitives.typography.family.uiBold, letterSpacing: primitives.typography.letterSpacing.label },
+  fieldLabel: { ...textStyles.caption, color: tokens.text.secondary, fontFamily: primitives.typography.family.uiSemiBold, letterSpacing: primitives.typography.letterSpacing.label },
   input: { minHeight: componentTokens.input.minHeight, borderRadius: componentTokens.input.radius, borderWidth, borderColor: tokens.border.strong, backgroundColor: tokens.background.surface, color: tokens.text.primary, paddingHorizontal: spacing.md, ...textStyles.body },
   inputMultiline: { minHeight: componentTokens.input.multilineMinHeight, paddingTop: spacing.md, textAlignVertical: 'top' },
   inputError: { borderColor: tokens.status.risk },
@@ -521,12 +523,12 @@ function createStyles(tokens: import('./tokens').ThemeTokens) {
   card: { backgroundColor: tokens.background.surface, borderWidth: surfaceBorderWidth, borderColor: tokens.border.default, borderRadius: componentTokens.card.radius, padding: componentTokens.card.padding, ...tokens.elevation.card },
   cardRaised: { backgroundColor: tokens.background.surfaceMuted, borderColor: tokens.border.default },
   metricCard: { minWidth: componentTokens.card.metricMinWidth, flexGrow: 1, flexBasis: componentTokens.card.metricMinWidth, gap: spacing.xs },
-  metricLabel: { ...textStyles.caption, color: tokens.text.secondary, fontFamily: primitives.typography.family.uiBold, letterSpacing: primitives.typography.letterSpacing.label },
+  metricLabel: { ...textStyles.caption, color: tokens.text.secondary, fontFamily: primitives.typography.family.uiSemiBold, letterSpacing: primitives.typography.letterSpacing.label },
   metricValue: { ...textStyles.moneyL, flexShrink: 1, color: tokens.text.primary },
   metricHelper: { ...textStyles.caption, color: tokens.text.secondary },
   pageHeader: { gap: spacing.xxs },
   pageTitleRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.sm },
-  eyebrow: { ...textStyles.caption, color: tokens.action.text, fontFamily: primitives.typography.family.uiExtraBold, letterSpacing: primitives.typography.letterSpacing.eyebrow },
+  eyebrow: { ...textStyles.caption, color: tokens.action.text, fontFamily: primitives.typography.family.uiSemiBold, letterSpacing: primitives.typography.letterSpacing.eyebrow },
   pageTitle: { ...textStyles.title, flexGrow: 1, flexShrink: 1, flexBasis: 240, color: tokens.text.primary },
   pageDescription: { ...textStyles.bodySmall, color: tokens.text.secondary, maxWidth: componentTokens.screen.readableMaxWidth },
   sectionHeader: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.sm },
@@ -536,24 +538,24 @@ function createStyles(tokens: import('./tokens').ThemeTokens) {
   pill_positive: { borderColor: tokens.status.positive, backgroundColor: tokens.background.surfaceMuted },
   pill_warning: { borderColor: tokens.status.warning, backgroundColor: tokens.background.surfaceMuted },
   pill_negative: { borderColor: tokens.status.risk, backgroundColor: tokens.background.surfaceMuted },
-  pill_gold: { borderColor: tokens.action.primary, backgroundColor: tokens.background.surfaceMuted },
+  pill_gold: { borderColor: tokens.action.text, backgroundColor: tokens.background.surfaceMuted },
   pill_info: { borderColor: tokens.status.info, backgroundColor: tokens.background.surfaceMuted },
-  pillText: { ...textStyles.caption, fontFamily: primitives.typography.family.uiBold },
+  pillText: { ...textStyles.caption, fontFamily: primitives.typography.family.uiSemiBold },
   pillText_neutral: { color: tokens.text.secondary }, pillText_positive: { color: tokens.status.positiveText }, pillText_warning: { color: tokens.status.warning }, pillText_negative: { color: tokens.status.riskText }, pillText_gold: { color: tokens.action.text }, pillText_info: { color: tokens.status.info },
   filterChip: { minHeight: componentTokens.chip.minHeight, justifyContent: 'center', borderRadius: componentTokens.chip.radius, borderWidth, borderColor: tokens.border.strong, backgroundColor: tokens.background.surface, paddingHorizontal: componentTokens.chip.horizontalPadding },
-  filterChipSelected: { borderColor: tokens.action.primary, backgroundColor: tokens.background.surfaceMuted },
+  filterChipSelected: { borderColor: tokens.action.text, backgroundColor: tokens.background.surfaceMuted },
   filterChipText: { ...textStyles.bodySmall, color: tokens.text.secondary, fontFamily: primitives.typography.family.uiSemiBold },
   filterChipTextSelected: { color: tokens.text.primary },
   notice: { flexDirection: 'row', alignItems: 'flex-start', borderRadius: componentTokens.notice.radius, borderWidth, padding: componentTokens.notice.padding, gap: spacing.sm },
   notice_info: { borderColor: tokens.status.info, backgroundColor: tokens.background.surfaceMuted }, notice_warning: { borderColor: tokens.status.warning, backgroundColor: tokens.background.surfaceMuted }, notice_error: { borderColor: tokens.status.risk, backgroundColor: tokens.background.surfaceMuted }, notice_success: { borderColor: tokens.status.positive, backgroundColor: tokens.background.surfaceMuted },
   noticeIcon_info: { color: tokens.status.info }, noticeIcon_warning: { color: tokens.status.warning }, noticeIcon_error: { color: tokens.status.riskText }, noticeIcon_success: { color: tokens.status.positiveText },
   noticeCopy: { flex: 1, gap: spacing.xs },
-  noticeTitle: { ...textStyles.bodySmall, color: tokens.text.primary, fontFamily: primitives.typography.family.uiExtraBold }, noticeMessage: { ...textStyles.bodySmall, color: tokens.text.secondary },
+  noticeTitle: { ...textStyles.bodySmall, color: tokens.text.primary, fontFamily: primitives.typography.family.uiSemiBold }, noticeMessage: { ...textStyles.bodySmall, color: tokens.text.secondary },
   stateView: { flex: 1, minHeight: componentTokens.screen.stateMinHeight, alignItems: 'center', justifyContent: 'center', gap: spacing.md, padding: spacing.xl },
   stateTitle: { ...textStyles.section, color: tokens.text.primary, textAlign: 'center' }, stateMessage: { ...textStyles.body, color: tokens.text.secondary, textAlign: 'center', maxWidth: componentTokens.dialog.maxWidth },
   stateAction: { width: '100%', maxWidth: componentTokens.dialog.maxWidth, gap: spacing.sm },
   progressGroup: { gap: spacing.xs },
-  progressTrack: { height: componentTokens.progress.height, borderRadius: componentTokens.progress.radius, backgroundColor: tokens.background.surfaceMuted, overflow: 'hidden' }, progressFill: { height: '100%', borderRadius: componentTokens.progress.radius, backgroundColor: tokens.action.primary }, progressLabel: { ...textStyles.caption, color: tokens.text.secondary, textAlign: 'right' }, overlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: tokens.overlay },
+  progressTrack: { height: componentTokens.progress.height, borderRadius: componentTokens.progress.radius, backgroundColor: tokens.background.surfaceMuted, overflow: 'hidden' }, progressFill: { height: '100%', borderRadius: componentTokens.progress.radius, backgroundColor: tokens.action.text }, progressLabel: { ...textStyles.caption, color: tokens.text.secondary, textAlign: 'right' }, overlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: tokens.overlay },
   dialogAlignment: { justifyContent: 'center', padding: spacing.md },
   sheet: { width: '100%', maxWidth: componentTokens.sheet.maxWidth, alignSelf: 'center', borderTopLeftRadius: componentTokens.sheet.radius, borderTopRightRadius: componentTokens.sheet.radius, borderWidth, borderColor: tokens.border.strong, backgroundColor: tokens.background.surfaceMuted, padding: componentTokens.sheet.padding, gap: spacing.md, ...tokens.elevation.overlay },
   dialog: { width: '100%', maxWidth: componentTokens.dialog.maxWidth, alignSelf: 'center', borderRadius: componentTokens.dialog.radius, borderWidth, borderColor: tokens.border.strong, backgroundColor: tokens.background.surfaceMuted, padding: componentTokens.dialog.padding, gap: spacing.md, ...tokens.elevation.overlay },
