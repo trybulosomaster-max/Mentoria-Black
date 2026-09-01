@@ -47,7 +47,7 @@ function activityItem(transaction: TransactionRow, today: string): DashboardActi
       ? 'risk'
       : 'neutral';
   const amount = effect.valid && effect.amount !== null
-    ? (effect.type === 'despesa' ? -effect.amount : effect.amount)
+    ? (effect.type === 'despesa' || effect.type === 'investimento' ? -effect.amount : effect.amount)
     : null;
 
   return Object.freeze({

@@ -158,6 +158,8 @@ test('série diária da Principal usa somente efeitos realizados do contrato fin
   assert.equal(model.realizedDailyMovements.reduce((total, point) => total + point.income, 0), canonical.income);
   assert.equal(model.realizedDailyMovements.reduce((total, point) => total + point.expense, 0), canonical.expense);
   assert.deepEqual(model.scheduledTransactions.map((row) => row.id), ['scheduled', 'future-realized']);
+  assert.equal(model.recentTransactions.find((row) => row.id === 'investment')?.amount, -30, 'investimento preserva saída do saldo disponível');
+  assert.equal(model.recentTransactions.find((row) => row.id === 'investment')?.typeLabel, 'Investimento');
   assert.equal(model.realizedDailyMovements.some((point) => point.income === 50 || point.income === 500), false);
   assert.equal(model.realizedDailyMovements.some((point) => point.expense === 30 || point.income === 999), false);
 });
