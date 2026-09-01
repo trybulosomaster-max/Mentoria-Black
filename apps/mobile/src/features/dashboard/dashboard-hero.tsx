@@ -1,8 +1,8 @@
+import { LinearGradient } from 'expo-linear-gradient';
 import { useMemo } from 'react';
-import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
 import { Card, IconButton } from '../../design-system/components';
-import { AppIcon } from '../../design-system/icons';
 import { useReducedMotion } from '../../design-system/system';
 import { useAvioraTheme } from '../../design-system/theme-provider';
 import {
@@ -32,30 +32,25 @@ type FlowButtonGlyphProps = Readonly<{
   styles: ReturnType<typeof createStyles>;
 }>;
 
+const FLOW_ASSETS = Object.freeze({
+  income: require('../../../assets/dashboard/income-brl-premium-v1.png'),
+  expense: require('../../../assets/dashboard/expense-brl-premium-v1.png'),
+});
+
 function FlowButtonGlyph({ flow, styles }: FlowButtonGlyphProps) {
-  const income = flow === 'income';
   return (
     <View
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
-      style={[styles.flowButton, income ? styles.incomeButton : styles.expenseButton]}
+      style={styles.flowAssetFrame}
     >
-      <View style={styles.flowGlassInset} />
-      <View style={[styles.flowRing, income ? styles.incomeRing : styles.expenseRing]}>
-        <Text
-          allowFontScaling={false}
-          style={[styles.currencyGlyph, income ? styles.incomeGlyph : styles.expenseGlyph]}
-        >
-          R$
-        </Text>
-      </View>
-      <View style={styles.flowArrowMask}>
-        <AppIcon
-          name={income ? 'arrow-up' : 'arrow-down'}
-          size={primitives.size.icon.sm}
-          color={income ? primitives.color.green[200] : primitives.color.red[200]}
-        />
-      </View>
+      <Image
+        accessible={false}
+        fadeDuration={primitives.motion.duration.instant}
+        resizeMode="contain"
+        source={FLOW_ASSETS[flow]}
+        style={styles.flowAsset}
+      />
     </View>
   );
 }
@@ -85,8 +80,24 @@ export function DashboardHero({
 
   return (
     <Card tone="raised" style={styles.hero}>
+      <LinearGradient
+        colors={[tokens.background.surfaceMuted, tokens.background.surface]}
+        end={{ x: 0.9, y: 1 }}
+        pointerEvents="none"
+        start={{ x: 0.1, y: 0 }}
+        style={styles.heroBackdrop}
+      />
+      <View accessibilityElementsHidden pointerEvents="none" style={styles.heroHighlight} />
       <View style={styles.balance}>
-        <Text style={styles.balanceLabel}>Saldo atual em contas</Text>
+        <View style={styles.balanceHeader}>
+          <Text style={styles.balanceLabel}>Saldo atual em contas</Text>
+          <IconButton
+            icon={valuesVisible ? 'eye-off' : 'eye'}
+            label={valuesVisible ? 'Ocultar valores da Principal' : 'Mostrar valores da Principal'}
+            onPress={onToggleValues}
+            variant="ghost"
+          />
+        </View>
         <View
           accessible
           accessibilityRole="summary"
@@ -94,12 +105,6 @@ export function DashboardHero({
         >
           <Text maxFontSizeMultiplier={dynamicType.moneyMaxFontSizeMultiplier} style={styles.balanceValue}>{balanceValue.text}</Text>
         </View>
-        <IconButton
-          icon={valuesVisible ? 'eye-off' : 'eye'}
-          label={valuesVisible ? 'Ocultar valores da Principal' : 'Mostrar valores da Principal'}
-          onPress={onToggleValues}
-          variant="ghost"
-        />
       </View>
 
       <View style={styles.heroDivider} />
@@ -118,6 +123,8 @@ export function DashboardHero({
             <Text maxFontSizeMultiplier={dynamicType.moneyMaxFontSizeMultiplier} style={[styles.shortcutValue, styles.incomeValue]}>{incomeValue.text}</Text>
           </View>
         </Pressable>
+
+        {!reflow ? <View accessibilityElementsHidden style={styles.shortcutDivider} /> : null}
 
         <Pressable
           accessibilityRole="button"
@@ -139,26 +146,21 @@ export function DashboardHero({
 
 function createStyles(tokens: ThemeTokens) {
   return StyleSheet.create({
-    hero: { gap: spacing.lg, paddingHorizontal: spacing.lg, paddingVertical: spacing.xl, backgroundColor: tokens.background.surface },
-    balance: { alignItems: 'center', gap: spacing.xxs },
-    balanceLabel: { ...textStyles.bodySmall, color: tokens.text.secondary, textAlign: 'center' },
-    balanceValue: { ...textStyles.moneyXL, maxWidth: '100%', color: tokens.text.primary, textAlign: 'center' },
+    hero: { position: 'relative', gap: spacing.md, paddingHorizontal: spacing.lg, paddingVertical: spacing.lg, backgroundColor: tokens.background.surface },
+    heroBackdrop: { position: 'absolute', top: primitives.space.none, right: primitives.space.none, bottom: primitives.space.none, left: primitives.space.none, borderRadius: primitives.radius.lg },
+    heroHighlight: { position: 'absolute', top: primitives.space.none, right: spacing.lg, left: spacing.lg, height: StyleSheet.hairlineWidth, borderRadius: primitives.radius.pill, backgroundColor: tokens.brand.accent, opacity: primitives.opacity.subtle },
+    balance: { alignItems: 'stretch', gap: spacing.xs },
+    balanceHeader: { minHeight: primitives.size.touch.default, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
+    balanceLabel: { ...textStyles.bodySmall, flex: 1, color: tokens.text.secondary, textAlign: 'left' },
+    balanceValue: { ...textStyles.moneyXL, maxWidth: '100%', color: tokens.text.primary, textAlign: 'left' },
     heroDivider: { width: '100%', height: StyleSheet.hairlineWidth, backgroundColor: tokens.border.default },
-    shortcuts: { flexDirection: 'row', alignItems: 'stretch', justifyContent: 'space-between', gap: spacing.sm },
+    shortcuts: { flexDirection: 'row', alignItems: 'stretch', justifyContent: 'space-between', gap: spacing.xs },
     shortcutsReflow: { flexDirection: 'column' },
     shortcut: { minHeight: primitives.size.touch.comfortable, flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start', gap: spacing.xs, paddingHorizontal: spacing.xxs, paddingVertical: spacing.sm, borderRadius: primitives.radius.md },
     shortcutReflow: { width: '100%', minHeight: primitives.size.touch.comfortable },
-    flowButton: { width: primitives.size.touch.comfortable, height: primitives.size.touch.comfortable, flexShrink: 0, alignItems: 'center', justifyContent: 'center', borderRadius: primitives.radius.md, borderWidth: primitives.size.border.thin, backgroundColor: primitives.color.neutral[950], ...tokens.elevation.card },
-    incomeButton: { borderColor: tokens.status.positive, shadowColor: tokens.status.positive, shadowOffset: { width: primitives.space.none, height: primitives.space.none } },
-    expenseButton: { borderColor: tokens.status.risk, shadowColor: tokens.status.risk, shadowOffset: { width: primitives.space.none, height: primitives.space.none } },
-    flowGlassInset: { position: 'absolute', top: primitives.size.border.strong, right: primitives.size.border.strong, bottom: primitives.size.border.strong, left: primitives.size.border.strong, borderRadius: primitives.radius.sm, borderWidth: StyleSheet.hairlineWidth, borderColor: primitives.color.neutral[650], backgroundColor: primitives.color.neutral[900] },
-    flowRing: { width: primitives.size.icon.xl, height: primitives.size.icon.xl, alignItems: 'center', justifyContent: 'center', borderRadius: primitives.radius.pill, borderWidth: primitives.size.border.thin },
-    incomeRing: { borderColor: primitives.color.green[200] },
-    expenseRing: { borderColor: primitives.color.red[200] },
-    currencyGlyph: { fontFamily: primitives.typography.family.uiSemiBold, fontSize: primitives.typography.size.bodySmall, lineHeight: primitives.typography.lineHeight.bodySmall, letterSpacing: primitives.typography.letterSpacing.tight, textAlign: 'center' },
-    incomeGlyph: { color: primitives.color.green[200] },
-    expenseGlyph: { color: primitives.color.red[200] },
-    flowArrowMask: { position: 'absolute', right: spacing.xxs, bottom: spacing.xxs, width: primitives.size.icon.sm, height: primitives.size.icon.sm, alignItems: 'center', justifyContent: 'center', backgroundColor: primitives.color.neutral[900] },
+    shortcutDivider: { width: StyleSheet.hairlineWidth, alignSelf: 'stretch', marginVertical: spacing.xs, backgroundColor: tokens.border.default },
+    flowAssetFrame: { width: primitives.size.touch.comfortable + spacing.xs, height: primitives.size.touch.comfortable + spacing.xs, flexShrink: 0, alignItems: 'center', justifyContent: 'center' },
+    flowAsset: { width: '100%', height: '100%' },
     shortcutCopy: { flex: 1, minWidth: 0, alignItems: 'flex-start', gap: spacing.xxs },
     shortcutLabel: { ...textStyles.caption, color: tokens.text.secondary, textTransform: 'uppercase', letterSpacing: primitives.typography.letterSpacing.label },
     incomeLabel: { color: tokens.status.positiveText },

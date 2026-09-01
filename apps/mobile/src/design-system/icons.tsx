@@ -23,8 +23,6 @@ export const iconMap = Object.freeze({
   'eye-off': 'eye-off-outline',
   'trend-up': 'trending-up-outline',
   'trend-down': 'trending-down-outline',
-  'arrow-up': 'arrow-up-outline',
-  'arrow-down': 'arrow-down-outline',
   goal: 'flag-outline',
   report: 'bar-chart-outline',
   knowledge: 'book-outline',
