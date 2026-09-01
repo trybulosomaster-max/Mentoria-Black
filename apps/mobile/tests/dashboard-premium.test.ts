@@ -177,8 +177,16 @@ test('hero elimina redundância e mantém métricas livres de cards internos', a
   ]);
   assert.doesNotMatch(hero, /PANORAMA FINANCEIRO|Movimentos em|periodLabel/);
   assert.match(hero, /variant="ghost"/);
-  assert.match(hero, /width < 360/);
-  assert.doesNotMatch(hero, /shortcutHint|chevron-right|backgroundColor: tokens\.background\.surfaceMuted|borderColor: tokens\.border\.strong/);
+  assert.match(hero, /width < 380/);
+  assert.match(hero, /function FlowButtonGlyph/);
+  assert.match(hero, /name=\{income \? 'arrow-up' : 'arrow-down'\}/);
+  assert.match(hero, /style=\{styles\.flowGlassInset\}/);
+  assert.match(hero, /backgroundColor: tokens\.background\.surfaceMuted/);
+  assert.match(hero, /borderColor: tokens\.border\.strong/);
+  assert.match(hero, /color=\{income \? tokens\.status\.positiveText : tokens\.status\.riskText\}/);
+  assert.match(hero, /heroDivider/);
+  assert.doesNotMatch(hero, /currencyGlyph|flowRing|>\$<|trend-up|trend-down/);
+  assert.doesNotMatch(hero, /shortcutHint|chevron-right/);
   assert.equal((hero.match(/<Card\b/g) ?? []).length, 1);
   assert.match(dashboard, /const periodSelector = \([\s\S]*?<MonthSelector/);
   assert.match(dashboard, /loading && !data[\s\S]*?<Screen>\{periodSelector\}<StateView loading/);
