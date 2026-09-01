@@ -18,9 +18,14 @@ import {
 } from '../../lib/format';
 import type { AccessContext } from '../../domain/foundation/access-context';
 import type { FinancialReadRepositoryPort } from '../../ports/foundation-ports';
+import {
+  buildDashboardPeriodReadModel,
+  type DashboardPeriodReadModel,
+} from '../dashboard/dashboard-read-model';
 
 export type MobileSnapshot = Readonly<{
   generatedAt: string;
+  financialAsOfDate: string;
   period: Readonly<{ year: number; month: number; label: string }>;
   metrics: Readonly<{
     realizedIncome: number;
@@ -31,6 +36,7 @@ export type MobileSnapshot = Readonly<{
     knownAccountBalance: number;
     accountsWithSnapshot: number;
     accountsTotal: number;
+    accountBalanceIsCurrent: boolean;
     configuredCardLimit: number;
     goalsSaved: number;
     goalsTarget: number;
@@ -40,6 +46,7 @@ export type MobileSnapshot = Readonly<{
   cards: readonly CardRow[];
   goals: readonly GoalRow[];
   monthlyPlan: MonthlyPlanRow | null;
+  dashboard: DashboardPeriodReadModel;
 }>;
 
 function firstError(results: readonly { error: { message: string } | null }[]) {
@@ -117,12 +124,16 @@ export async function loadMobileSnapshotForPeriod(
     (total, account) => total + Number(account.statement_balance ?? 0),
     0,
   );
+  const accountBalanceIsCurrent = accountsWithSnapshot.length > 0
+    && accountsWithSnapshot.every((account) => account.balance_as_of === calendar.today);
   const configuredCardLimit = cards.reduce((total, card) => total + Number(card.limit || 0), 0);
   const goalsSaved = goals.reduce((total, goal) => total + Number(goal.current || 0), 0);
   const goalsTarget = goals.reduce((total, goal) => total + Number(goal.target || 0), 0);
+  const dashboard = buildDashboardPeriodReadModel(transactions, period, calendar.today);
 
   return Object.freeze({
     generatedAt: new Date().toISOString(),
+    financialAsOfDate: calendar.today,
     period: Object.freeze({ year: window.year, month: window.month, label: window.label }),
     metrics: Object.freeze({
       realizedIncome: realized.income,
@@ -133,6 +144,7 @@ export async function loadMobileSnapshotForPeriod(
       knownAccountBalance,
       accountsWithSnapshot: accountsWithSnapshot.length,
       accountsTotal: accounts.length,
+      accountBalanceIsCurrent,
       configuredCardLimit,
       goalsSaved,
       goalsTarget,
@@ -142,6 +154,7 @@ export async function loadMobileSnapshotForPeriod(
     cards: Object.freeze(cards),
     goals: Object.freeze(goals),
     monthlyPlan,
+    dashboard,
   });
 }
 

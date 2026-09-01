@@ -2,12 +2,15 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
+import type { TransactionRow } from '../src/core/supabase/database.types.ts';
+import { summarizeRealized } from '../src/domain/finance/foundation-financial-read-model.ts';
 import {
   dashboardTransactionsHref,
   financialValuePresentation,
   parseDashboardTransactionsIntent,
   transactionMatchesDashboardFlow,
 } from '../src/features/dashboard/dashboard-contract.ts';
+import { buildDashboardPeriodReadModel } from '../src/features/dashboard/dashboard-read-model.ts';
 import {
   calendarMonthKey,
   calendarMonthLabel,
@@ -18,6 +21,45 @@ import {
 
 async function source(relative: string): Promise<string> {
   return readFile(new URL(`../${relative}`, import.meta.url), 'utf8');
+}
+
+function transaction(
+  id: string,
+  overrides: Partial<TransactionRow> = {},
+): TransactionRow {
+  return {
+    id,
+    user_id: 'owner-a',
+    amount: 100,
+    transaction_type: 'receita',
+    status: 'realizado',
+    transaction_date: '2026-08-02',
+    created_at: `2026-08-02T12:00:0${id.length}.000Z`,
+    account_id: 'account-a',
+    asset_id: null,
+    card_billing_cycle_id: null,
+    card_id: null,
+    category: 'Categoria',
+    description: `Lançamento ${id}`,
+    destination_account_id: null,
+    goal_effect: null,
+    goal_id: null,
+    installment_number: null,
+    installment_series_id: null,
+    installment_total: null,
+    liability_id: null,
+    note: null,
+    operation_id: null,
+    payment_method: null,
+    purchase_date: null,
+    recurring_occurrence_date: null,
+    recurring_series_id: null,
+    reversal_of_id: null,
+    source_account_id: null,
+    subcategory: null,
+    updated_at: '2026-08-02T12:00:00.000Z',
+    ...overrides,
+  };
 }
 
 test('período inicial respeita o calendário financeiro de São Paulo', () => {
@@ -92,12 +134,50 @@ test('ocultação remove o valor tanto do texto quanto do rótulo acessível', (
   });
 });
 
-test('Dashboard implementa hero, loading, vazio, erro e leitura sem números artificiais', async () => {
+test('série diária da Principal usa somente efeitos realizados do contrato financeiro', () => {
+  const today = '2026-08-10';
+  const rows = [
+    transaction('income', { amount: 100, transaction_type: 'receita' }),
+    transaction('expense', { amount: 25, transaction_type: 'despesa' }),
+    transaction('investment', { amount: 30, transaction_type: 'investimento', transaction_date: '2026-08-03', asset_id: 'asset-a' }),
+    transaction('transfer', { amount: 999, transaction_type: 'transferencia', transaction_date: '2026-08-04', source_account_id: 'account-a', destination_account_id: 'account-b' }),
+    transaction('scheduled', { amount: 40, transaction_type: 'despesa', status: 'programado', transaction_date: '2026-08-05' }),
+    transaction('future-realized', { amount: 50, transaction_type: 'receita', transaction_date: '2026-08-20' }),
+    transaction('cancelled', { amount: 500, transaction_type: 'receita', status: 'cancelado', transaction_date: '2026-08-06' }),
+  ];
+  const model = buildDashboardPeriodReadModel(rows, { year: 2026, month: 8 }, today);
+  const canonical = summarizeRealized(rows, today);
+
+  assert.equal(model.realizedDailyMovements.length, 10, 'mês atual termina no hoje financeiro, não no futuro');
+  assert.deepEqual(model.realizedDailyMovements[1], {
+    date: '2026-08-02',
+    day: 2,
+    income: 100,
+    expense: 25,
+  });
+  assert.equal(model.realizedDailyMovements.reduce((total, point) => total + point.income, 0), canonical.income);
+  assert.equal(model.realizedDailyMovements.reduce((total, point) => total + point.expense, 0), canonical.expense);
+  assert.deepEqual(model.scheduledTransactions.map((row) => row.id), ['scheduled', 'future-realized']);
+  assert.equal(model.realizedDailyMovements.some((point) => point.income === 50 || point.income === 500), false);
+  assert.equal(model.realizedDailyMovements.some((point) => point.expense === 30 || point.income === 999), false);
+});
+
+test('read model não sintetiza série quando não existe Receita/Despesa realizada', () => {
+  const model = buildDashboardPeriodReadModel([
+    transaction('investment-only', { transaction_type: 'investimento', asset_id: 'asset-a' }),
+    transaction('programmed-only', { transaction_type: 'despesa', status: 'programado' }),
+  ], { year: 2026, month: 8 }, '2026-08-31');
+  assert.deepEqual(model.realizedDailyMovements, []);
+  assert.deepEqual(model.scheduledTransactions.map((row) => row.id), ['programmed-only']);
+});
+
+test('Dashboard implementa composição, loading, vazio, erro e leitura sem números artificiais', async () => {
   const dashboard = await source('app/(tabs)/index.tsx');
-  for (const contract of ['MonthSelector', 'DashboardHero', 'StateView', 'useMobileSnapshot(accessContext, period)']) {
+  for (const contract of ['MonthSelector', 'DashboardHero', 'DashboardMonthlyMovements', 'DashboardActivity', 'StateView', 'useMobileSnapshot(accessContext, period)']) {
     assert.match(dashboard, new RegExp(contract.replace(/[()]/g, '\\$&')));
   }
-  assert.match(dashboard, /Seu panorama começa aqui/);
+  assert.match(dashboard, /styles\.topPanel/);
+  assert.match(dashboard, /styles\.body/);
   assert.match(dashboard, /Não foi possível carregar/);
   assert.doesNotMatch(dashboard, /<ChartCard\b/);
   assert.doesNotMatch(dashboard, /PageHeader|PRINCIPAL|Seu panorama financeiro/);
@@ -113,6 +193,9 @@ test('seletor recolhe o carrossel e, ao expandir, oferece swipe, snap e alternat
   assert.match(dashboard, /monthSelectorExpanded, setMonthSelectorExpanded.*useState\(false\)/);
   assert.match(selector, /expanded: boolean/);
   assert.match(selector, /onExpandedChange\(expanded: boolean\)/);
+  assert.match(selector, /embedded\?: boolean/);
+  assert.match(selector, /embedded && styles\.triggerEmbedded/);
+  assert.match(dashboard, /<MonthSelector[\s\S]*?embedded/);
   assert.match(selector, /accessibilityState=\{\{ expanded \}\}/);
   assert.match(selector, /name="calendar"/);
   assert.match(selector, /borderColor: tokens\.border\.default/);
@@ -154,17 +237,23 @@ test('período participa da leitura e da proteção contra snapshot atrasado', a
   assert.match(repository, /\.lt\('transaction_date', endExclusive\)/);
   assert.match(repository, /\.eq\('year', window\.year\)/);
   assert.match(repository, /\.eq\('month', window\.month\)/);
+  assert.match(repository, /buildDashboardPeriodReadModel\(transactions, period, calendar\.today\)/);
+  assert.match(repository, /financialAsOfDate: calendar\.today/);
   assert.match(hook, /periodKey/);
   assert.match(hook, /loadSnapshot\(context, period\)/);
   assert.match(layout, /<FinancialPeriodProvider>/);
   assert.match(transactions, /parseDashboardTransactionsIntent/);
   assert.match(transactions, /transactionMatchesDashboardFlow/);
+  assert.match(transactions, /data\.financialAsOfDate/);
+  assert.doesNotMatch(transactions, /transactionMatchesDashboardFlow\([^)]*data\.generatedAt/);
 });
 
 test('Dashboard mantém árvore ABC única e módulos congelados fora da implementação', async () => {
   const dashboardFiles = await Promise.all([
     source('app/(tabs)/index.tsx'),
     source('src/features/dashboard/dashboard-hero.tsx'),
+    source('src/features/dashboard/dashboard-monthly-movements.tsx'),
+    source('src/features/dashboard/dashboard-activity.tsx'),
     source('src/features/dashboard/month-selector.tsx'),
   ]);
   const combined = dashboardFiles.join('\n');
@@ -173,31 +262,54 @@ test('Dashboard mantém árvore ABC única e módulos congelados fora da impleme
   assert.doesNotMatch(combined, /Open Finance|Saúde V2|Knowledge|Reader|Quick Add|startTrial/);
 });
 
-test('hero elimina redundância e mantém métricas livres de cards internos', async () => {
+test('topo integra mês, saldo e Receita/Despesa acionáveis numa superfície única', async () => {
   const [hero, dashboard] = await Promise.all([
     source('src/features/dashboard/dashboard-hero.tsx'),
     source('app/(tabs)/index.tsx'),
   ]);
   assert.doesNotMatch(hero, /PANORAMA FINANCEIRO|Movimentos em|periodLabel/);
   assert.match(hero, /variant="ghost"/);
-  assert.match(hero, /width < 380/);
-  assert.match(hero, /function FlowButtonGlyph/);
-  assert.match(hero, /<LinearGradient/);
-  assert.match(hero, /styles\.heroHighlight/);
-  assert.match(hero, /styles\.balanceHeader/);
-  assert.match(hero, /styles\.shortcutDivider/);
-  assert.match(hero, /<Image/);
-  assert.match(hero, /resizeMode="contain"/);
-  assert.match(hero, /fadeDuration=\{primitives\.motion\.duration\.instant\}/);
-  assert.match(hero, /income-brl-premium-v1\.png/);
-  assert.match(hero, /expense-brl-premium-v1\.png/);
+  assert.match(hero, /width < 350/);
+  assert.match(hero, /function FlowShortcut/);
+  assert.match(hero, /name=\{income \? 'arrow-up' : 'arrow-down'\}/);
+  assert.match(hero, /tokens\.status\.onPositive/);
+  assert.match(hero, /tokens\.status\.onRisk/);
+  assert.match(hero, /styles\.flowIndicator/);
   assert.match(hero, /accessibilityElementsHidden/);
-  assert.match(hero, /importantForAccessibility="no-hide-descendants"/);
+  assert.doesNotMatch(hero, /<Card\b|<Image\b|<LinearGradient\b/);
   assert.doesNotMatch(hero, /currencyGlyph|flowRing|flowArrowMask|allowFontScaling=\{false\}/);
-  assert.match(hero, /heroDivider/);
-  assert.doesNotMatch(hero, /trend-up|trend-down|arrow-up|arrow-down|chevron-up|chevron-down/);
-  assert.doesNotMatch(hero, /shortcutHint|chevron-right/);
-  assert.equal((hero.match(/<Card\b/g) ?? []).length, 1);
+  assert.doesNotMatch(hero, /Desempenho positivo|Controle de gastos|Ao vivo/);
+  assert.equal((hero.match(/<FlowShortcut\b/g) ?? []).length, 2);
+  assert.match(dashboard, /contentStyle=\{styles\.screenContent\}/);
+  assert.match(dashboard, /<View style=\{\[styles\.topPanel/);
+  assert.match(dashboard, /<LinearGradient/);
+  assert.match(dashboard, /embedded/);
+  assert.match(dashboard, /<View style=\{\[styles\.body/);
   assert.match(dashboard, /const periodSelector = \([\s\S]*?<MonthSelector/);
   assert.match(dashboard, /loading && !data[\s\S]*?<Screen>\{periodSelector\}<StateView loading/);
+});
+
+test('composição analítica usa série canônica, equivalente acessível e listas agrupadas', async () => {
+  const [dashboard, chart, activity, readModel] = await Promise.all([
+    source('app/(tabs)/index.tsx'),
+    source('src/features/dashboard/dashboard-monthly-movements.tsx'),
+    source('src/features/dashboard/dashboard-activity.tsx'),
+    source('src/features/dashboard/dashboard-read-model.ts'),
+  ]);
+  assert.match(dashboard, /data\.dashboard\.realizedDailyMovements/);
+  assert.match(dashboard, /data\.dashboard\.scheduledTransactions/);
+  assert.match(dashboard, /data\.dashboard\.recentTransactions/);
+  assert.doesNotMatch(dashboard, /<TransactionRow\b|<SectionTitle\b/);
+  assert.match(chart, /accessibilityRole="image"/);
+  assert.match(chart, /accessibleEquivalent/);
+  assert.match(chart, /Sem série realizada neste período/);
+  assert.match(chart, /Valores do gráfico ocultos/);
+  assert.doesNotMatch(chart, /Math\.random|fixture|mock|8\.193|8\.154|38,55/);
+  assert.equal((activity.match(/<Card\b/g) ?? []).length, 2);
+  assert.match(activity, /breakpoints\.mediumMin/);
+  assert.match(activity, /Programados do período/);
+  assert.match(activity, /Movimentos recentes/);
+  assert.match(activity, /financialValuePresentation/);
+  assert.match(readModel, /financialEffect\(transaction, \{ now: today \}\)/);
+  assert.doesNotMatch(readModel, /Math\.random|fixture|mock/);
 });

@@ -24,6 +24,7 @@ type Deferred<T> = Readonly<{
 
 type SyntheticSnapshot = Readonly<{
   generatedAt: string;
+  financialAsOfDate: string;
   period: Readonly<{ year: number; month: number; label: string }>;
   metrics: Readonly<Record<string, number>>;
   transactions: readonly unknown[];
@@ -31,6 +32,32 @@ type SyntheticSnapshot = Readonly<{
   cards: readonly unknown[];
   goals: readonly unknown[];
   monthlyPlan: null;
+  dashboard: Readonly<{
+    realizedDailyMovements: readonly Readonly<{
+      date: string;
+      day: number;
+      income: number;
+      expense: number;
+    }>[];
+    scheduledTransactions: readonly Readonly<{
+      id: string;
+      description: string;
+      financialDate: string;
+      typeLabel: string;
+      statusLabel: 'Programado';
+      tone: 'neutral';
+      amount: number;
+    }>[];
+    recentTransactions: readonly Readonly<{
+      id: string;
+      description: string;
+      financialDate: string;
+      typeLabel: string;
+      statusLabel: 'Realizado';
+      tone: 'positive';
+      amount: number;
+    }>[];
+  }>;
 }>;
 
 function deferred<T>(): Deferred<T> {
@@ -44,8 +71,10 @@ function deferred<T>(): Deferred<T> {
 }
 
 function snapshot(owner: string, period: CalendarMonth = { year: 2026, month: 8 }): SyntheticSnapshot {
+  const financialDate = `${period.year}-${String(period.month).padStart(2, '0')}-01`;
   return Object.freeze({
     generatedAt: `owner:${owner}`,
+    financialAsOfDate: financialDate,
     period: Object.freeze({ year: period.year, month: period.month, label: calendarMonthKey(period) }),
     metrics: Object.freeze({
       realizedIncome: 0,
@@ -65,6 +94,33 @@ function snapshot(owner: string, period: CalendarMonth = { year: 2026, month: 8 
     cards: Object.freeze([]),
     goals: Object.freeze([]),
     monthlyPlan: null,
+    dashboard: Object.freeze({
+      realizedDailyMovements: Object.freeze([
+        Object.freeze({ date: `owner:${owner}`, day: 1, income: 100, expense: 0 }),
+      ]),
+      scheduledTransactions: Object.freeze([
+        Object.freeze({
+          id: `scheduled:${owner}`,
+          description: `owner:${owner}`,
+          financialDate,
+          typeLabel: 'Receita',
+          statusLabel: 'Programado',
+          tone: 'neutral',
+          amount: 100,
+        }),
+      ]),
+      recentTransactions: Object.freeze([
+        Object.freeze({
+          id: `recent:${owner}`,
+          description: `owner:${owner}`,
+          financialDate,
+          typeLabel: 'Receita',
+          statusLabel: 'Realizado',
+          tone: 'positive',
+          amount: 100,
+        }),
+      ]),
+    }),
   });
 }
 
@@ -107,6 +163,9 @@ type RenderEvidence = Readonly<{
   activeOwner: string | null;
   snapshotOwner: string | null;
   snapshotPeriod: string | null;
+  dashboardMovementOwner: string | null;
+  dashboardScheduledOwner: string | null;
+  dashboardRecentOwner: string | null;
   entitlementOwner: string | null;
   loading: boolean;
 }>;
@@ -125,6 +184,9 @@ function Probe({ context: activeContext, entitlement, period, evidence }: ProbeP
     activeOwner: activeContext?.actingUserId ?? null,
     snapshotOwner: result.data?.generatedAt.replace('owner:', '') ?? null,
     snapshotPeriod: result.data ? `${result.data.period.year}-${String(result.data.period.month).padStart(2, '0')}` : null,
+    dashboardMovementOwner: result.data?.dashboard.realizedDailyMovements[0]?.date.replace('owner:', '') ?? null,
+    dashboardScheduledOwner: result.data?.dashboard.scheduledTransactions[0]?.description.replace('owner:', '') ?? null,
+    dashboardRecentOwner: result.data?.dashboard.recentTransactions[0]?.description.replace('owner:', '') ?? null,
     entitlementOwner: entitlementValue?.owner ?? null,
     loading: result.loading,
   }));
@@ -227,7 +289,7 @@ async function render(root: Root, props: ProbeProps): Promise<void> {
   });
 }
 
-test('React montado nunca entrega snapshot ou entitlement de A ao contexto B', async () => {
+test('React montado nunca entrega snapshot, dashboard ou entitlement de A ao contexto B', async () => {
   pendingLoads.clear();
   loadCalls.length = 0;
   const dom = installMinimalDom();
@@ -244,6 +306,9 @@ test('React montado nunca entrega snapshot ou entitlement de A ao contexto B', a
     const firstA = await waitForLoad('A', 0);
     await act(async () => { firstA.resolve(snapshot('A')); await firstA.promise; });
     assert.equal(evidence.at(-1)?.snapshotOwner, 'A');
+    assert.equal(evidence.at(-1)?.dashboardMovementOwner, 'A');
+    assert.equal(evidence.at(-1)?.dashboardScheduledOwner, 'A');
+    assert.equal(evidence.at(-1)?.dashboardRecentOwner, 'A');
     assert.equal(evidence.at(-1)?.entitlementOwner, 'A');
 
     const beforeB = evidence.length;
@@ -252,19 +317,31 @@ test('React montado nunca entrega snapshot ou entitlement de A ao contexto B', a
     const transitionToB = evidence.slice(beforeB);
     assert.ok(transitionToB.some((frame) => frame.activeOwner === 'B' && frame.loading));
     assert.ok(transitionToB.every((frame) => frame.activeOwner !== 'B' || frame.snapshotOwner !== 'A'));
+    assert.ok(transitionToB.every((frame) => frame.activeOwner !== 'B' || frame.dashboardMovementOwner !== 'A'));
+    assert.ok(transitionToB.every((frame) => frame.activeOwner !== 'B' || frame.dashboardScheduledOwner !== 'A'));
+    assert.ok(transitionToB.every((frame) => frame.activeOwner !== 'B' || frame.dashboardRecentOwner !== 'A'));
     assert.ok(transitionToB.every((frame) => frame.activeOwner !== 'B' || frame.entitlementOwner !== 'A'));
 
     await render(root, { context: contextB, entitlement: entitlementB, evidence });
     assert.equal(evidence.at(-1)?.snapshotOwner, null);
+    assert.equal(evidence.at(-1)?.dashboardMovementOwner, null);
+    assert.equal(evidence.at(-1)?.dashboardScheduledOwner, null);
+    assert.equal(evidence.at(-1)?.dashboardRecentOwner, null);
     assert.equal(evidence.at(-1)?.entitlementOwner, 'B');
     await act(async () => { firstB.resolve(snapshot('B')); await firstB.promise; });
     assert.equal(evidence.at(-1)?.snapshotOwner, 'B');
+    assert.equal(evidence.at(-1)?.dashboardMovementOwner, 'B');
+    assert.equal(evidence.at(-1)?.dashboardScheduledOwner, 'B');
+    assert.equal(evidence.at(-1)?.dashboardRecentOwner, 'B');
 
     await render(root, { context: null, entitlement: entitlementB, evidence });
     assert.deepEqual(evidence.at(-1), {
       activeOwner: null,
       snapshotOwner: null,
       snapshotPeriod: null,
+      dashboardMovementOwner: null,
+      dashboardScheduledOwner: null,
+      dashboardRecentOwner: null,
       entitlementOwner: null,
       loading: false,
     });
@@ -274,10 +351,16 @@ test('React montado nunca entrega snapshot ou entitlement de A ao contexto B', a
     const secondA = await waitForLoad('A', 1);
     const transitionToA = evidence.slice(beforeReturnToA);
     assert.ok(transitionToA.every((frame) => frame.activeOwner !== 'A' || frame.snapshotOwner !== 'B'));
+    assert.ok(transitionToA.every((frame) => frame.activeOwner !== 'A' || frame.dashboardMovementOwner !== 'B'));
+    assert.ok(transitionToA.every((frame) => frame.activeOwner !== 'A' || frame.dashboardScheduledOwner !== 'B'));
+    assert.ok(transitionToA.every((frame) => frame.activeOwner !== 'A' || frame.dashboardRecentOwner !== 'B'));
     assert.ok(transitionToA.every((frame) => frame.activeOwner !== 'A' || frame.entitlementOwner !== 'B'));
     await render(root, { context: contextASecondSession, entitlement: entitlementA, evidence });
     await act(async () => { secondA.resolve(snapshot('A')); await secondA.promise; });
     assert.equal(evidence.at(-1)?.snapshotOwner, 'A');
+    assert.equal(evidence.at(-1)?.dashboardMovementOwner, 'A');
+    assert.equal(evidence.at(-1)?.dashboardScheduledOwner, 'A');
+    assert.equal(evidence.at(-1)?.dashboardRecentOwner, 'A');
 
     const beforeSameOwner = loadCalls.length;
     await render(root, { context: contextASecondSession, entitlement: entitlementA, evidence });
@@ -287,10 +370,16 @@ test('React montado nunca entrega snapshot ou entitlement de A ao contexto B', a
     for (const frame of evidence) {
       if (!frame.activeOwner) {
         assert.equal(frame.snapshotOwner, null);
+        assert.equal(frame.dashboardMovementOwner, null);
+        assert.equal(frame.dashboardScheduledOwner, null);
+        assert.equal(frame.dashboardRecentOwner, null);
         assert.equal(frame.entitlementOwner, null);
         continue;
       }
       assert.ok(frame.snapshotOwner === null || frame.snapshotOwner === frame.activeOwner);
+      assert.ok(frame.dashboardMovementOwner === null || frame.dashboardMovementOwner === frame.activeOwner);
+      assert.ok(frame.dashboardScheduledOwner === null || frame.dashboardScheduledOwner === frame.activeOwner);
+      assert.ok(frame.dashboardRecentOwner === null || frame.dashboardRecentOwner === frame.activeOwner);
       assert.ok(frame.entitlementOwner === null || frame.entitlementOwner === frame.activeOwner);
     }
   } finally {

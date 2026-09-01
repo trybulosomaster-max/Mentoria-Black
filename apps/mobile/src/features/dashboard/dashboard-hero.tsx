@@ -1,11 +1,12 @@
-import { LinearGradient } from 'expo-linear-gradient';
 import { useMemo } from 'react';
-import { Image, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
-import { Card, IconButton } from '../../design-system/components';
+import { IconButton } from '../../design-system/components';
+import { AppIcon } from '../../design-system/icons';
 import { useReducedMotion } from '../../design-system/system';
 import { useAvioraTheme } from '../../design-system/theme-provider';
 import {
+  componentTokens,
   dynamicType,
   primitives,
   spacing,
@@ -19,6 +20,8 @@ import {
 
 type DashboardHeroProps = Readonly<{
   balance: string | null;
+  balanceLabel: string;
+  balanceHelper: string;
   income: string | null;
   expense: string | null;
   valuesVisible: boolean;
@@ -27,36 +30,66 @@ type DashboardHeroProps = Readonly<{
   onExpensePress(): void;
 }>;
 
-type FlowButtonGlyphProps = Readonly<{
+type PresentedValue = Readonly<{ text: string; accessibilityLabel: string }>;
+
+type FlowShortcutProps = Readonly<{
   flow: 'income' | 'expense';
+  label: string;
+  value: PresentedValue;
+  onPress(): void;
   styles: ReturnType<typeof createStyles>;
+  tokens: ThemeTokens;
 }>;
 
-const FLOW_ASSETS = Object.freeze({
-  income: require('../../../assets/dashboard/income-brl-premium-v1.png'),
-  expense: require('../../../assets/dashboard/expense-brl-premium-v1.png'),
-});
+function FlowShortcut({
+  flow,
+  label,
+  value,
+  onPress,
+  styles,
+  tokens,
+}: FlowShortcutProps) {
+  const reducedMotion = useReducedMotion();
+  const income = flow === 'income';
+  const accent = income ? tokens.status.positive : tokens.status.risk;
+  const onAccent = income ? tokens.status.onPositive : tokens.status.onRisk;
+  const valueColor = income ? tokens.status.positiveText : tokens.status.riskText;
 
-function FlowButtonGlyph({ flow, styles }: FlowButtonGlyphProps) {
   return (
-    <View
-      accessibilityElementsHidden
-      importantForAccessibility="no-hide-descendants"
-      style={styles.flowAssetFrame}
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${label}. ${value.accessibilityLabel}.`}
+      accessibilityHint={`Abre Lançamentos neste período com o filtro de ${label.toLocaleLowerCase('pt-BR')}.`}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.flowShortcut,
+        pressed && (reducedMotion ? styles.pressedReduced : styles.pressed),
+      ]}
     >
-      <Image
-        accessible={false}
-        fadeDuration={primitives.motion.duration.instant}
-        resizeMode="contain"
-        source={FLOW_ASSETS[flow]}
-        style={styles.flowAsset}
-      />
-    </View>
+      <View accessibilityElementsHidden style={[styles.flowIndicator, { backgroundColor: accent }]}>
+        <AppIcon
+          name={income ? 'arrow-up' : 'arrow-down'}
+          size={primitives.size.icon.xl}
+          color={onAccent}
+        />
+      </View>
+      <View style={styles.flowCopy}>
+        <Text style={styles.flowLabel}>{label}</Text>
+        <Text
+          maxFontSizeMultiplier={dynamicType.moneyMaxFontSizeMultiplier}
+          style={[styles.flowValue, { color: valueColor }]}
+        >
+          {value.text}
+        </Text>
+      </View>
+    </Pressable>
   );
 }
 
 export function DashboardHero({
   balance,
+  balanceLabel,
+  balanceHelper,
   income,
   expense,
   valuesVisible,
@@ -66,7 +99,6 @@ export function DashboardHero({
 }: DashboardHeroProps) {
   const { fontScale, width } = useWindowDimensions();
   const { tokens } = useAvioraTheme();
-  const reducedMotion = useReducedMotion();
   const styles = useMemo(() => createStyles(tokens), [tokens]);
   const unavailableValue = (value: string | null, label: string) => {
     if (value) return financialValuePresentation(value, valuesVisible);
@@ -76,98 +108,66 @@ export function DashboardHero({
   const balanceValue = unavailableValue(balance, 'Saldo ainda não informado');
   const incomeValue = unavailableValue(income, 'Sem receitas realizadas');
   const expenseValue = unavailableValue(expense, 'Sem despesas realizadas');
-  const reflow = fontScale >= dynamicType.metricReflowFontScale || width < 380;
+  const reflow = fontScale >= dynamicType.metricReflowFontScale || width < 350;
 
   return (
-    <Card tone="raised" style={styles.hero}>
-      <LinearGradient
-        colors={[tokens.background.surfaceMuted, tokens.background.surface]}
-        end={{ x: 0.9, y: 1 }}
-        pointerEvents="none"
-        start={{ x: 0.1, y: 0 }}
-        style={styles.heroBackdrop}
+    <View style={styles.hero}>
+      <View
+        accessible
+        accessibilityRole="summary"
+        accessibilityLabel={`${balanceLabel}. ${balanceValue.accessibilityLabel}. ${balanceHelper}.`}
+        style={styles.balance}
+      >
+        <Text style={styles.balanceLabel}>{balanceLabel}</Text>
+        <Text
+          maxFontSizeMultiplier={dynamicType.moneyMaxFontSizeMultiplier}
+          style={styles.balanceValue}
+        >
+          {balanceValue.text}
+        </Text>
+      </View>
+      <IconButton
+        icon={valuesVisible ? 'eye-off' : 'eye'}
+        label={valuesVisible ? 'Ocultar valores da Principal' : 'Mostrar valores da Principal'}
+        onPress={onToggleValues}
+        variant="ghost"
       />
-      <View accessibilityElementsHidden pointerEvents="none" style={styles.heroHighlight} />
-      <View style={styles.balance}>
-        <View style={styles.balanceHeader}>
-          <Text style={styles.balanceLabel}>Saldo atual em contas</Text>
-          <IconButton
-            icon={valuesVisible ? 'eye-off' : 'eye'}
-            label={valuesVisible ? 'Ocultar valores da Principal' : 'Mostrar valores da Principal'}
-            onPress={onToggleValues}
-            variant="ghost"
-          />
-        </View>
-        <View
-          accessible
-          accessibilityRole="summary"
-          accessibilityLabel={`Saldo atual em contas. ${balanceValue.accessibilityLabel}.`}
-        >
-          <Text maxFontSizeMultiplier={dynamicType.moneyMaxFontSizeMultiplier} style={styles.balanceValue}>{balanceValue.text}</Text>
-        </View>
-      </View>
 
-      <View style={styles.heroDivider} />
-
-      <View style={[styles.shortcuts, reflow && styles.shortcutsReflow]}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`Receitas realizadas. ${incomeValue.accessibilityLabel}.`}
-          accessibilityHint="Abre Lançamentos neste período com o filtro de receitas."
+      <View style={[styles.flows, reflow && styles.flowsReflow]}>
+        <FlowShortcut
+          flow="income"
+          label="Receitas"
+          value={incomeValue}
           onPress={onIncomePress}
-          style={({ pressed }) => [styles.shortcut, reflow && styles.shortcutReflow, pressed && (reducedMotion ? styles.pressedReduced : styles.pressed)]}
-        >
-          <FlowButtonGlyph flow="income" styles={styles} />
-          <View style={styles.shortcutCopy}>
-            <Text style={[styles.shortcutLabel, styles.incomeLabel]}>Receitas</Text>
-            <Text maxFontSizeMultiplier={dynamicType.moneyMaxFontSizeMultiplier} style={[styles.shortcutValue, styles.incomeValue]}>{incomeValue.text}</Text>
-          </View>
-        </Pressable>
-
-        {!reflow ? <View accessibilityElementsHidden style={styles.shortcutDivider} /> : null}
-
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`Despesas realizadas. ${expenseValue.accessibilityLabel}.`}
-          accessibilityHint="Abre Lançamentos neste período com o filtro de despesas."
+          styles={styles}
+          tokens={tokens}
+        />
+        <FlowShortcut
+          flow="expense"
+          label="Despesas"
+          value={expenseValue}
           onPress={onExpensePress}
-          style={({ pressed }) => [styles.shortcut, reflow && styles.shortcutReflow, pressed && (reducedMotion ? styles.pressedReduced : styles.pressed)]}
-        >
-          <FlowButtonGlyph flow="expense" styles={styles} />
-          <View style={styles.shortcutCopy}>
-            <Text style={[styles.shortcutLabel, styles.expenseLabel]}>Despesas</Text>
-            <Text maxFontSizeMultiplier={dynamicType.moneyMaxFontSizeMultiplier} style={[styles.shortcutValue, styles.expenseValue]}>{expenseValue.text}</Text>
-          </View>
-        </Pressable>
+          styles={styles}
+          tokens={tokens}
+        />
       </View>
-    </Card>
+    </View>
   );
 }
 
 function createStyles(tokens: ThemeTokens) {
   return StyleSheet.create({
-    hero: { position: 'relative', gap: spacing.md, paddingHorizontal: spacing.lg, paddingVertical: spacing.lg, backgroundColor: tokens.background.surface },
-    heroBackdrop: { position: 'absolute', top: primitives.space.none, right: primitives.space.none, bottom: primitives.space.none, left: primitives.space.none, borderRadius: primitives.radius.lg },
-    heroHighlight: { position: 'absolute', top: primitives.space.none, right: spacing.lg, left: spacing.lg, height: StyleSheet.hairlineWidth, borderRadius: primitives.radius.pill, backgroundColor: tokens.brand.accent, opacity: primitives.opacity.subtle },
-    balance: { alignItems: 'stretch', gap: spacing.xs },
-    balanceHeader: { minHeight: primitives.size.touch.default, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
-    balanceLabel: { ...textStyles.bodySmall, flex: 1, color: tokens.text.secondary, textAlign: 'left' },
-    balanceValue: { ...textStyles.moneyXL, maxWidth: '100%', color: tokens.text.primary, textAlign: 'left' },
-    heroDivider: { width: '100%', height: StyleSheet.hairlineWidth, backgroundColor: tokens.border.default },
-    shortcuts: { flexDirection: 'row', alignItems: 'stretch', justifyContent: 'space-between', gap: spacing.xs },
-    shortcutsReflow: { flexDirection: 'column' },
-    shortcut: { minHeight: primitives.size.touch.comfortable, flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start', gap: spacing.xs, paddingHorizontal: spacing.xxs, paddingVertical: spacing.sm, borderRadius: primitives.radius.md },
-    shortcutReflow: { width: '100%', minHeight: primitives.size.touch.comfortable },
-    shortcutDivider: { width: StyleSheet.hairlineWidth, alignSelf: 'stretch', marginVertical: spacing.xs, backgroundColor: tokens.border.default },
-    flowAssetFrame: { width: primitives.size.touch.comfortable + spacing.xs, height: primitives.size.touch.comfortable + spacing.xs, flexShrink: 0, alignItems: 'center', justifyContent: 'center' },
-    flowAsset: { width: '100%', height: '100%' },
-    shortcutCopy: { flex: 1, minWidth: 0, alignItems: 'flex-start', gap: spacing.xxs },
-    shortcutLabel: { ...textStyles.caption, color: tokens.text.secondary, textTransform: 'uppercase', letterSpacing: primitives.typography.letterSpacing.label },
-    incomeLabel: { color: tokens.status.positiveText },
-    expenseLabel: { color: tokens.status.riskText },
-    shortcutValue: { ...textStyles.moneyM, flexShrink: 1 },
-    incomeValue: { color: tokens.status.positiveText },
-    expenseValue: { color: tokens.status.riskText },
+    hero: { alignItems: 'center', gap: spacing.md },
+    balance: { maxWidth: '100%', alignItems: 'center', gap: spacing.xs },
+    balanceLabel: { ...textStyles.bodySmall, color: tokens.text.secondary, textAlign: 'center' },
+    balanceValue: { ...textStyles.moneyXL, maxWidth: '100%', color: tokens.text.primary, textAlign: 'center' },
+    flows: { width: '100%', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.xl, paddingTop: spacing.sm },
+    flowsReflow: { flexDirection: 'column', alignItems: 'stretch', gap: spacing.sm },
+    flowShortcut: { minWidth: 0, minHeight: primitives.size.touch.comfortable, flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, paddingVertical: spacing.xs, borderRadius: primitives.radius.md },
+    flowIndicator: { width: componentTokens.dashboard.flowIndicatorSize, height: componentTokens.dashboard.flowIndicatorSize, flexShrink: 0, alignItems: 'center', justifyContent: 'center', borderRadius: componentTokens.dashboard.flowIndicatorSize / 2 },
+    flowCopy: { minWidth: 0, gap: spacing.xxs },
+    flowLabel: { ...textStyles.bodySmall, color: tokens.text.secondary },
+    flowValue: { ...textStyles.moneyM, flexShrink: 1 },
     pressed: { opacity: primitives.opacity.pressed, transform: [{ scale: primitives.motion.pressedScale }] },
     pressedReduced: { opacity: primitives.opacity.pressed },
   });

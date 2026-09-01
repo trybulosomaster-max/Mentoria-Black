@@ -46,7 +46,7 @@ export default function TransactionsScreen() {
     if (!data) return [];
     const normalized = query.trim().toLocaleLowerCase('pt-BR');
     return data.transactions.filter((transaction) => matchesFilter(transaction, filter)
-      && transactionMatchesDashboardFlow(transaction, intent?.flow ?? null, data.generatedAt)
+      && transactionMatchesDashboardFlow(transaction, intent?.flow ?? null, data.financialAsOfDate)
       && (!normalized || [transaction.description, transaction.category, transaction.subcategory].some((value) => String(value ?? '').toLocaleLowerCase('pt-BR').includes(normalized))));
   }, [data, filter, intent?.flow, query]);
 

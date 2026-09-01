@@ -46,11 +46,13 @@ export function MonthSelector({
   onChange,
   expanded,
   onExpandedChange,
+  embedded = false,
 }: Readonly<{
   period: CalendarMonth;
   onChange(period: CalendarMonth): void;
   expanded: boolean;
   onExpandedChange(expanded: boolean): void;
+  embedded?: boolean;
 }>) {
   const { width } = useWindowDimensions();
   const layout = useResponsiveLayout();
@@ -134,9 +136,9 @@ export function MonthSelector({
           if (event.nativeEvent.actionName === 'increment') move(1);
         }}
         onPress={() => onExpandedChange(!expanded)}
-        style={({ pressed }) => [styles.trigger, pressed && styles.triggerPressed]}
+        style={({ pressed }) => [styles.trigger, embedded && styles.triggerEmbedded, pressed && styles.triggerPressed]}
       >
-        <AppIcon name="calendar" size={primitives.size.icon.sm} color={tokens.text.secondary} />
+        {!embedded ? <AppIcon name="calendar" size={primitives.size.icon.sm} color={tokens.text.secondary} /> : null}
         <Text accessibilityRole="header" maxFontSizeMultiplier={dynamicType.headingMaxFontSizeMultiplier} style={styles.title}>
           {calendarMonthName(period)} <Text style={styles.titleYear}>{period.year}</Text>
         </Text>
@@ -208,6 +210,7 @@ function createStyles(tokens: ThemeTokens) {
   return StyleSheet.create({
     container: { gap: spacing.sm },
     trigger: { minHeight: primitives.size.touch.comfortable, alignSelf: 'center', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, paddingHorizontal: spacing.md, borderRadius: primitives.radius.pill, borderWidth: StyleSheet.hairlineWidth, borderColor: tokens.border.default, backgroundColor: tokens.background.surface },
+    triggerEmbedded: { borderColor: primitives.color.transparent, backgroundColor: primitives.color.transparent },
     triggerPressed: { opacity: primitives.opacity.pressed },
     title: { ...textStyles.section, color: tokens.text.primary, textAlign: 'center' },
     titleYear: { ...textStyles.bodySmall, color: tokens.text.secondary },

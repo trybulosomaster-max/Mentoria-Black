@@ -133,6 +133,63 @@ const forbiddenWrites = ['.insert(', '.update(', '.upsert(', '.delete(', '.rpc('
 if (!forbiddenWrites.length) ok('gate:read-repository-has-no-write');
 else fail('gate:read-repository-has-no-write', forbiddenWrites.join(', '));
 
+const dashboardSources = combined.filter(({ file }) => file.startsWith('src/features/dashboard/'));
+const dashboardBoundaryViolations = dashboardSources.flatMap(({ file, source }) => {
+  const sourceFile = ts.createSourceFile(
+    file,
+    source,
+    ts.ScriptTarget.ES2022,
+    true,
+    file.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
+  );
+  const violations = [];
+  const hasRuntimeSupabaseImport = sourceFile.statements.some((statement) => (
+    ts.isImportDeclaration(statement)
+    && ts.isStringLiteral(statement.moduleSpecifier)
+    && /supabase/i.test(statement.moduleSpecifier.text)
+    && statement.importClause?.isTypeOnly !== true
+  ));
+  if (hasRuntimeSupabaseImport) violations.push('import Supabase em runtime');
+  if (/(?:require|import)\s*\(\s*['"][^'"]*supabase/i.test(source)) {
+    violations.push('import Supabase dinâmico');
+  }
+  if (/\b(?:requireSupabaseClient|getSupabaseClient|createClient|supabaseAdmin)\b/.test(source)) {
+    violations.push('acesso a cliente Supabase');
+  }
+  const operations = new Set();
+  function collectDatabaseOperations(node) {
+    if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)) {
+      const operation = node.expression.name.text;
+      const receiver = node.expression.expression;
+      const isNativeArrayFrom = operation === 'from'
+        && ts.isIdentifier(receiver)
+        && receiver.text === 'Array';
+      if (
+        !isNativeArrayFrom
+        && ['from', 'rpc', 'insert', 'update', 'upsert', 'delete'].includes(operation)
+      ) {
+        operations.add(`.${operation}(`);
+      }
+    }
+    ts.forEachChild(node, collectDatabaseOperations);
+  }
+  collectDatabaseOperations(sourceFile);
+  if (operations.size) violations.push(...operations);
+  return violations.length ? [{ file, violations }] : [];
+});
+if (dashboardSources.length && !dashboardBoundaryViolations.length) {
+  ok('gate:dashboard-read-only-boundary', `${dashboardSources.length} arquivos`);
+} else if (!dashboardSources.length) {
+  fail('gate:dashboard-read-only-boundary', 'nenhum arquivo encontrado em src/features/dashboard');
+} else {
+  fail(
+    'gate:dashboard-read-only-boundary',
+    dashboardBoundaryViolations
+      .map(({ file, violations }) => `${file}: ${violations.join(', ')}`)
+      .join(' | '),
+  );
+}
+
 const components = await readFile(path.join(root, 'src/design-system/components.tsx'), 'utf8');
 const designTokens = await readFile(path.join(root, 'src/design-system/tokens.ts'), 'utf8');
 if (
